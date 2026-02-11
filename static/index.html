@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TPL Signum - CNC Safety Monitor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+    background: #111; color: #eee; height: 100vh; display: flex; flex-direction: column;
+    overflow: hidden; user-select: none;
+  }
+
+  /* --- Status Strip --- */
+  #status-strip {
+    height: 3.5rem; display: flex; align-items: center; padding: 0 1.5rem;
+    transition: background-color 0.3s; flex-shrink: 0; gap: 1rem;
+  }
+  #status-strip.clear { background: #1a5c2a; }
+  #status-strip.alarm { background: #b91c1c; animation: pulse-red 0.8s ease-in-out infinite alternate; }
+  #status-strip.comm_loss { background: #a16207; }
+  #status-strip.disconnected { background: #374151; }
+  @keyframes pulse-red { from { background: #b91c1c; } to { background: #7f1d1d; } }
+
+  #status-label {
+    font-size: 1.4rem; font-weight: 900; text-transform: uppercase;
+    letter-spacing: 0.08em; text-shadow: 0 1px 8px rgba(0,0,0,0.4);
+  }
+  #status-detail { font-size: 0.9rem; opacity: 0.8; }
+  #ack-btn {
+    display: none; margin-left: auto; padding: 0.4rem 1.5rem;
+    font-size: 0.9rem; font-weight: 700; background: #fff; color: #b91c1c;
+    border: none; border-radius: 6px; cursor: pointer; text-transform: uppercase;
+  }
+  #ack-btn:hover { background: #ddd; }
+  #ack-btn.visible { display: block; }
+
+  /* --- Map Area --- */
+  #map-area {
+    flex: 1; position: relative; min-height: 0;
+    border-top: 1px solid #222; border-bottom: 1px solid #222;
+  }
+  #map { width: 100%; height: 100%; }
+
+  /* Leaflet marker overrides */
+  .sensor-marker {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; width: 48px !important; height: 48px !important;
+    margin-left: -24px !important; margin-top: -24px !important;
+    font-weight: 900; font-size: 16px; color: #fff;
+    border: 3px solid; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: transform 0.15s;
+  }
+  .sensor-marker:hover { transform: scale(1.15); }
+  .sensor-marker.controller { background: #1e3a5f; border-color: #3b82f6; }
+  .sensor-marker.relay { background: #3b2f1e; border-color: #f59e0b; }
+  .sensor-marker.detector { background: #1e3a2f; border-color: #22c55e; }
+
+  .sensor-tooltip {
+    background: #1e293b !important; color: #e2e8f0 !important; border: 1px solid #475569 !important;
+    border-radius: 6px !important; padding: 4px 8px !important; font-size: 11px !important;
+    font-family: monospace !important; box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+  }
+  .sensor-tooltip::before { border-top-color: #475569 !important; }
+
+  .ellipse-label-div {
+    font-size: 12px; font-weight: 600; color: #f87171; text-align: center;
+    white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    pointer-events: none;
+  }
+  .ellipse-label-div.off { color: #888; }
+
+  /* --- Event Log --- */
+  #event-log-container {
+    height: 22vh; background: #1a1a2e; border-top: 2px solid #333;
+    display: flex; flex-direction: column;
+  }
+  #event-log-header {
+    padding: 0.3rem 1rem; background: #16213e; font-size: 0.8rem;
+    font-weight: 600; color: #888; flex-shrink: 0;
+  }
+  #event-log {
+    flex: 1; overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem; min-height: 0;
+  }
+  .event-row {
+    padding: 0.2rem 1rem; border-bottom: 1px solid #1a1a2e;
+    display: flex; gap: 1rem; align-items: baseline;
+  }
+  .event-row:nth-child(odd) { background: rgba(255,255,255,0.02); }
+  .event-row .time { color: #666; min-width: 9ch; flex-shrink: 0; }
+  .event-row .type { font-weight: 600; min-width: 12ch; flex-shrink: 0; }
+  .event-row .detail { color: #aaa; }
+  .event-row.detection .type { color: #f87171; }
+  .event-row.comm_loss .type { color: #fbbf24; }
+  .event-row.connected .type { color: #34d399; }
+  .event-row.disconnected-event .type { color: #fb923c; }
+
+  /* --- Toolbar --- */
+  #toolbar {
+    height: 2.8rem; background: #0f0f23; border-top: 1px solid #333;
+    display: flex; align-items: center; padding: 0 1rem; gap: 0.75rem; flex-shrink: 0;
+  }
+  .tb-btn {
+    padding: 0.3rem 0.9rem; background: #1e293b; color: #94a3b8;
+    border: 1px solid #334155; border-radius: 4px; cursor: pointer;
+    font-size: 0.75rem; font-weight: 500;
+  }
+  .tb-btn:hover { background: #334155; color: #e2e8f0; }
+  .tb-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+  #conn-indicator {
+    margin-left: auto; display: flex; align-items: center; gap: 0.4rem;
+    font-size: 0.7rem; color: #666;
+  }
+  #conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+  #conn-dot.ok { background: #22c55e; }
+  #conn-dot.err { background: #ef4444; }
+
+  /* --- Modals --- */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 10000; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #1e293b; border: 1px solid #475569; border-radius: 12px;
+    padding: 2rem; min-width: 380px; max-width: 90vw;
+  }
+  .modal h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: #e2e8f0; }
+  .modal label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.3rem; }
+  .modal input[type="range"] { width: 100%; margin-bottom: 0.2rem; }
+  .field { margin-bottom: 1.2rem; }
+  .field-value { font-size: 0.9rem; color: #e2e8f0; font-weight: 600; text-align: right; }
+  .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+  .modal-actions button {
+    padding: 0.5rem 1.5rem; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 0.85rem; font-weight: 600;
+  }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-secondary { background: #475569; color: #e2e8f0; }
+  .btn-secondary:hover { background: #64748b; }
+  .toggle-group {
+    display: flex; gap: 0; border-radius: 6px; overflow: hidden; border: 1px solid #475569;
+  }
+  .toggle-group button {
+    flex: 1; padding: 0.5rem 1rem; border: none; background: #1e293b;
+    color: #94a3b8; cursor: pointer; font-size: 0.8rem; font-weight: 600;
+  }
+  .toggle-group button.active { background: #3b82f6; color: #fff; }
+  .map-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .map-table th { text-align: left; padding: 0.4rem 0.6rem; color: #94a3b8; border-bottom: 1px solid #475569; }
+  .map-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #334155; }
+  .map-table .rssi-good { color: #34d399; }
+  .map-table .rssi-ok { color: #fbbf24; }
+  .map-table .rssi-bad { color: #f87171; }
+  .peers-list { font-size: 0.75rem; color: #94a3b8; }
+
+  /* --- Location Modal --- */
+  #location-modal .modal { min-width: 340px; }
+  #location-input {
+    width: 100%; padding: 0.6rem 0.8rem; font-size: 1.1rem; font-family: monospace;
+    background: #0f172a; color: #e2e8f0; border: 1px solid #475569; border-radius: 6px;
+    text-align: center; letter-spacing: 0.05em;
+  }
+  #location-input:focus { outline: none; border-color: #3b82f6; }
+  #location-input::placeholder { color: #475569; font-size: 0.85rem; letter-spacing: 0; }
+  .location-hint { font-size: 0.75rem; color: #64748b; margin-top: 0.5rem; line-height: 1.5; }
+  .location-current { font-size: 0.8rem; color: #94a3b8; margin-bottom: 1rem; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<!-- Status Strip -->
+<div id="status-strip" class="disconnected">
+  <div id="status-label">Connecting...</div>
+  <div id="status-detail"></div>
+  <button id="ack-btn" onclick="acknowledge()">Acknowledge</button>
+</div>
+
+<!-- Map Area -->
+<div id="map-area">
+  <div id="map"></div>
+</div>
+
+<!-- Event Log -->
+<div id="event-log-container">
+  <div id="event-log-header">Event Log</div>
+  <div id="event-log"></div>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <button class="tb-btn" onclick="openSettings()">Settings</button>
+  <button class="tb-btn" onclick="requestMap()">Map</button>
+  <button class="tb-btn" id="mute-btn" onclick="toggleMute()">Mute</button>
+  <div id="conn-indicator">
+    <div id="conn-dot"></div>
+    <span id="conn-label">Disconnected</span>
+  </div>
+</div>
+
+<!-- Location Modal -->
+<div class="modal-overlay" id="location-modal">
+  <div class="modal">
+    <h2>Set Location</h2>
+    <div class="location-current">Current: <span id="current-coords"></span></div>
+    <input type="text" id="location-input" placeholder="e.g. 32.0801, 34.7800" autofocus>
+    <div class="location-hint">
+      Accepts: <b>lat, lng</b> &nbsp;|&nbsp; <b>lat lng</b> &nbsp;|&nbsp; <b>12 digits</b> (6+6, e.g. 320801347800)
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeLocation()">Cancel</button>
+      <button class="btn-primary" onclick="applyLocation()">Go</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h2>Settings</h2>
+    <div class="field">
+      <label>Detection Threshold</label>
+      <input type="range" id="threshold-slider" min="50" max="2000" step="10" value="500">
+      <div class="field-value" id="threshold-value">500</div>
+    </div>
+    <div class="field">
+      <label>Gain (filter strength)</label>
+      <input type="range" id="gain-slider" min="1" max="128" step="1" value="32">
+      <div class="field-value" id="gain-value">32</div>
+    </div>
+    <div class="field">
+      <label>Alarm Mode</label>
+      <div class="toggle-group" id="alarm-mode-toggle">
+        <button class="active" data-mode="auto" onclick="setAlarmModeUI('auto')">Auto-Reset</button>
+        <button data-mode="manual" onclick="setAlarmModeUI('manual')">Manual Ack</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+      <button class="btn-primary" onclick="applySettings()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Map Modal -->
+<div class="modal-overlay" id="map-modal">
+  <div class="modal" style="min-width: 500px">
+    <h2>System Map</h2>
+    <div id="map-content"><p style="color:#666">Requesting map data...</p></div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="closeMap()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// State
+// =====================================================
+let ws = null;
+let alarmState = 'disconnected';
+let alarmMode = 'auto';
+let detectionEnabled = true;
+let muted = false;
+let audioCtx = null;
+let alarmOsc = null;
+let alarmGainNode = null;
+let mapData = [];
+let pendingAlarmMode = 'auto';
+let lastDetection = null;
+let lastDetectionTime = 0;
+
+// Sensor definitions
+const SENSORS = {
+  1:  { id: 1,  role: 'USB Controller', type: 'controller' },
+  2:  { id: 2,  role: 'Mesh Relay',     type: 'relay' },
+  11: { id: 11, role: 'Detector A',     type: 'detector' },
+  12: { id: 12, role: 'Detector B',     type: 'detector' },
+};
+
+const SENSOR_COLORS = { controller: '#3b82f6', relay: '#f59e0b', detector: '#22c55e' };
+const SENSOR_BG     = { controller: '#1e3a5f', relay: '#3b2f1e', detector: '#1e3a2f' };
+
+const DETECTION_PAIRS = [{ a: 11, b: 12 }];
+
+// Default lat/lng positions (near center of map)
+const DEFAULT_MAP_CENTER = [32.08, 34.78]; // Tel Aviv area - change to your location
+const DEFAULT_ZOOM = 18;
+const DEFAULT_LATLNGS = {
+  1:  [32.08010, 34.78000],
+  2:  [32.08010, 34.78020],
+  11: [32.08020, 34.78040],
+  12: [32.08000, 34.78040],
+};
+
+// =====================================================
+// Leaflet Map
+// =====================================================
+let leafletMap = null;
+let sensorMarkers = {};   // id -> L.marker
+let meshLines = [];       // L.polyline[]
+let ellipseOverlay = null; // L.polygon (approximated ellipse)
+let ellipseLabelMarker = null;
+let sensorLatlngs = {};   // id -> [lat, lng]
+
+function initMap() {
+  // Load saved positions
+  const saved = localStorage.getItem('tpl_sensor_latlngs');
+  if (saved) {
+    try {
+      sensorLatlngs = JSON.parse(saved);
+    } catch { /* ignore */ }
+  }
+  for (const [id, def] of Object.entries(DEFAULT_LATLNGS)) {
+    if (!sensorLatlngs[id]) sensorLatlngs[id] = def;
+  }
+
+  // Load saved map view
+  const savedView = localStorage.getItem('tpl_map_view');
+  let center = DEFAULT_MAP_CENTER, zoom = DEFAULT_ZOOM;
+  if (savedView) {
+    try {
+      const v = JSON.parse(savedView);
+      center = v.center; zoom = v.zoom;
+    } catch { /* ignore */ }
+  }
+
+  leafletMap = L.map('map', {
+    center, zoom,
+    zoomControl: true,
+    attributionControl: false,
+  });
+
+  // Satellite tile layer (Esri)
+  const satellite = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 22, maxNativeZoom: 19,
+  });
+
+  // Street map layer (OpenStreetMap)
+  const streets = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 22, maxNativeZoom: 19,
+  });
+
+  // Dark layer
+  const dark = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 22, maxNativeZoom: 20,
+  });
+
+  // Default to satellite
+  satellite.addTo(leafletMap);
+
+  L.control.layers({
+    'Satellite': satellite,
+    'Streets': streets,
+    'Dark': dark,
+  }, null, { position: 'topright' }).addTo(leafletMap);
+
+  // Save view on move
+  leafletMap.on('moveend', () => {
+    localStorage.setItem('tpl_map_view', JSON.stringify({
+      center: [leafletMap.getCenter().lat, leafletMap.getCenter().lng],
+      zoom: leafletMap.getZoom(),
+    }));
+  });
+
+  // Create sensor markers
+  for (const [id, sensor] of Object.entries(SENSORS)) {
+    createSensorMarker(id, sensor);
+  }
+
+  renderOverlays();
+}
+
+function createSensorMarker(id, sensor) {
+  const latlng = sensorLatlngs[id];
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="sensor-marker ${sensor.type}">${sensor.id}</div>`,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+  });
+
+  const marker = L.marker(latlng, {
+    icon, draggable: true, zIndexOffset: 1000,
+  }).addTo(leafletMap);
+
+  // Tooltip with role and info
+  marker.bindTooltip(buildTooltip(sensor), {
+    className: 'sensor-tooltip', direction: 'top', offset: [0, -28],
+  });
+
+  marker.on('dragend', () => {
+    const pos = marker.getLatLng();
+    sensorLatlngs[id] = [pos.lat, pos.lng];
+    saveMapPositions();
+    renderOverlays();
+  });
+
+  marker.on('drag', () => {
+    const pos = marker.getLatLng();
+    sensorLatlngs[id] = [pos.lat, pos.lng];
+    renderOverlays();
+  });
+
+  // Click Unit 1 (controller) to set location
+  if (sensor.type === 'controller') {
+    marker.on('click', () => openLocation());
+  }
+
+  sensorMarkers[id] = marker;
+}
+
+function buildTooltip(sensor) {
+  const mapUnit = mapData.find(u => u.unit_id === sensor.id);
+  let text = `<b>${sensor.role}</b>`;
+  if (mapUnit) {
+    text += `<br>${(mapUnit.voltage/1000).toFixed(2)}V | gain:${mapUnit.gain}`;
+  }
+  return text;
+}
+
+function updateTooltips() {
+  for (const [id, sensor] of Object.entries(SENSORS)) {
+    if (sensorMarkers[id]) {
+      sensorMarkers[id].setTooltipContent(buildTooltip(sensor));
+    }
+  }
+}
+
+function saveMapPositions() {
+  localStorage.setItem('tpl_sensor_latlngs', JSON.stringify(sensorLatlngs));
+}
+
+// =====================================================
+// Overlays: mesh lines + detection ellipse
+// =====================================================
+function renderOverlays() {
+  // Clear existing
+  meshLines.forEach(l => leafletMap.removeLayer(l));
+  meshLines = [];
+  if (ellipseOverlay) { leafletMap.removeLayer(ellipseOverlay); ellipseOverlay = null; }
+  if (ellipseLabelMarker) { leafletMap.removeLayer(ellipseLabelMarker); ellipseLabelMarker = null; }
+
+  // Mesh lines
+  const conns = getAllConnections();
+  for (const conn of conns) {
+    const la = sensorLatlngs[conn.a];
+    const lb = sensorLatlngs[conn.b];
+    if (!la || !lb) continue;
+
+    const line = L.polyline([la, lb], {
+      color: '#475569', weight: 1.5, dashArray: '6 4', opacity: 0.6,
+    }).addTo(leafletMap);
+
+    if (conn.rssi !== null) {
+      const mid = [(la[0]+lb[0])/2, (la[1]+lb[1])/2];
+      const tip = L.tooltip({ permanent: true, direction: 'center', className: 'sensor-tooltip' })
+        .setLatLng(mid).setContent(`${conn.rssi}dBm`).addTo(leafletMap);
+      meshLines.push(tip);
+    }
+
+    meshLines.push(line);
+  }
+
+  // Detection ellipse for each pair
+  for (const pair of DETECTION_PAIRS) {
+    const la = sensorLatlngs[pair.a];
+    const lb = sensorLatlngs[pair.b];
+    if (!la || !lb) continue;
+
+    const isOn = detectionEnabled;
+    const isRecent = isOn && alarmState === 'alarm' && lastDetection &&
+      (Date.now() - lastDetectionTime < 5000);
+
+    // Compute ellipse points
+    const cx = (la[0]+lb[0])/2, cy = (la[1]+lb[1])/2;
+    const dx = lb[0]-la[0], dy = lb[1]-la[1];
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const angle = Math.atan2(dy, dx);
+
+    const rx = dist/2 * 1.5;  // major radius
+    const ry = dist/2 * 0.6;  // minor radius
+
+    // Generate ellipse polygon points
+    const pts = [];
+    for (let i = 0; i <= 64; i++) {
+      const t = (i/64) * 2 * Math.PI;
+      const ex = rx * Math.cos(t);
+      const ey = ry * Math.sin(t);
+      // Rotate
+      const rx2 = ex * Math.cos(angle) - ey * Math.sin(angle);
+      const ry2 = ex * Math.sin(angle) + ey * Math.cos(angle);
+      pts.push([cx + rx2, cy + ry2]);
+    }
+
+    const color = isRecent ? '#ef4444' : isOn ? '#ef4444' : '#888';
+    const fillOpacity = isRecent ? 0.15 : isOn ? 0.06 : 0.03;
+    const weight = isRecent ? 3 : 2;
+    const dashArray = isOn ? '8 4' : '4 4';
+
+    ellipseOverlay = L.polygon(pts, {
+      color, weight, dashArray, fillColor: color, fillOpacity,
+      className: isRecent ? 'ellipse-active-anim' : '',
+    }).addTo(leafletMap);
+
+    // Click to toggle
+    ellipseOverlay.on('click', (e) => {
+      L.DomEvent.stopPropagation(e);
+      send({ cmd: 'toggle_detection' });
+    });
+
+    // Label
+    const labelText = isOn ? (isRecent ? 'INTRUSION!' : 'Detection Zone') : 'Detection OFF (click to enable)';
+    const labelIcon = L.divIcon({
+      className: '',
+      html: `<div class="ellipse-label-div ${isOn ? '' : 'off'}">${labelText}<br><span style="font-size:10px;color:#666">click ellipse to toggle</span></div>`,
+      iconSize: [200, 40],
+      iconAnchor: [100, 40],
+    });
+    // Place label above ellipse center
+    const labelLat = cx + rx * Math.sin(angle) * 0.3 + ry * Math.cos(angle) * 1.1;
+    const labelLng = cy - rx * Math.cos(angle) * 0.3 + ry * Math.sin(angle) * 1.1;
+    ellipseLabelMarker = L.marker([labelLat, labelLng], {
+      icon: labelIcon, interactive: false, zIndexOffset: 500,
+    }).addTo(leafletMap);
+  }
+}
+
+function getAllConnections() {
+  const conns = [];
+  const seen = new Set();
+  if (mapData.length > 0) {
+    for (const unit of mapData) {
+      for (const peer of unit.peers) {
+        const key = [Math.min(unit.unit_id, peer.id), Math.max(unit.unit_id, peer.id)].join('-');
+        if (!seen.has(key)) { seen.add(key); conns.push({ a: unit.unit_id, b: peer.id, rssi: peer.rssi }); }
+      }
+    }
+  } else {
+    [[1,2],[2,11],[2,12],[11,12],[1,11]].forEach(([a,b]) => conns.push({ a, b, rssi: null }));
+  }
+  return conns;
+}
+
+// =====================================================
+// WebSocket
+// =====================================================
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onopen = () => updateConnection(true);
+  ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
+  ws.onclose = () => { updateConnection(false); setTimeout(connect, 2000); };
+  ws.onerror = () => ws.close();
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'status':
+      detectionEnabled = msg.detection_enabled;
+      updateAlarmState(msg.alarm_state);
+      alarmMode = msg.alarm_mode;
+      updateAlarmModeUI();
+      updateConnection(msg.serial_connected);
+      renderOverlays();
+      break;
+    case 'detection':
+      lastDetection = msg;
+      lastDetectionTime = Date.now();
+      updateAlarmState(alarmState);
+      addEventRow('detection', msg.timestamp, `Units ${msg.unit_a}-${msg.unit_b}  val:${msg.value} th:${msg.threshold} c:${msg.count}`);
+      renderOverlays();
+      break;
+    case 'comm_loss':
+      addEventRow('comm_loss', msg.timestamp, `COMM LOSS ${msg.unit_a}-${msg.unit_b}`);
+      break;
+    case 'connected': {
+      const evtType = msg.connected ? 'connected' : 'disconnected-event';
+      const label = msg.connected ? 'CONNECTED' : 'DISCONNECTED';
+      addEventRow(evtType, msg.timestamp, `${label} Unit ${msg.unit} \u2194 ${msg.peer}`);
+      break;
+    }
+    case 'map':
+      updateMapUnit(msg);
+      renderOverlays();
+      updateTooltips();
+      break;
+    case 'map_full':
+      mapData = msg.units;
+      renderOverlays();
+      updateTooltips();
+      break;
+  }
+}
+
+// =====================================================
+// Alarm State
+// =====================================================
+function updateAlarmState(newState) {
+  alarmState = newState;
+  const banner = document.getElementById('status-strip');
+  const label = document.getElementById('status-label');
+  const detail = document.getElementById('status-detail');
+  const ackBtn = document.getElementById('ack-btn');
+
+  banner.className = newState;
+
+  const labels = { clear: 'Clear', alarm: 'Intrusion Detected', comm_loss: 'Comm Loss', disconnected: 'Disconnected' };
+  label.textContent = labels[newState] || newState;
+
+  let detailText;
+  if (newState === 'alarm' && lastDetection) {
+    detailText = `Unit ${lastDetection.unit_a} \u2192 Unit ${lastDetection.unit_b}  |  val: ${lastDetection.value}  th: ${lastDetection.threshold}`;
+  } else {
+    const details = { clear: 'System operational', comm_loss: 'Communication lost between detection units', disconnected: 'Serial connection lost' };
+    detailText = details[newState] || '';
+  }
+  detail.textContent = detailText;
+
+  ackBtn.className = (newState === 'alarm' && alarmMode === 'manual') ? 'visible' : '';
+
+  if (newState === 'alarm' && !muted) startAlarm();
+  else stopAlarm();
+}
+
+// =====================================================
+// Event Log
+// =====================================================
+function addEventRow(type, timestamp, detail) {
+  const log = document.getElementById('event-log');
+  const row = document.createElement('div');
+  row.className = `event-row ${type}`;
+  const time = timestamp ? timestamp.split('T')[1]?.substring(0, 12) || '' : '';
+  const typeLabels = { detection: 'DETECTION', comm_loss: 'COMM LOSS', connected: 'CONNECTED', 'disconnected-event': 'DISCONNECTED' };
+  row.innerHTML = `<span class="time">${time}</span><span class="type">${typeLabels[type] || type}</span><span class="detail">${detail}</span>`;
+  log.insertBefore(row, log.firstChild);
+  while (log.children.length > 50) log.removeChild(log.lastChild);
+}
+
+// =====================================================
+// Connection Indicator
+// =====================================================
+function updateConnection(connected) {
+  document.getElementById('conn-dot').className = connected ? 'ok' : 'err';
+  document.getElementById('conn-label').textContent = connected ? 'Serial Connected' : 'Disconnected';
+}
+
+// =====================================================
+// Audio Alarm
+// =====================================================
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function startAlarm() {
+  initAudio();
+  if (alarmOsc) return;
+  alarmOsc = audioCtx.createOscillator();
+  alarmGainNode = audioCtx.createGain();
+  alarmOsc.type = 'square';
+  alarmOsc.frequency.value = 880;
+  alarmGainNode.gain.value = 0.15;
+  alarmOsc.connect(alarmGainNode);
+  alarmGainNode.connect(audioCtx.destination);
+  alarmOsc.start();
+  (function pulseAlarm() {
+    if (!alarmOsc) return;
+    const now = audioCtx.currentTime;
+    alarmOsc.frequency.setValueAtTime(880, now);
+    alarmOsc.frequency.setValueAtTime(440, now + 0.3);
+    setTimeout(pulseAlarm, 600);
+  })();
+}
+
+function stopAlarm() {
+  if (alarmOsc) { alarmOsc.stop(); alarmOsc.disconnect(); alarmOsc = null; alarmGainNode = null; }
+}
+
+function toggleMute() {
+  muted = !muted;
+  const btn = document.getElementById('mute-btn');
+  btn.textContent = muted ? 'Unmute' : 'Mute';
+  btn.classList.toggle('active', muted);
+  if (muted) stopAlarm();
+  else if (alarmState === 'alarm') startAlarm();
+}
+
+function acknowledge() { send({ cmd: 'acknowledge' }); }
+
+// =====================================================
+// Location
+// =====================================================
+function openLocation() {
+  const c = sensorLatlngs[1] || DEFAULT_LATLNGS[1];
+  document.getElementById('current-coords').textContent = `${c[0].toFixed(6)}, ${c[1].toFixed(6)}`;
+  document.getElementById('location-input').value = '';
+  document.getElementById('location-modal').classList.add('open');
+  setTimeout(() => document.getElementById('location-input').focus(), 100);
+}
+
+function closeLocation() {
+  document.getElementById('location-modal').classList.remove('open');
+}
+
+function parseCoords(input) {
+  const s = input.trim();
+
+  // Try "lat, lng" or "lat lng"
+  const sepMatch = s.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+  if (sepMatch) {
+    return [parseFloat(sepMatch[1]), parseFloat(sepMatch[2])];
+  }
+
+  // Try pure digits: 12 digits = 6 lat + 6 lng (e.g. 320801347800 → 32.0801, 34.7800)
+  const digits = s.replace(/[^0-9]/g, '');
+  if (digits.length === 12) {
+    const latStr = digits.substring(0, 6);
+    const lngStr = digits.substring(6, 12);
+    const lat = parseFloat(latStr.substring(0, 2) + '.' + latStr.substring(2));
+    const lng = parseFloat(lngStr.substring(0, 2) + '.' + lngStr.substring(2));
+    return [lat, lng];
+  }
+
+  // Try 12 digits with different lat/lng digit splits (3+3 for higher latitudes)
+  if (digits.length >= 10 && digits.length <= 14) {
+    // Heuristic: try splitting in half
+    const half = Math.floor(digits.length / 2);
+    const latStr = digits.substring(0, half);
+    const lngStr = digits.substring(half);
+    // Insert decimal after first 2 digits
+    const lat = parseFloat(latStr.substring(0, 2) + '.' + latStr.substring(2));
+    const lng = parseFloat(lngStr.substring(0, 2) + '.' + lngStr.substring(2));
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return [lat, lng];
+  }
+
+  return null;
+}
+
+function applyLocation() {
+  const input = document.getElementById('location-input').value;
+  const coords = parseCoords(input);
+  if (!coords || isNaN(coords[0]) || isNaN(coords[1])) {
+    document.getElementById('location-input').style.borderColor = '#ef4444';
+    setTimeout(() => document.getElementById('location-input').style.borderColor = '', 1500);
+    return;
+  }
+
+  const [newLat, newLng] = coords;
+
+  // Calculate offset from current Unit 1 position
+  const oldPos = sensorLatlngs[1] || DEFAULT_LATLNGS[1];
+  const dLat = newLat - oldPos[0];
+  const dLng = newLng - oldPos[1];
+
+  // Move all sensors by the same offset
+  for (const id of Object.keys(sensorLatlngs)) {
+    sensorLatlngs[id] = [
+      sensorLatlngs[id][0] + dLat,
+      sensorLatlngs[id][1] + dLng,
+    ];
+    if (sensorMarkers[id]) {
+      sensorMarkers[id].setLatLng(sensorLatlngs[id]);
+    }
+  }
+
+  saveMapPositions();
+  renderOverlays();
+
+  // Pan map to new location
+  leafletMap.setView([newLat, newLng], leafletMap.getZoom());
+
+  closeLocation();
+}
+
+// Enter key in location input
+document.getElementById('location-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') applyLocation();
+  if (e.key === 'Escape') closeLocation();
+});
+
+// =====================================================
+// Settings
+// =====================================================
+function openSettings() {
+  document.getElementById('threshold-slider').value = 500;
+  document.getElementById('threshold-value').textContent = '500';
+  document.getElementById('gain-slider').value = 32;
+  document.getElementById('gain-value').textContent = '32';
+  pendingAlarmMode = alarmMode;
+  updateAlarmModeToggle(pendingAlarmMode);
+  document.getElementById('settings-modal').classList.add('open');
+}
+function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+function setAlarmModeUI(mode) { pendingAlarmMode = mode; updateAlarmModeToggle(mode); }
+function updateAlarmModeToggle(mode) {
+  document.querySelectorAll('#alarm-mode-toggle button').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.mode === mode));
+}
+function updateAlarmModeUI() { pendingAlarmMode = alarmMode; }
+function applySettings() {
+  const threshold = parseInt(document.getElementById('threshold-slider').value);
+  const gain = parseInt(document.getElementById('gain-slider').value);
+  send({ cmd: 'set_threshold', value: threshold });
+  setTimeout(() => send({ cmd: 'set_gain', value: gain }), 2000);
+  if (pendingAlarmMode !== alarmMode) send({ cmd: 'set_alarm_mode', mode: pendingAlarmMode });
+  closeSettings();
+}
+document.getElementById('threshold-slider').addEventListener('input', (e) => {
+  document.getElementById('threshold-value').textContent = e.target.value;
+});
+document.getElementById('gain-slider').addEventListener('input', (e) => {
+  document.getElementById('gain-value').textContent = e.target.value;
+});
+
+// =====================================================
+// Map Modal
+// =====================================================
+function requestMap() {
+  mapData = [];
+  document.getElementById('map-content').innerHTML = '<p style="color:#666">Requesting map data...</p>';
+  document.getElementById('map-modal').classList.add('open');
+  send({ cmd: 'map' });
+  setTimeout(renderMap, 4000);
+}
+function updateMapUnit(unit) {
+  mapData = mapData.filter(u => u.unit_id !== unit.unit_id);
+  mapData.push(unit);
+  mapData.sort((a, b) => a.unit_id - b.unit_id);
+}
+function renderMap() {
+  if (mapData.length === 0) {
+    document.getElementById('map-content').innerHTML = '<p style="color:#f87171">No map data received.</p>';
+    return;
+  }
+  const roles = { 1: 'USB Controller', 2: 'Mesh Relay', 11: 'Detector A', 12: 'Detector B' };
+  function rssiClass(r) { return r > -50 ? 'rssi-good' : r > -75 ? 'rssi-ok' : 'rssi-bad'; }
+  let html = '<table class="map-table"><thead><tr><th>Unit</th><th>Role</th><th>Gain</th><th>Voltage</th><th>Peers</th></tr></thead><tbody>';
+  for (const u of mapData) {
+    const peersHtml = u.peers.map(p => `\u2192 ${p.id} <span class="${rssiClass(p.rssi)}">${p.rssi}dBm</span> th:${p.threshold}`).join('<br>');
+    html += `<tr><td><strong>${u.unit_id}</strong></td><td>${roles[u.unit_id] || '?'}</td><td>${u.gain}</td><td>${(u.voltage/1000).toFixed(2)}V</td><td class="peers-list">${peersHtml}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('map-content').innerHTML = html;
+}
+function closeMap() { document.getElementById('map-modal').classList.remove('open'); }
+
+// =====================================================
+// Init
+// =====================================================
+document.addEventListener('click', () => initAudio(), { once: true });
+
+window.addEventListener('resize', () => {
+  if (leafletMap) leafletMap.invalidateSize();
+});
+
+initMap();
+connect();
+</script>
+</body>
+</html>
