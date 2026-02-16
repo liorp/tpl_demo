@@ -37,6 +37,63 @@ describe('monitor state model', () => {
     expect(shouldShowAck(state)).toBe(true);
   });
 
+  test('maps snake_case crossing alert fields from backend payload', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'alarm',
+      events: [],
+      links: [],
+      crossing_alert: {
+        // Backend payload shape.
+        sensor_a: 11,
+        sensor_b: 12,
+        timestamp: 1_739_742_000,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      } as unknown as never,
+      config: { threshold: null, val: null },
+    });
+
+    expect(state.crossingAlert).toEqual({
+      sensorA: 11,
+      sensorB: 12,
+      at: 1_739_742_000,
+      lat: null,
+      lng: null,
+      acknowledged: false,
+    });
+  });
+
+  test('normalizes crossing pair order to ascending ids', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'alarm',
+      events: [],
+      links: [],
+      crossing_alert: {
+        sensor_a: 12,
+        sensor_b: 2,
+        timestamp: 1_739_742_000,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      } as unknown as never,
+      config: { threshold: null, val: null },
+    });
+
+    expect(state.crossingAlert).toEqual({
+      sensorA: 2,
+      sensorB: 12,
+      at: 1_739_742_000,
+      lat: null,
+      lng: null,
+      acknowledged: false,
+    });
+  });
+
   test('upserts units and enforces max unit count', () => {
     let state = createInitialMonitorState();
     for (let id = 1; id <= 32; id += 1) {

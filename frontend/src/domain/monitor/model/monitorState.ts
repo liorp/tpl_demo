@@ -10,6 +10,49 @@ const MAX_EVENTS = 50;
 const MAX_UNITS = 32;
 const MAP_FROM_RE = /MAP from (\d+)/;
 
+function toCrossingAlert(
+  raw: MonitorPayload['crossing_alert'],
+): MonitorState['crossingAlert'] {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const value = raw as Record<string, unknown>;
+  const sensorA =
+    typeof value.sensorA === 'number'
+      ? value.sensorA
+      : typeof value.sensor_a === 'number'
+        ? value.sensor_a
+        : null;
+  const sensorB =
+    typeof value.sensorB === 'number'
+      ? value.sensorB
+      : typeof value.sensor_b === 'number'
+        ? value.sensor_b
+        : null;
+  const at =
+    typeof value.at === 'number'
+      ? value.at
+      : typeof value.timestamp === 'number'
+        ? value.timestamp
+        : null;
+
+  if (sensorA === null || sensorB === null || at === null) {
+    return null;
+  }
+  const side1 = Math.min(sensorA, sensorB);
+  const side2 = Math.max(sensorA, sensorB);
+
+  return {
+    sensorA: side1,
+    sensorB: side2,
+    at,
+    lat: typeof value.lat === 'number' ? value.lat : null,
+    lng: typeof value.lng === 'number' ? value.lng : null,
+    acknowledged: value.acknowledged === true,
+  };
+}
+
 export function createInitialMonitorState(): MonitorState {
   return {
     connected: false,
@@ -33,7 +76,7 @@ export function toMonitorStateFromPayload(
     alarm: payload.alarm,
     events: payload.events.slice(0, MAX_EVENTS),
     links: payload.links,
-    crossingAlert: payload.crossing_alert,
+    crossingAlert: toCrossingAlert(payload.crossing_alert),
     config: payload.config,
     units: [],
     pairings: [],

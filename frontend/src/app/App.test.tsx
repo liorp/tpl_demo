@@ -32,12 +32,13 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
 }));
 
 describe('App', () => {
-  test('does not render place unit id control', () => {
+  test('renders refresh map as map HUD and hides live feed indicator', () => {
     render(<App />);
 
     expect(screen.queryByText('Place unit ID:')).toBeNull();
     expect(
       screen.getByRole('button', { name: 'REFRESH MAP' }),
     ).not.toBeNull();
+    expect(screen.queryByText('Live Feed')).toBeNull();
   });
 });
