@@ -58,7 +58,7 @@ export type MonitorState = {
   alarm: AlarmState;
   events: MonitorEvent[];
   links: SignalLinkState[];
-  crossingAlert: CrossingAlert | null;
+  crossingAlerts: CrossingAlert[];
   config: MonitorConfig;
   units: UnitPlacement[];
   pairings: PairLink[];

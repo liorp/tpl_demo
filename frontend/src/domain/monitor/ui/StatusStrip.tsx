@@ -1,12 +1,9 @@
-import { Button } from '@/component/ui/button';
 import { cn } from '@/lib/utils';
 
-import { shouldShowAck } from '../model/monitorState';
 import type { AlarmState, MonitorState } from '../model/types';
 
 type Props = {
   state: MonitorState;
-  onAcknowledge: () => void;
 };
 
 const alarmConfig: Record<
@@ -42,7 +39,7 @@ const alarmLabel: Record<AlarmState, string> = {
   disconnected: 'DISCONNECTED',
 };
 
-export function StatusStrip({ state, onAcknowledge }: Props) {
+export function StatusStrip({ state }: Props) {
   const config = alarmConfig[state.alarm];
 
   return (
@@ -59,18 +56,9 @@ export function StatusStrip({ state, onAcknowledge }: Props) {
           {alarmLabel[state.alarm]}
         </h1>
       </div>
-      {shouldShowAck(state) ? (
-        <Button
-          className="ml-auto border border-white/20 font-display tracking-wider uppercase"
-          onClick={onAcknowledge}
-        >
-          Acknowledge
-        </Button>
-      ) : (
-        <span className="ml-auto font-display text-xs font-medium tracking-[0.2em] text-white/30 uppercase">
-          TPL SIGNUM
-        </span>
-      )}
+      <span className="ml-auto font-display text-xs font-medium tracking-[0.2em] text-white/30 uppercase">
+        TPL SIGNUM
+      </span>
     </section>
   );
 }

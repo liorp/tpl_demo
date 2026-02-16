@@ -13,12 +13,12 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
       alarm: 'clear',
       events: [],
       links: [],
-      crossingAlert: null,
+      crossingAlerts: [],
       config: { threshold: null, val: null },
       units: [],
       pairings: [],
     },
-    acknowledge: vi.fn(),
+    acknowledgeCrossing: vi.fn(),
     requestMap: vi.fn(),
     applyConfig: vi.fn(),
     resetAll: vi.fn(),
@@ -36,9 +36,7 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.queryByText('Place unit ID:')).toBeNull();
-    expect(
-      screen.getByRole('button', { name: 'REFRESH MAP' }),
-    ).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'REFRESH MAP' })).not.toBeNull();
     expect(screen.queryByText('Live Feed')).toBeNull();
   });
 });

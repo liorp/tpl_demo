@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { Button } from '@/component/ui/button';
 import { TooltipProvider } from '@/component/ui/tooltip';
@@ -13,36 +13,26 @@ import { PairingPanel } from '../domain/monitor/ui/PairingPanel';
 import { StatusStrip } from '../domain/monitor/ui/StatusStrip';
 
 export function App() {
-  const { state, acknowledge, requestMap, applyConfig, resetAll, setUnitPairing } =
-    useMonitorSocket();
-  const [focusTick, setFocusTick] = useState(0);
+  const {
+    state,
+    requestMap,
+    acknowledgeCrossing,
+    applyConfig,
+    resetAll,
+    setUnitPairing,
+  } = useMonitorSocket();
   const activeUnits = useMemo(
     () => state.units.filter((unit) => unit.status !== 'inactive'),
     [state.units],
   );
 
-  const focusPoint = useMemo(() => {
-    if (
-      !state.crossingAlert ||
-      state.crossingAlert.acknowledged ||
-      focusTick === 0
-    ) {
-      return null;
-    }
-    if (state.crossingAlert.lat === null || state.crossingAlert.lng === null) {
-      return null;
-    }
-    return { lat: state.crossingAlert.lat, lng: state.crossingAlert.lng };
-  }, [focusTick, state.crossingAlert]);
-
   return (
     <TooltipProvider>
       <main className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-        <StatusStrip state={state} onAcknowledge={acknowledge} />
+        <StatusStrip state={state} />
         <CrossingAlertBanner
-          alert={state.crossingAlert}
-          onFocus={() => setFocusTick((value) => value + 1)}
-          onAcknowledge={acknowledge}
+          alerts={state.crossingAlerts}
+          onAcknowledge={acknowledgeCrossing}
         />
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div className="pointer-events-none absolute bottom-4 left-4 z-[1200]">
@@ -54,6 +44,8 @@ export function App() {
               onClick={() => requestMap()}
             >
               <svg
+                aria-hidden="true"
+                focusable="false"
                 xmlns="http://www.w3.org/2000/svg"
                 width="13"
                 height="13"
@@ -73,7 +65,7 @@ export function App() {
             units={activeUnits}
             pairings={state.pairings}
             links={state.links}
-            focusPoint={focusPoint}
+            focusPoint={null}
           />
         </div>
         <PairingPanel

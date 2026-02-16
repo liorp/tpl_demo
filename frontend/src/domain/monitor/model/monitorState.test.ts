@@ -4,6 +4,7 @@ import {
   acknowledgeCrossingAlert,
   createInitialMonitorState,
   isSignalFresh,
+  mergeCrossingAlerts,
   mergeTelemetryUnits,
   setPairing,
   shouldShowAck,
@@ -56,14 +57,16 @@ describe('monitor state model', () => {
       config: { threshold: null, val: null },
     });
 
-    expect(state.crossingAlert).toEqual({
-      sensorA: 11,
-      sensorB: 12,
-      at: 1_739_742_000,
-      lat: null,
-      lng: null,
-      acknowledged: false,
-    });
+    expect(state.crossingAlerts).toEqual([
+      {
+        sensorA: 11,
+        sensorB: 12,
+        at: 1_739_742_000,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
+    ]);
   });
 
   test('normalizes crossing pair order to ascending ids', () => {
@@ -84,14 +87,16 @@ describe('monitor state model', () => {
       config: { threshold: null, val: null },
     });
 
-    expect(state.crossingAlert).toEqual({
-      sensorA: 2,
-      sensorB: 12,
-      at: 1_739_742_000,
-      lat: null,
-      lng: null,
-      acknowledged: false,
-    });
+    expect(state.crossingAlerts).toEqual([
+      {
+        sensorA: 2,
+        sensorB: 12,
+        at: 1_739_742_000,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
+    ]);
   });
 
   test('upserts units and enforces max unit count', () => {
@@ -120,39 +125,78 @@ describe('monitor state model', () => {
     state = upsertUnit(state, { id: 1, label: 'U1', lat: 32, lng: 34 });
     state = upsertUnit(state, { id: 2, label: 'U2', lat: 32.2, lng: 34.2 });
     state = setPairing(state, 1, 2, true);
-    expect(state.pairings).toEqual([
-      { side1Id: 1, side2Id: 2, enabled: true },
-    ]);
+    expect(state.pairings).toEqual([{ side1Id: 1, side2Id: 2, enabled: true }]);
 
     state = setPairing(state, 2, 1, true);
-    expect(state.pairings).toEqual([
-      { side1Id: 1, side2Id: 2, enabled: true },
-    ]);
+    expect(state.pairings).toEqual([{ side1Id: 1, side2Id: 2, enabled: true }]);
 
     state = setPairing(state, 2, 1, false);
     expect(state.pairings).toEqual([]);
   });
 
-  test('marks crossing alert acknowledged', () => {
-    const state = toMonitorStateFromPayload({
-      connected: true,
-      port: '/dev/ttyUSB0',
-      alarm: 'alarm',
-      events: [],
-      links: [],
-      crossing_alert: {
-        sensorA: 1,
-        sensorB: 2,
-        at: 999,
+  test('deduplicates crossing alerts within a sliding time window', () => {
+    const initial = [
+      {
+        sensorA: 2,
+        sensorB: 12,
+        at: 1_000,
         lat: null,
         lng: null,
         acknowledged: false,
       },
-      config: { threshold: 500, val: 549 },
-    });
+    ];
+    const duplicate = {
+      sensorA: 12,
+      sensorB: 2,
+      at: 4_000,
+      lat: 33.1,
+      lng: 35.7,
+      acknowledged: false,
+    };
+    const outsideWindow = {
+      sensorA: 2,
+      sensorB: 12,
+      at: 12_000,
+      lat: null,
+      lng: null,
+      acknowledged: false,
+    };
 
-    const next = acknowledgeCrossingAlert(state);
-    expect(next.crossingAlert?.acknowledged).toBe(true);
+    const deduped = mergeCrossingAlerts(initial, duplicate, 5_000, 50);
+    expect(deduped).toHaveLength(1);
+    expect(deduped[0]?.at).toBe(4_000);
+    expect(deduped[0]?.lat).toBe(33.1);
+    expect(deduped[0]?.lng).toBe(35.7);
+
+    const appended = mergeCrossingAlerts(deduped, outsideWindow, 5_000, 50);
+    expect(appended).toHaveLength(2);
+    expect(appended[0]?.at).toBe(12_000);
+    expect(appended[1]?.at).toBe(4_000);
+  });
+
+  test('removes a crossing alert when it is acknowledged', () => {
+    const alerts = [
+      {
+        sensorA: 2,
+        sensorB: 12,
+        at: 1_000,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
+      {
+        sensorA: 3,
+        sensorB: 8,
+        at: 2_000,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
+    ];
+
+    const next = acknowledgeCrossingAlert(alerts, alerts[1]);
+    expect(next).toHaveLength(1);
+    expect(next[0]).toMatchObject({ sensorA: 2, sensorB: 12 });
   });
 
   test('detects stale signal links', () => {
@@ -188,7 +232,9 @@ describe('monitor state model', () => {
       connected: true,
       port: '/dev/cu.usbserial-0001',
       alarm: 'clear' as const,
-      events: [{ time: '21:55:46', msg: 'MAP from 1 ver=0.4c10 gain=32 v=2130' }],
+      events: [
+        { time: '21:55:46', msg: 'MAP from 1 ver=0.4c10 gain=32 v=2130' },
+      ],
       links: [],
       crossing_alert: null,
       config: { threshold: null, val: null },
@@ -206,7 +252,13 @@ describe('monitor state model', () => {
   test('marks local units as inactive when no longer reported by backend', () => {
     const previous = [
       { id: 2, label: 'S2', lat: 33.3, lng: 35.75, status: 'active' as const },
-      { id: 11, label: 'S11', lat: 33.32, lng: 35.76, status: 'active' as const },
+      {
+        id: 11,
+        label: 'S11',
+        lat: 33.32,
+        lng: 35.76,
+        status: 'active' as const,
+      },
       { id: 99, label: 'S99', lat: 33.2, lng: 35.8, status: 'active' as const },
     ];
     const payload = {
@@ -224,10 +276,12 @@ describe('monitor state model', () => {
 
     const next = mergeTelemetryUnits(previous, payload);
 
-    expect(next.map((unit) => ({
-      id: unit.id,
-      status: unit.status,
-    }))).toEqual([
+    expect(
+      next.map((unit) => ({
+        id: unit.id,
+        status: unit.status,
+      })),
+    ).toEqual([
       { id: 2, status: 'active' },
       { id: 11, status: 'active' },
       { id: 99, status: 'inactive' },

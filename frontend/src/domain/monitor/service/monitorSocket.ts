@@ -3,6 +3,7 @@ import { createAppWebSocketUrl } from '@/config';
 import {
   acknowledgeCrossingAlert,
   createInitialMonitorState,
+  mergeCrossingAlerts,
   mergeTelemetryUnits,
   setPairing,
   toMonitorStateFromPayload,
@@ -14,6 +15,7 @@ import {
   savePersistedMonitorConfig,
 } from '../model/persistence';
 import type {
+  CrossingAlert,
   MonitorPayload,
   MonitorState,
   UnitPlacement,
@@ -36,16 +38,12 @@ function isPayload(data: unknown): data is MonitorPayload {
 
 export function useMonitorSocket(): {
   state: MonitorState;
-  acknowledge: () => void;
+  acknowledgeCrossing: (alert: CrossingAlert) => void;
   requestMap: () => void;
   applyConfig: (value: { threshold: number; val: number }) => void;
   resetAll: () => void;
   placeUnit: (unit: UnitPlacement) => void;
-  setUnitPairing: (
-    side1Id: number,
-    side2Id: number,
-    enabled: boolean,
-  ) => void;
+  setUnitPairing: (side1Id: number, side2Id: number, enabled: boolean) => void;
 } {
   const [state, setState] = useState<MonitorState>(() => {
     const next = createInitialMonitorState();
@@ -71,11 +69,18 @@ export function useMonitorSocket(): {
       try {
         const payload: unknown = JSON.parse(event.data);
         if (isPayload(payload)) {
-          setState((previous) => ({
-            ...toMonitorStateFromPayload(payload),
-            units: mergeTelemetryUnits(previous.units, payload),
-            pairings: previous.pairings,
-          }));
+          setState((previous) => {
+            const base = toMonitorStateFromPayload(payload);
+            return {
+              ...base,
+              crossingAlerts: mergeCrossingAlerts(
+                previous.crossingAlerts,
+                base.crossingAlerts[0] ?? null,
+              ),
+              units: mergeTelemetryUnits(previous.units, payload),
+              pairings: previous.pairings,
+            };
+          });
         }
       } catch {
         // Ignore malformed websocket payloads.
@@ -102,11 +107,17 @@ export function useMonitorSocket(): {
     };
   }, []);
 
-  const acknowledge = useCallback(() => {
+  const acknowledgeCrossing = useCallback((alert: CrossingAlert) => {
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send('ack');
-      setState((previous) => acknowledgeCrossingAlert(previous));
+      setState((previous) => ({
+        ...previous,
+        crossingAlerts: acknowledgeCrossingAlert(
+          previous.crossingAlerts,
+          alert,
+        ),
+      }));
     }
   }, []);
 
@@ -162,7 +173,7 @@ export function useMonitorSocket(): {
 
   return {
     state,
-    acknowledge,
+    acknowledgeCrossing,
     requestMap,
     applyConfig,
     resetAll,

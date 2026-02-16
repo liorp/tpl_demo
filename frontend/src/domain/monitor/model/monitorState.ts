@@ -1,4 +1,5 @@
 import type {
+  CrossingAlert,
   MonitorPayload,
   MonitorState,
   PairLink,
@@ -8,11 +9,13 @@ import type {
 
 const MAX_EVENTS = 50;
 const MAX_UNITS = 32;
+const MAX_CROSSING_ALERTS = 8;
+const CROSSING_ALERT_DEDUP_WINDOW_MS = 10_000;
 const MAP_FROM_RE = /MAP from (\d+)/;
 
 function toCrossingAlert(
   raw: MonitorPayload['crossing_alert'],
-): MonitorState['crossingAlert'] {
+): CrossingAlert | null {
   if (!raw || typeof raw !== 'object') {
     return null;
   }
@@ -60,7 +63,7 @@ export function createInitialMonitorState(): MonitorState {
     alarm: 'disconnected',
     events: [],
     links: [],
-    crossingAlert: null,
+    crossingAlerts: [],
     config: { threshold: null, val: null },
     units: [],
     pairings: [],
@@ -70,17 +73,63 @@ export function createInitialMonitorState(): MonitorState {
 export function toMonitorStateFromPayload(
   payload: MonitorPayload,
 ): MonitorState {
+  const crossingAlert = toCrossingAlert(payload.crossing_alert);
   return {
     connected: payload.connected,
     port: payload.port,
     alarm: payload.alarm,
     events: payload.events.slice(0, MAX_EVENTS),
     links: payload.links,
-    crossingAlert: toCrossingAlert(payload.crossing_alert),
+    crossingAlerts: crossingAlert ? [crossingAlert] : [],
     config: payload.config,
     units: [],
     pairings: [],
   };
+}
+
+export function mergeCrossingAlerts(
+  previous: CrossingAlert[],
+  next: CrossingAlert | null,
+  dedupWindowMs = CROSSING_ALERT_DEDUP_WINDOW_MS,
+  maxAlerts = MAX_CROSSING_ALERTS,
+): CrossingAlert[] {
+  if (!next) {
+    return previous;
+  }
+
+  const sensorA = Math.min(next.sensorA, next.sensorB);
+  const sensorB = Math.max(next.sensorA, next.sensorB);
+  const normalized = { ...next, sensorA, sensorB };
+
+  const existingIndex = previous.findIndex(
+    (alert) =>
+      alert.sensorA === sensorA &&
+      alert.sensorB === sensorB &&
+      Math.abs(normalized.at - alert.at) <= dedupWindowMs,
+  );
+
+  if (existingIndex >= 0) {
+    const withoutDuplicate = previous.filter(
+      (_, index) => index !== existingIndex,
+    );
+    return [normalized, ...withoutDuplicate].slice(0, maxAlerts);
+  }
+
+  return [normalized, ...previous].slice(0, maxAlerts);
+}
+
+export function acknowledgeCrossingAlert(
+  alerts: CrossingAlert[],
+  target: CrossingAlert,
+): CrossingAlert[] {
+  return alerts.filter(
+    (alert) =>
+      !(
+        alert.sensorA === target.sensorA &&
+        alert.sensorB === target.sensorB &&
+        alert.at === target.at
+      ),
+  );
 }
 
 function toDefaultUnitPosition(unitId: number): { lat: number; lng: number } {
@@ -207,16 +256,6 @@ export function setPairing(
     enabled: true,
   };
   return { ...state, pairings: [...next, pairing] };
-}
-
-export function acknowledgeCrossingAlert(state: MonitorState): MonitorState {
-  if (!state.crossingAlert) {
-    return state;
-  }
-  return {
-    ...state,
-    crossingAlert: { ...state.crossingAlert, acknowledged: true },
-  };
 }
 
 export function isSignalFresh(
