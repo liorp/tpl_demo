@@ -5,7 +5,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -59,6 +58,7 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
           type="button"
         >
           <svg
+            aria-hidden="true"
             xmlns="http://www.w3.org/2000/svg"
             width="13"
             height="13"
@@ -69,8 +69,8 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-            <circle cx="12" cy="12" r="3" />
+            <path d="m4 4 7.5 16 2.3-6.2L20 11.5z" />
+            <path d="m13.8 13.8 4.2 4.2" />
           </svg>
           Settings
         </button>
@@ -114,9 +114,10 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
             />
           </div>
         </div>
-        <DialogFooter>
+        <div className="mt-2 flex items-center justify-between gap-2">
           <Button
-            variant="outline"
+            variant="destructive"
+            size="sm"
             onClick={() => {
               onResetAll();
               setOpen(false);
@@ -125,24 +126,26 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
           >
             Reset all
           </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setOpen(false)}
-            className="font-display tracking-wide"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              onApply({ threshold: thresholdNum, val: valNum });
-              setOpen(false);
-            }}
-            disabled={!valid}
-            className="font-display tracking-wide"
-          >
-            Apply
-          </Button>
-        </DialogFooter>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              className="font-display tracking-wide"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                onApply({ threshold: thresholdNum, val: valNum });
+                setOpen(false);
+              }}
+              disabled={!valid}
+              className="font-display tracking-wide"
+            >
+              Apply
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
