@@ -57,6 +57,15 @@ export function useMonitorSocket(): {
   useEffect(() => {
     const socket = new WebSocket(createAppWebSocketUrl('/ws'));
     socketRef.current = socket;
+    let shouldCloseAfterOpen = false;
+    let disposed = false;
+
+    socket.onopen = () => {
+      if (!disposed && !shouldCloseAfterOpen) {
+        return;
+      }
+      socket.close();
+    };
 
     socket.onmessage = (event: MessageEvent<string>) => {
       try {
@@ -83,7 +92,12 @@ export function useMonitorSocket(): {
     };
 
     return () => {
-      socket.close();
+      disposed = true;
+      if (socket.readyState === WebSocket.CONNECTING) {
+        shouldCloseAfterOpen = true;
+      } else if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
       socketRef.current = null;
     };
   }, []);
