@@ -1,0 +1,179 @@
+import { describe, expect, test } from 'vitest';
+
+import {
+  acknowledgeCrossingAlert,
+  createInitialMonitorState,
+  isSignalFresh,
+  mergeTelemetryUnits,
+  setPairing,
+  shouldShowAck,
+  toMonitorStateFromPayload,
+  upsertUnit,
+} from './monitorState';
+
+describe('monitor state model', () => {
+  test('creates disconnected initial state', () => {
+    const state = createInitialMonitorState();
+
+    expect(state.alarm).toBe('disconnected');
+    expect(state.connected).toBe(false);
+    expect(state.events).toHaveLength(0);
+  });
+
+  test('maps websocket payload into monitor state', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'alarm',
+      events: [{ time: '20:00:00', msg: 'DETECTION x' }],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+    });
+
+    expect(state.connected).toBe(true);
+    expect(state.port).toBe('/dev/ttyUSB0');
+    expect(state.alarm).toBe('alarm');
+    expect(shouldShowAck(state)).toBe(true);
+  });
+
+  test('upserts units and enforces max unit count', () => {
+    let state = createInitialMonitorState();
+    for (let id = 1; id <= 32; id += 1) {
+      state = upsertUnit(state, {
+        id,
+        label: `U${id}`,
+        lat: 32 + id / 1000,
+        lng: 34,
+      });
+    }
+    const overflow = upsertUnit(state, {
+      id: 33,
+      label: 'U33',
+      lat: 32.5,
+      lng: 34.5,
+    });
+    expect(overflow.units).toHaveLength(32);
+    const moved = upsertUnit(state, { id: 1, label: 'U1', lat: 31, lng: 35 });
+    expect(moved.units.find((u) => u.id === 1)?.lat).toBe(31);
+  });
+
+  test('creates and toggles undirected pairings', () => {
+    let state = createInitialMonitorState();
+    state = upsertUnit(state, { id: 1, label: 'U1', lat: 32, lng: 34 });
+    state = upsertUnit(state, { id: 2, label: 'U2', lat: 32.2, lng: 34.2 });
+    state = setPairing(state, 1, 2, true);
+    expect(state.pairings).toEqual([
+      { side1Id: 1, side2Id: 2, enabled: true },
+    ]);
+
+    state = setPairing(state, 2, 1, true);
+    expect(state.pairings).toEqual([
+      { side1Id: 1, side2Id: 2, enabled: true },
+    ]);
+
+    state = setPairing(state, 2, 1, false);
+    expect(state.pairings).toEqual([]);
+  });
+
+  test('marks crossing alert acknowledged', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'alarm',
+      events: [],
+      links: [],
+      crossing_alert: {
+        sensorA: 1,
+        sensorB: 2,
+        at: 999,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
+      config: { threshold: 500, val: 549 },
+    });
+
+    const next = acknowledgeCrossingAlert(state);
+    expect(next.crossingAlert?.acknowledged).toBe(true);
+  });
+
+  test('detects stale signal links', () => {
+    expect(isSignalFresh({ updatedAt: 1_000 }, 11_000, 10_000)).toBe(false);
+    expect(isSignalFresh({ updatedAt: 2_000 }, 11_000, 10_000)).toBe(true);
+  });
+
+  test('discovers units from telemetry logs and links', () => {
+    const payload = {
+      connected: true,
+      port: '/dev/cu.usbserial-0001',
+      alarm: 'clear' as const,
+      events: [
+        { time: '21:55:46', msg: 'MAP from 11 ver=0.4c10 gain=32 v=2130' },
+        { time: '21:55:46', msg: 'MAP from 12 ver=0.4c10 gain=32 v=2587' },
+        { time: '21:55:46', msg: 'MAP from 2 ver=0.4c10 gain=32 v=2112' },
+      ],
+      links: [
+        { side1: 11, side2: 12, quality: 95, intensity: 23, updatedAt: 1 },
+      ],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+    };
+
+    const nextUnits = mergeTelemetryUnits([], payload);
+    const ids = nextUnits.map((unit) => unit.id).sort((a, b) => a - b);
+
+    expect(ids).toEqual([2, 11, 12]);
+  });
+
+  test('assigns default sensor positions around Mount Hermon', () => {
+    const payload = {
+      connected: true,
+      port: '/dev/cu.usbserial-0001',
+      alarm: 'clear' as const,
+      events: [{ time: '21:55:46', msg: 'MAP from 1 ver=0.4c10 gain=32 v=2130' }],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+    };
+
+    const [unit] = mergeTelemetryUnits([], payload);
+
+    expect(unit).toMatchObject({
+      id: 1,
+      lat: 33.29,
+      lng: 35.75,
+    });
+  });
+
+  test('marks local units as inactive when no longer reported by backend', () => {
+    const previous = [
+      { id: 2, label: 'S2', lat: 33.3, lng: 35.75, status: 'active' as const },
+      { id: 11, label: 'S11', lat: 33.32, lng: 35.76, status: 'active' as const },
+      { id: 99, label: 'S99', lat: 33.2, lng: 35.8, status: 'active' as const },
+    ];
+    const payload = {
+      connected: true,
+      port: '/dev/cu.usbserial-0001',
+      alarm: 'clear' as const,
+      events: [
+        { time: '21:55:46', msg: 'MAP from 2 ver=0.4c10 gain=32 v=2112' },
+        { time: '21:55:46', msg: 'MAP from 11 ver=0.4c10 gain=32 v=2130' },
+      ],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+    };
+
+    const next = mergeTelemetryUnits(previous, payload);
+
+    expect(next.map((unit) => ({
+      id: unit.id,
+      status: unit.status,
+    }))).toEqual([
+      { id: 2, status: 'active' },
+      { id: 11, status: 'active' },
+      { id: 99, status: 'inactive' },
+    ]);
+  });
+});
