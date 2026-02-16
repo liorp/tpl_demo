@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 
+import { Button } from '@/component/ui/button';
 import { TooltipProvider } from '@/component/ui/tooltip';
 
 import { useMonitorSocket } from '../domain/monitor/service/monitorSocket';
@@ -41,11 +42,14 @@ export function App() {
         <CrossingAlertBanner
           alert={state.crossingAlert}
           onFocus={() => setFocusTick((value) => value + 1)}
+          onAcknowledge={acknowledge}
         />
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <section className="flex items-center gap-3 border-b border-border bg-card/60 px-4 py-2">
-            <button
-              className="inline-flex items-center gap-2 rounded-md border border-border-bright bg-card px-3 py-1.5 font-display text-sm font-medium tracking-wide text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+          <div className="pointer-events-none absolute bottom-4 left-4 z-[1200]">
+            <Button
+              variant="outline"
+              size="sm"
+              className="pointer-events-auto border-border-bright bg-card/90 font-display text-sm font-medium tracking-wide text-muted-foreground shadow-sm backdrop-blur-sm hover:border-primary/50 hover:text-primary"
               type="button"
               onClick={() => requestMap()}
             >
@@ -63,12 +67,8 @@ export function App() {
                 <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
               </svg>
               REFRESH MAP
-            </button>
-            <div className="ml-auto flex items-center gap-2 text-xs font-medium tracking-widest text-muted-foreground/60 uppercase">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary/40" />
-              Live Feed
-            </div>
-          </section>
+            </Button>
+          </div>
           <MonitorMap
             units={activeUnits}
             pairings={state.pairings}

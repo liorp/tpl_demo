@@ -1,4 +1,5 @@
 import { Badge } from '@/component/ui/badge';
+import { Button } from '@/component/ui/button';
 
 import type { CrossingAlert } from '../model/types';
 
@@ -35,16 +36,20 @@ export function CrossingAlertBanner({ alert, onFocus, onAcknowledge }: Props) {
           ) : null}
         </div>
         <div className="shrink-0 flex items-center gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
-            className="inline-flex items-center rounded-md border border-red-700/60 bg-red-900/50 px-3 py-1 font-display text-sm font-semibold tracking-wide text-red-200 transition-colors hover:border-red-600 hover:bg-red-800/50"
+            className="border-red-700/60 bg-red-900/50 font-display text-sm font-semibold tracking-wide text-red-200 hover:border-red-600 hover:bg-red-800/50"
             onClick={onAcknowledge}
           >
             OK
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-md border border-red-700/60 bg-red-900/50 px-3 py-1 font-display text-sm font-semibold tracking-wide text-red-200 transition-colors hover:border-red-600 hover:bg-red-800/50"
+            className="gap-1.5 border-red-700/60 bg-red-900/50 font-display text-sm font-semibold tracking-wide text-red-200 hover:border-red-600 hover:bg-red-800/50"
             onClick={onFocus}
           >
             <svg
@@ -65,7 +70,7 @@ export function CrossingAlertBanner({ alert, onFocus, onAcknowledge }: Props) {
               <path d="M8 11h6" />
             </svg>
             Focus
-          </button>
+          </Button>
         </div>
       </div>
     </section>

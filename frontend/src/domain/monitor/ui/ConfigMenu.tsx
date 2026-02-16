@@ -53,8 +53,10 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button
-          className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 font-display text-sm font-medium tracking-wide text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-border bg-card font-display text-sm font-medium tracking-wide text-muted-foreground hover:border-primary/50 hover:text-foreground"
           type="button"
         >
           <svg
@@ -73,7 +75,7 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
             <circle cx="12" cy="12" r="3" />
           </svg>
           Settings
-        </button>
+        </Button>
       </DialogTrigger>
       <DialogContent className="border-border-bright bg-card sm:max-w-sm">
         <DialogHeader>
