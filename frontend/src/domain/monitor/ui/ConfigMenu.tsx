@@ -54,7 +54,7 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
-          className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 font-display text-sm font-medium tracking-wide text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 font-display text-sm font-medium tracking-wide text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
           type="button"
         >
           <svg
@@ -69,10 +69,8 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="m4 4 7.5 16 2.3-6.2L20 11.5z" />
-            <path d="m13.8 13.8 4.2 4.2" />
-            <path d="M16 4v3" />
-            <path d="M18 6h-3" />
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
           </svg>
           Settings
         </button>
