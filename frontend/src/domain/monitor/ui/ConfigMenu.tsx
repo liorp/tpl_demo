@@ -71,6 +71,8 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
           >
             <path d="m4 4 7.5 16 2.3-6.2L20 11.5z" />
             <path d="m13.8 13.8 4.2 4.2" />
+            <path d="M16 4v3" />
+            <path d="M18 6h-3" />
           </svg>
           Settings
         </button>
