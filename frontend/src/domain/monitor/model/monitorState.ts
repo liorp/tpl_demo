@@ -1,4 +1,5 @@
 import type {
+  CrossingAckWindow,
   CrossingAlert,
   MonitorPayload,
   MonitorState,
@@ -10,7 +11,9 @@ import type {
 const MAX_EVENTS = 50;
 const MAX_UNITS = 32;
 const MAX_CROSSING_ALERTS = 8;
+const MAX_CROSSING_ACK_WINDOWS = 40;
 const CROSSING_ALERT_DEDUP_WINDOW_MS = 10_000;
+const CROSSING_ACK_SUPPRESSION_WINDOW_MS = 2_000;
 const MAP_FROM_RE = /MAP from (\d+)/;
 
 function toCrossingAlert(
@@ -64,6 +67,7 @@ export function createInitialMonitorState(): MonitorState {
     events: [],
     links: [],
     crossingAlerts: [],
+    crossingAckWindows: [],
     config: { threshold: null, val: null },
     units: [],
     pairings: [],
@@ -81,6 +85,7 @@ export function toMonitorStateFromPayload(
     events: payload.events.slice(0, MAX_EVENTS),
     links: payload.links,
     crossingAlerts: crossingAlert ? [crossingAlert] : [],
+    crossingAckWindows: [],
     config: payload.config,
     units: [],
     pairings: [],
@@ -129,6 +134,36 @@ export function acknowledgeCrossingAlert(
         alert.sensorB === target.sensorB &&
         alert.at === target.at
       ),
+  );
+}
+
+export function addCrossingAckWindow(
+  windows: CrossingAckWindow[],
+  alert: CrossingAlert,
+  maxWindows = MAX_CROSSING_ACK_WINDOWS,
+): CrossingAckWindow[] {
+  const sensorA = Math.min(alert.sensorA, alert.sensorB);
+  const sensorB = Math.max(alert.sensorA, alert.sensorB);
+  const nextWindow: CrossingAckWindow = { sensorA, sensorB, at: alert.at };
+  return [nextWindow, ...windows].slice(0, maxWindows);
+}
+
+export function isCrossingAlertSuppressed(
+  alert: CrossingAlert | null,
+  windows: CrossingAckWindow[],
+  suppressionWindowMs = CROSSING_ACK_SUPPRESSION_WINDOW_MS,
+): boolean {
+  if (!alert) {
+    return false;
+  }
+  const sensorA = Math.min(alert.sensorA, alert.sensorB);
+  const sensorB = Math.max(alert.sensorA, alert.sensorB);
+
+  return windows.some(
+    (window) =>
+      window.sensorA === sensorA &&
+      window.sensorB === sensorB &&
+      Math.abs(alert.at - window.at) <= suppressionWindowMs,
   );
 }
 

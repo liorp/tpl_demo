@@ -16,6 +16,7 @@ describe('StatusStrip', () => {
           events: [],
           links: [],
           crossingAlerts: [],
+          crossingAckWindows: [],
           config: { threshold: null, val: null },
           units: [],
           pairings: [],

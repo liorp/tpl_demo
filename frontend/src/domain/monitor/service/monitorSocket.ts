@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createAppWebSocketUrl } from '@/config';
 import {
   acknowledgeCrossingAlert,
+  addCrossingAckWindow,
   createInitialMonitorState,
+  isCrossingAlertSuppressed,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
   setPairing,
@@ -71,12 +73,20 @@ export function useMonitorSocket(): {
         if (isPayload(payload)) {
           setState((previous) => {
             const base = toMonitorStateFromPayload(payload);
+            const incomingAlert = base.crossingAlerts[0] ?? null;
+            const allowedAlert = isCrossingAlertSuppressed(
+              incomingAlert,
+              previous.crossingAckWindows,
+            )
+              ? null
+              : incomingAlert;
             return {
               ...base,
               crossingAlerts: mergeCrossingAlerts(
                 previous.crossingAlerts,
-                base.crossingAlerts[0] ?? null,
+                allowedAlert,
               ),
+              crossingAckWindows: previous.crossingAckWindows,
               units: mergeTelemetryUnits(previous.units, payload),
               pairings: previous.pairings,
             };
@@ -115,6 +125,10 @@ export function useMonitorSocket(): {
         ...previous,
         crossingAlerts: acknowledgeCrossingAlert(
           previous.crossingAlerts,
+          alert,
+        ),
+        crossingAckWindows: addCrossingAckWindow(
+          previous.crossingAckWindows,
           alert,
         ),
       }));

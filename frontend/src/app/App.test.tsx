@@ -14,6 +14,7 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
       events: [],
       links: [],
       crossingAlerts: [],
+      crossingAckWindows: [],
       config: { threshold: null, val: null },
       units: [],
       pairings: [],

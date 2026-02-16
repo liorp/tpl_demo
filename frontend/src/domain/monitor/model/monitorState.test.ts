@@ -2,7 +2,9 @@ import { describe, expect, test } from 'vitest';
 
 import {
   acknowledgeCrossingAlert,
+  addCrossingAckWindow,
   createInitialMonitorState,
+  isCrossingAlertSuppressed,
   isSignalFresh,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
@@ -197,6 +199,66 @@ describe('monitor state model', () => {
     const next = acknowledgeCrossingAlert(alerts, alerts[1]);
     expect(next).toHaveLength(1);
     expect(next[0]).toMatchObject({ sensorA: 2, sensorB: 12 });
+  });
+
+  test('suppresses same crossing pair within ack sliding window in past and future', () => {
+    const windows = addCrossingAckWindow(
+      [],
+      {
+        sensorA: 2,
+        sensorB: 12,
+        at: 10_000,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
+      20,
+    );
+
+    expect(
+      isCrossingAlertSuppressed(
+        {
+          sensorA: 12,
+          sensorB: 2,
+          at: 8_500,
+          lat: null,
+          lng: null,
+          acknowledged: false,
+        },
+        windows,
+        2_000,
+      ),
+    ).toBe(true);
+
+    expect(
+      isCrossingAlertSuppressed(
+        {
+          sensorA: 2,
+          sensorB: 12,
+          at: 11_500,
+          lat: null,
+          lng: null,
+          acknowledged: false,
+        },
+        windows,
+        2_000,
+      ),
+    ).toBe(true);
+
+    expect(
+      isCrossingAlertSuppressed(
+        {
+          sensorA: 2,
+          sensorB: 12,
+          at: 12_500,
+          lat: null,
+          lng: null,
+          acknowledged: false,
+        },
+        windows,
+        2_000,
+      ),
+    ).toBe(false);
   });
 
   test('detects stale signal links', () => {

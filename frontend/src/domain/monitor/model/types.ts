@@ -37,6 +37,12 @@ export type CrossingAlert = {
   acknowledged: boolean;
 };
 
+export type CrossingAckWindow = {
+  sensorA: number;
+  sensorB: number;
+  at: number;
+};
+
 export type MonitorConfig = {
   threshold: number | null;
   val: number | null;
@@ -59,6 +65,7 @@ export type MonitorState = {
   events: MonitorEvent[];
   links: SignalLinkState[];
   crossingAlerts: CrossingAlert[];
+  crossingAckWindows: CrossingAckWindow[];
   config: MonitorConfig;
   units: UnitPlacement[];
   pairings: PairLink[];
