@@ -6,6 +6,7 @@ import {
   Popup,
   TileLayer,
   useMap,
+  useMapEvents,
 } from 'react-leaflet';
 
 import { getUnitBounds } from '../model/mapViewport';
@@ -22,6 +23,11 @@ type Props = {
   pairings: PairLink[];
   links: SignalLinkState[];
   focusPoint: { lat: number; lng: number } | null;
+  tileRoot: string | null;
+  mapBounds: [[number, number], [number, number]] | null;
+  placementMode: boolean;
+  onPlaceAt: (lat: number, lng: number) => void;
+  onSelectUnit: (unitId: number) => void;
 };
 
 function MapFocusController({
@@ -83,7 +89,41 @@ function toSignalColor(link: SignalLinkState | undefined): string {
   return '#ef4444';
 }
 
-export function MonitorMap({ units, pairings, links, focusPoint }: Props) {
+function toTileUrl(tileRoot: string | null): string {
+  const root = (tileRoot ?? '/tiles').replace(/\/+$/, '');
+  return `${root}/{z}/{x}/{y}.png`;
+}
+
+function MapPlacementController({
+  placementMode,
+  onPlaceAt,
+}: {
+  placementMode: boolean;
+  onPlaceAt: (lat: number, lng: number) => void;
+}) {
+  useMapEvents({
+    click: (event) => {
+      if (!placementMode) {
+        return;
+      }
+      onPlaceAt(event.latlng.lat, event.latlng.lng);
+    },
+  });
+
+  return null;
+}
+
+export function MonitorMap({
+  units,
+  pairings,
+  links,
+  focusPoint,
+  tileRoot,
+  mapBounds,
+  placementMode,
+  onPlaceAt,
+  onSelectUnit,
+}: Props) {
   const unitById = new Map(units.map((unit) => [unit.id, unit] as const));
 
   return (
@@ -93,17 +133,18 @@ export function MonitorMap({ units, pairings, links, focusPoint }: Props) {
         zoom={12}
         minZoom={7}
         maxZoom={16}
-        maxBounds={ISRAEL_BOUNDS}
+        maxBounds={mapBounds ?? ISRAEL_BOUNDS}
         maxBoundsViscosity={1}
         attributionControl={false}
         className="h-full w-full"
       >
-        <TileLayer
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={16}
-        />
+        <TileLayer url={toTileUrl(tileRoot)} maxZoom={16} />
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
+        <MapPlacementController
+          placementMode={placementMode}
+          onPlaceAt={onPlaceAt}
+        />
         {pairings.map((pair) => {
           const side1 = unitById.get(pair.side1Id);
           const side2 = unitById.get(pair.side2Id);
@@ -141,6 +182,9 @@ export function MonitorMap({ units, pairings, links, focusPoint }: Props) {
               weight: 2,
               fillColor: '#06b6d4',
               fillOpacity: 0.65,
+            }}
+            eventHandlers={{
+              click: () => onSelectUnit(unit.id),
             }}
           >
             <Popup>

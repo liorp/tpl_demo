@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'vitest';
-
 import {
   acknowledgeCrossingAlert,
   addCrossingAckWindow,
@@ -13,6 +12,7 @@ import {
   toMonitorStateFromPayload,
   upsertUnit,
 } from './monitorState';
+import type { MonitorPayload } from './types';
 
 describe('monitor state model', () => {
   test('creates disconnected initial state', () => {
@@ -38,6 +38,61 @@ describe('monitor state model', () => {
     expect(state.port).toBe('/dev/ttyUSB0');
     expect(state.alarm).toBe('alarm');
     expect(shouldShowAck(state)).toBe(true);
+  });
+
+  test('maps backend units, sensor_status, and map_policy payload fields', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+      units: [
+        { id: 7, label: 'S7', lat: 33.31, lng: 35.78 },
+        { id: 8, label: 'S8', lat: 33.32, lng: 35.79 },
+      ],
+      sensor_status: {
+        '7': { active: true, last_seen: 101, connected_peers: [8] },
+        '8': { active: false, last_seen: 99, connected_peers: [7] },
+      },
+      map_policy: {
+        bounds: { north: 34.0, south: 33.0, west: 35.0, east: 36.0 },
+        buffer_km: 2,
+        tile_root: '/tiles',
+        offline_required: true,
+      },
+    } as MonitorPayload);
+
+    expect(state.units).toEqual([
+      {
+        id: 7,
+        label: 'S7',
+        lat: 33.31,
+        lng: 35.78,
+        status: 'active',
+        lastSeenAt: 101,
+      },
+      {
+        id: 8,
+        label: 'S8',
+        lat: 33.32,
+        lng: 35.79,
+        status: 'inactive',
+        lastSeenAt: 99,
+      },
+    ]);
+    expect(state.sensorStatus).toEqual({
+      '7': { active: true, lastSeen: 101, connectedPeers: [8] },
+      '8': { active: false, lastSeen: 99, connectedPeers: [7] },
+    });
+    expect(state.mapPolicy).toEqual({
+      bounds: { north: 34.0, south: 33.0, west: 35.0, east: 36.0 },
+      bufferKm: 2,
+      tileRoot: '/tiles',
+      offlineRequired: true,
+    });
   });
 
   test('maps snake_case crossing alert fields from backend payload', () => {
@@ -99,6 +154,27 @@ describe('monitor state model', () => {
         acknowledged: false,
       },
     ]);
+  });
+
+  test('keeps legacy payload compatibility when new fields are omitted', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'alarm',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+    });
+
+    expect(state.units).toEqual([]);
+    expect(state.sensorStatus).toEqual({});
+    expect(state.mapPolicy).toEqual({
+      bounds: null,
+      bufferKm: null,
+      tileRoot: null,
+      offlineRequired: false,
+    });
   });
 
   test('upserts units and enforces max unit count', () => {

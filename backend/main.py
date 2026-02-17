@@ -7,7 +7,8 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from backend.api.routes import AppDeps, register_routes
-from backend.config import AUTO_RESET_TIMEOUT, SERIAL_PORT
+from backend.config import AUTO_RESET_TIMEOUT, LAYOUT_STATE_PATH, SERIAL_PORT
+from backend.core.layout_store import load_layout_state, save_layout_state
 from backend.core.models import SensorState, snapshot
 from backend.core.service import check_auto_reset, handle_event, mark_disconnected, set_connection_state
 from backend.realtime.broadcaster import Broadcaster
@@ -20,13 +21,22 @@ app = FastAPI()
 state = SensorState()
 broadcaster = Broadcaster()
 serial_manager = SerialManager(state=state, forced_port=SERIAL_PORT)
+layout_state_path = (
+    Path(LAYOUT_STATE_PATH).expanduser()
+    if LAYOUT_STATE_PATH
+    else Path(__file__).resolve().parent / "data" / "layout_state.json"
+)
 
 frontend_dist = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+tiles_dir = Path(__file__).resolve().parents[1] / "frontend" / "public" / "tiles"
 deps = AppDeps(
     state=state,
     broadcaster=broadcaster,
     static_dir=str(frontend_dist),
+    tiles_dir=str(tiles_dir),
     send_serial=serial_manager.send_serial,
+    layout_state_path=layout_state_path,
+    save_layout=save_layout_state,
 )
 register_routes(app, deps)
 
@@ -67,6 +77,10 @@ def serial_reader_thread() -> None:
 
 @app.on_event("startup")
 async def startup_event():
+    persisted = load_layout_state(layout_state_path)
+    with state.lock:
+        state.units = persisted["units"]
+        state.map_policy = persisted["map_policy"]
     asyncio.create_task(broadcaster.start())
     threading.Thread(target=serial_reader_thread, daemon=True).start()
 

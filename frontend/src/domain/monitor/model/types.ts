@@ -48,6 +48,41 @@ export type MonitorConfig = {
   val: number | null;
 };
 
+export type SensorStatus = {
+  active: boolean;
+  lastSeen: number | null;
+  connectedPeers: number[];
+};
+
+export type SensorStatusMap = Record<string, SensorStatus>;
+
+export type MapBounds = {
+  north: number;
+  south: number;
+  west: number;
+  east: number;
+};
+
+export type MapPolicy = {
+  bounds: MapBounds | null;
+  bufferKm: number | null;
+  tileRoot: string | null;
+  offlineRequired: boolean;
+};
+
+export type BackendSensorStatus = {
+  active?: unknown;
+  last_seen?: unknown;
+  connected_peers?: unknown;
+};
+
+export type BackendMapPolicy = {
+  bounds?: unknown;
+  buffer_km?: unknown;
+  tile_root?: unknown;
+  offline_required?: unknown;
+};
+
 export type MonitorPayload = {
   connected: boolean;
   port: string;
@@ -56,6 +91,9 @@ export type MonitorPayload = {
   links: SignalLinkState[];
   crossing_alert: CrossingAlert | null;
   config: MonitorConfig;
+  units?: UnitPlacement[];
+  sensor_status?: Record<string, BackendSensorStatus>;
+  map_policy?: BackendMapPolicy;
 };
 
 export type MonitorState = {
@@ -69,4 +107,6 @@ export type MonitorState = {
   config: MonitorConfig;
   units: UnitPlacement[];
   pairings: PairLink[];
+  sensorStatus: SensorStatusMap;
+  mapPolicy: MapPolicy;
 };

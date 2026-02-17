@@ -28,6 +28,89 @@ def _normalize_side_links(raw_links: list[dict]) -> list[dict]:
     return normalized
 
 
+def _event_last_seen(event: Event) -> int:
+    marker = event.get("device_ts")
+    if isinstance(marker, int):
+        return marker
+    return int(now_ts())
+
+
+def _extract_peers(entry: dict, sensor_id: int) -> set[int]:
+    raw_peers = entry.get("connected_peers", [])
+    if not isinstance(raw_peers, list):
+        return set()
+    peers: set[int] = set()
+    for peer in raw_peers:
+        if isinstance(peer, int) and peer != sensor_id:
+            peers.add(peer)
+    return peers
+
+
+def _update_sensor_link_status(
+    state: SensorState, sensor_id: int, peer_id: int, connected: bool, last_seen: int
+) -> None:
+    sensor_key = str(sensor_id)
+    entry = state.sensor_status.get(sensor_key, {})
+    peers = _extract_peers(entry, sensor_id)
+    if connected:
+        peers.add(peer_id)
+    else:
+        peers.discard(peer_id)
+    state.sensor_status[sensor_key] = {
+        "active": len(peers) > 0,
+        "last_seen": last_seen,
+        "connected_peers": sorted(peers),
+    }
+
+
+def _refresh_sensor_status_from_map(
+    state: SensorState, unit_id: int | None, last_seen: int
+) -> None:
+    graph: dict[int, set[int]] = {}
+    for link in state.links:
+        side1 = link.get("side1")
+        side2 = link.get("side2")
+        if not isinstance(side1, int) or not isinstance(side2, int):
+            continue
+        graph.setdefault(side1, set()).add(side2)
+        graph.setdefault(side2, set()).add(side1)
+
+    touched = set(graph.keys())
+    if isinstance(unit_id, int):
+        touched.add(unit_id)
+    for sensor_id in touched:
+        peers = sorted(graph.get(sensor_id, set()))
+        state.sensor_status[str(sensor_id)] = {
+            "active": len(peers) > 0,
+            "last_seen": last_seen,
+            "connected_peers": peers,
+        }
+
+
+def _unit_coordinates(state: SensorState, unit_id: int) -> tuple[float, float] | None:
+    for unit in state.units:
+        raw_id = unit.get("id", unit.get("sensor_id", unit.get("unit")))
+        lat = unit.get("lat")
+        lng = unit.get("lng")
+        if raw_id == unit_id and isinstance(lat, (float, int)) and isinstance(lng, (float, int)):
+            return (float(lat), float(lng))
+    return None
+
+
+def _crossing_coordinates(
+    state: SensorState, sensor_a: int, sensor_b: int
+) -> tuple[float | None, float | None]:
+    coords_a = _unit_coordinates(state, sensor_a)
+    coords_b = _unit_coordinates(state, sensor_b)
+    if coords_a and coords_b:
+        return ((coords_a[0] + coords_b[0]) / 2.0, (coords_a[1] + coords_b[1]) / 2.0)
+    if coords_a:
+        return coords_a
+    if coords_b:
+        return coords_b
+    return (None, None)
+
+
 def set_connection_state(
     state: SensorState, connected: bool, port: str = "None", alarm: str | None = None
 ) -> None:
@@ -50,14 +133,15 @@ def acknowledge_alarm(state: SensorState) -> bool:
 def handle_event(state: SensorState, event: Event) -> bool:
     etype = event["type"]
     if etype == "detection":
+        crossing_lat, crossing_lng = _crossing_coordinates(state, event["unit_a"], event["unit_b"])
         state.last_detection_time = now_ts()
         set_connection_state(state, True, state.current_port, "alarm")
         state.crossing_alert = {
             "sensor_a": event["unit_a"],
             "sensor_b": event["unit_b"],
             "timestamp": event.get("device_ts"),
-            "lat": None,
-            "lng": None,
+            "lat": crossing_lat,
+            "lng": crossing_lng,
             "acknowledged": False,
         }
         state.config["threshold"] = event["threshold"]
@@ -74,6 +158,21 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         return True
     if etype == "connected":
+        last_seen = _event_last_seen(event)
+        _update_sensor_link_status(
+            state,
+            sensor_id=event["unit"],
+            peer_id=event["peer"],
+            connected=event["connected"],
+            last_seen=last_seen,
+        )
+        _update_sensor_link_status(
+            state,
+            sensor_id=event["peer"],
+            peer_id=event["unit"],
+            connected=event["connected"],
+            last_seen=last_seen,
+        )
         state.add_log(
             f"LINK {event['id_unit']}({event['unit']}) -> {event['id_peer']}({event['peer']}): "
             f"{'UP' if event['connected'] else 'DOWN'}"
@@ -81,6 +180,9 @@ def handle_event(state: SensorState, event: Event) -> bool:
         return True
     if etype == "map":
         state.links = _normalize_side_links(list(event.get("links", [])))
+        _refresh_sensor_status_from_map(
+            state, unit_id=event["unit_id"], last_seen=_event_last_seen(event)
+        )
         state.add_log(
             f"MAP from {event['unit_id']} ver={event['version']} gain={event['gain']} v={event['voltage']}"
         )

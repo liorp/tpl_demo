@@ -5,6 +5,20 @@ from typing import TypedDict
 
 import serial
 
+class MapPolicy(TypedDict):
+    bounds: dict | None
+    buffer_km: float | None
+    tile_root: str | None
+    offline_required: bool
+
+
+DEFAULT_MAP_POLICY: MapPolicy = {
+    "bounds": None,
+    "buffer_km": None,
+    "tile_root": None,
+    "offline_required": False,
+}
+
 
 class Event(TypedDict, total=False):
     type: str
@@ -45,6 +59,9 @@ class SensorState:
         self.links: list[dict] = []
         self.crossing_alert: dict | None = None
         self.config = {"threshold": None, "val": None}
+        self.units: list[dict] = []
+        self.sensor_status: dict = {}
+        self.map_policy: MapPolicy = dict(DEFAULT_MAP_POLICY)
 
         self.lock = threading.Lock()
         self.serial_lock = threading.Lock()
@@ -60,6 +77,10 @@ class SensorState:
 
 def snapshot(state: SensorState) -> dict:
     with state.lock:
+        map_policy: MapPolicy = {
+            **DEFAULT_MAP_POLICY,
+            **dict(state.map_policy),
+        }
         return {
             "connected": state.serial_connected,
             "port": state.current_port,
@@ -68,6 +89,9 @@ def snapshot(state: SensorState) -> dict:
             "links": list(state.links),
             "crossing_alert": dict(state.crossing_alert) if state.crossing_alert else None,
             "config": dict(state.config),
+            "units": list(state.units),
+            "sensor_status": dict(state.sensor_status),
+            "map_policy": map_policy,
         }
 
 

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "tile_root": "/tiles",
+  "format": "placeholder",
+  "offline_required": true,
+  "bounds": {
+    "north": 33.44,
+    "south": 29.46,
+    "east": 35.96,
+    "west": 34.19
+  },
+  "placeholders": [
+    "0/0/0.txt"
+  ]
+}

@@ -1,3 +1,7 @@
+import pytest
+
+import backend.core.models as models
+from backend.core.layout_store import ALLOWED_BOUNDS, MAP_BUFFER_KM, load_layout_state, save_layout_state
 from backend.core.models import SensorState, snapshot
 from backend.core.service import handle_event
 
@@ -35,6 +39,45 @@ def test_snapshot_includes_command_map_defaults():
     assert current["links"] == []
     assert current["crossing_alert"] is None
     assert current["config"] == {"threshold": None, "val": None}
+    assert current["units"] == []
+    assert current["sensor_status"] == {}
+    assert current["map_policy"] == {
+        "bounds": None,
+        "buffer_km": None,
+        "tile_root": None,
+        "offline_required": False,
+    }
+
+
+def test_snapshot_includes_mutated_runtime_fields():
+    state = SensorState()
+    state.units = [{"sensor_id": 1, "unit": 7}]
+    state.sensor_status = {
+        "1": {"active": True, "last_seen": 1700000000, "connected_peers": [2, 3]}
+    }
+    state.map_policy = {
+        "bounds": {"north": 1.0, "south": 0.0, "east": 1.0, "west": 0.0},
+        "buffer_km": 2.5,
+        "tile_root": "/tiles",
+        "offline_required": True,
+    }
+
+    current = snapshot(state)
+
+    assert current["units"] == [{"sensor_id": 1, "unit": 7}]
+    assert current["sensor_status"] == {
+        "1": {"active": True, "last_seen": 1700000000, "connected_peers": [2, 3]}
+    }
+    assert current["map_policy"] == {
+        "bounds": {"north": 1.0, "south": 0.0, "east": 1.0, "west": 0.0},
+        "buffer_km": 2.5,
+        "tile_root": "/tiles",
+        "offline_required": True,
+    }
+
+
+def test_default_map_policy_uses_typed_contract():
+    assert models.__annotations__["DEFAULT_MAP_POLICY"] is models.MapPolicy
 
 
 def test_handle_detection_updates_crossing_and_config():
@@ -115,3 +158,177 @@ def test_handle_config_event_updates_config_values():
 
     assert changed is True
     assert state.config == {"threshold": 777, "val": 799}
+
+
+def test_handle_connected_and_map_update_sensor_status_graph():
+    state = SensorState()
+
+    connected_changed = handle_event(
+        state,
+        {
+            "type": "connected",
+            "id_unit": "A",
+            "unit": 1,
+            "id_peer": "B",
+            "peer": 2,
+            "connected": True,
+            "device_ts": 1001,
+        },
+    )
+    disconnected_changed = handle_event(
+        state,
+        {
+            "type": "connected",
+            "id_unit": "A",
+            "unit": 1,
+            "id_peer": "B",
+            "peer": 2,
+            "connected": False,
+            "device_ts": 1002,
+        },
+    )
+    map_changed = handle_event(
+        state,
+        {
+            "type": "map",
+            "unit_id": 7,
+            "version": "v1",
+            "gain": 30,
+            "voltage": 2600,
+            "links": [
+                {"side1": 7, "side2": 8, "quality": 88, "intensity": 73},
+            ],
+            "device_ts": 1003,
+        },
+    )
+
+    assert connected_changed is True
+    assert disconnected_changed is True
+    assert map_changed is True
+    assert state.sensor_status["1"] == {
+        "active": False,
+        "last_seen": 1002,
+        "connected_peers": [],
+    }
+    assert state.sensor_status["2"] == {
+        "active": False,
+        "last_seen": 1002,
+        "connected_peers": [],
+    }
+    assert state.sensor_status["7"] == {
+        "active": True,
+        "last_seen": 1003,
+        "connected_peers": [8],
+    }
+    assert state.sensor_status["8"] == {
+        "active": True,
+        "last_seen": 1003,
+        "connected_peers": [7],
+    }
+
+
+def test_handle_detection_sets_crossing_midpoint_when_both_positions_known():
+    state = SensorState()
+    state.units = [
+        {"id": 1, "label": "S1", "lat": 10.0, "lng": 20.0},
+        {"id": 2, "label": "S2", "lat": 30.0, "lng": 40.0},
+    ]
+
+    changed = handle_event(
+        state,
+        {
+            "type": "detection",
+            "id_a": "AA",
+            "unit_a": 1,
+            "id_b": "BB",
+            "unit_b": 2,
+            "threshold": 500,
+            "value": 549,
+            "count": 1,
+            "device_ts": 321,
+        },
+    )
+
+    assert changed is True
+    assert state.crossing_alert is not None
+    assert state.crossing_alert["lat"] == 20.0
+    assert state.crossing_alert["lng"] == 30.0
+
+
+@pytest.mark.parametrize(
+    ('units', 'expected_lat', 'expected_lng'),
+    [
+        ([{"id": 1, "label": "S1", "lat": 10.0, "lng": 20.0}], 10.0, 20.0),
+        ([], None, None),
+    ],
+)
+def test_handle_detection_sets_crossing_coordinates_with_missing_positions(
+    units, expected_lat, expected_lng
+):
+    state = SensorState()
+    state.units = units
+
+    changed = handle_event(
+        state,
+        {
+            "type": "detection",
+            "id_a": "AA",
+            "unit_a": 1,
+            "id_b": "BB",
+            "unit_b": 2,
+            "threshold": 500,
+            "value": 549,
+            "count": 1,
+            "device_ts": 321,
+        },
+    )
+
+    assert changed is True
+    assert state.crossing_alert is not None
+    assert state.crossing_alert["lat"] == expected_lat
+    assert state.crossing_alert["lng"] == expected_lng
+
+
+def test_layout_store_load_missing_file_returns_safe_defaults(tmp_path):
+    layout_path = tmp_path / "layout.json"
+
+    loaded = load_layout_state(layout_path)
+
+    assert loaded["units"] == []
+    assert loaded["map_policy"]["buffer_km"] == MAP_BUFFER_KM
+    assert loaded["map_policy"]["bounds"] == ALLOWED_BOUNDS
+
+
+def test_layout_store_save_and_reload_units(tmp_path):
+    layout_path = tmp_path / "layout.json"
+    payload = {
+        "units": [
+            {"id": 7, "label": "S7", "lat": 33.31, "lng": 35.78},
+            {"id": 11, "label": "S11", "lat": 31.81, "lng": 34.66},
+        ]
+    }
+
+    save_layout_state(layout_path, payload)
+    loaded = load_layout_state(layout_path)
+
+    assert loaded["units"] == payload["units"]
+    assert loaded["map_policy"]["buffer_km"] == MAP_BUFFER_KM
+
+
+def test_layout_store_rejects_out_of_bounds_coordinates(tmp_path):
+    layout_path = tmp_path / "layout.json"
+
+    invalid_payload = {"units": [{"id": 7, "label": "S7", "lat": 40.0, "lng": 35.78}]}
+
+    with pytest.raises(ValueError, match="outside allowed map bounds"):
+        save_layout_state(layout_path, invalid_payload)
+
+
+def test_layout_store_load_corrupted_json_falls_back_to_defaults(tmp_path):
+    layout_path = tmp_path / "layout.json"
+    layout_path.write_text("{not json", encoding="utf-8")
+
+    loaded = load_layout_state(layout_path)
+
+    assert loaded["units"] == []
+    assert loaded["map_policy"]["buffer_km"] == MAP_BUFFER_KM

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -33,6 +33,12 @@ class FakeWebSocket {
     this.readyState = FakeWebSocket.OPEN;
     this.onopen?.(new Event('open'));
   }
+
+  emitMessage(payload: unknown) {
+    this.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify(payload) }),
+    );
+  }
 }
 
 function Harness() {
@@ -40,11 +46,21 @@ function Harness() {
   return null;
 }
 
-function StateHarness({ onState }: { onState: ReturnType<typeof vi.fn> }) {
-  const { state } = useMonitorSocket();
+function StateHarness({
+  onState,
+  onApi,
+}: {
+  onState: ReturnType<typeof vi.fn>;
+  onApi?: ReturnType<typeof vi.fn>;
+}) {
+  const api = useMonitorSocket();
+  const { state } = api;
   useEffect(() => {
     onState(state);
   }, [onState, state]);
+  useEffect(() => {
+    onApi?.(api);
+  }, [api, onApi]);
   return null;
 }
 
@@ -111,5 +127,94 @@ describe('monitor socket lifecycle', () => {
     expect(firstState.pairings).toEqual([
       { side1Id: 7, side2Id: 8, enabled: true },
     ]);
+  });
+
+  test('placeUnit sends set_unit_position command and applies optimistic unit update', async () => {
+    const onState = vi.fn();
+    const onApi = vi.fn();
+    render(<StateHarness onState={onState} onApi={onApi} />);
+
+    const socket = FakeWebSocket.instances[0];
+    socket.emitOpen();
+
+    const latestApi = onApi.mock.calls.at(-1)?.[0] as {
+      placeUnit: (unit: {
+        id: number;
+        label: string;
+        lat: number;
+        lng: number;
+      }) => void;
+    };
+    latestApi.placeUnit({ id: 7, label: 'S7', lat: 33.31, lng: 35.78 });
+
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        cmd: 'set_unit_position',
+        unit_id: 7,
+        lat: 33.31,
+        lng: 35.78,
+      }),
+    );
+
+    await waitFor(() => {
+      const latestState = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{ id: number; lat: number; lng: number }>;
+      };
+      expect(latestState.units).toEqual([
+        { id: 7, label: 'S7', lat: 33.31, lng: 35.78 },
+      ]);
+    });
+  });
+
+  test('uses backend units payload when available', async () => {
+    const onState = vi.fn();
+    render(<StateHarness onState={onState} />);
+
+    const socket = FakeWebSocket.instances[0];
+    socket.emitOpen();
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [
+        { time: '21:55:46', msg: 'MAP from 99 ver=0.4c10 gain=32 v=2112' },
+      ],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+      units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
+      sensor_status: {
+        '7': { active: true, last_seen: 100, connected_peers: [] },
+      },
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    await waitFor(() => {
+      const latestState = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{ id: number }>;
+        sensorStatus: Record<string, unknown>;
+        mapPolicy: { tileRoot: string | null };
+      };
+
+      expect(latestState.units).toEqual([
+        {
+          id: 7,
+          label: 'S7',
+          lat: 33.31,
+          lng: 35.78,
+          status: 'active',
+          lastSeenAt: 100,
+        },
+      ]);
+      expect(latestState.sensorStatus).toEqual({
+        '7': { active: true, lastSeen: 100, connectedPeers: [] },
+      });
+      expect(latestState.mapPolicy.tileRoot).toBe('/tiles');
+    });
   });
 });

@@ -1,9 +1,14 @@
 import type {
+  BackendMapPolicy,
+  BackendSensorStatus,
   CrossingAckWindow,
   CrossingAlert,
+  MapBounds,
+  MapPolicy,
   MonitorPayload,
   MonitorState,
   PairLink,
+  SensorStatusMap,
   SignalLinkState,
   UnitPlacement,
 } from './types';
@@ -59,6 +64,117 @@ function toCrossingAlert(
   };
 }
 
+function toDefaultMapPolicy(): MapPolicy {
+  return {
+    bounds: null,
+    bufferKm: null,
+    tileRoot: null,
+    offlineRequired: false,
+  };
+}
+
+function toMapBounds(raw: unknown): MapBounds | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const value = raw as Record<string, unknown>;
+  const north = value.north;
+  const south = value.south;
+  const west = value.west;
+  const east = value.east;
+  if (
+    typeof north !== 'number' ||
+    typeof south !== 'number' ||
+    typeof west !== 'number' ||
+    typeof east !== 'number'
+  ) {
+    return null;
+  }
+  return { north, south, west, east };
+}
+
+function toMapPolicy(raw: BackendMapPolicy | undefined): MapPolicy {
+  if (!raw || typeof raw !== 'object') {
+    return toDefaultMapPolicy();
+  }
+  return {
+    bounds: toMapBounds(raw.bounds),
+    bufferKm: typeof raw.buffer_km === 'number' ? raw.buffer_km : null,
+    tileRoot: typeof raw.tile_root === 'string' ? raw.tile_root : null,
+    offlineRequired: raw.offline_required === true,
+  };
+}
+
+function toSensorStatusMap(
+  raw: MonitorPayload['sensor_status'],
+): SensorStatusMap {
+  if (!raw || typeof raw !== 'object') {
+    return {};
+  }
+
+  const next: SensorStatusMap = {};
+  for (const [sensorId, status] of Object.entries(raw)) {
+    if (!status || typeof status !== 'object') {
+      continue;
+    }
+    const value = status as BackendSensorStatus;
+    const connectedPeers = Array.isArray(value.connected_peers)
+      ? value.connected_peers.filter(
+          (peer): peer is number => typeof peer === 'number',
+        )
+      : [];
+    next[sensorId] = {
+      active: value.active === true,
+      lastSeen: typeof value.last_seen === 'number' ? value.last_seen : null,
+      connectedPeers,
+    };
+  }
+  return next;
+}
+
+function toPayloadUnits(
+  payloadUnits: MonitorPayload['units'],
+  sensorStatus: SensorStatusMap,
+): UnitPlacement[] {
+  if (!Array.isArray(payloadUnits)) {
+    return [];
+  }
+
+  const nextUnits: UnitPlacement[] = [];
+  for (const unit of payloadUnits) {
+    if (!unit || typeof unit !== 'object') {
+      continue;
+    }
+    const value = unit as Record<string, unknown>;
+    const id = value.id;
+    const lat = value.lat;
+    const lng = value.lng;
+    if (
+      typeof id !== 'number' ||
+      !Number.isInteger(id) ||
+      typeof lat !== 'number' ||
+      typeof lng !== 'number'
+    ) {
+      continue;
+    }
+    const sensor = sensorStatus[String(id)];
+    nextUnits.push({
+      id,
+      label: typeof value.label === 'string' ? value.label : `S${id}`,
+      lat,
+      lng,
+      ...(sensor
+        ? {
+            status: sensor.active ? ('active' as const) : ('inactive' as const),
+            lastSeenAt: sensor.lastSeen ?? undefined,
+          }
+        : {}),
+    });
+  }
+
+  return nextUnits.slice(0, MAX_UNITS);
+}
+
 export function createInitialMonitorState(): MonitorState {
   return {
     connected: false,
@@ -71,6 +187,8 @@ export function createInitialMonitorState(): MonitorState {
     config: { threshold: null, val: null },
     units: [],
     pairings: [],
+    sensorStatus: {},
+    mapPolicy: toDefaultMapPolicy(),
   };
 }
 
@@ -78,6 +196,7 @@ export function toMonitorStateFromPayload(
   payload: MonitorPayload,
 ): MonitorState {
   const crossingAlert = toCrossingAlert(payload.crossing_alert);
+  const sensorStatus = toSensorStatusMap(payload.sensor_status);
   return {
     connected: payload.connected,
     port: payload.port,
@@ -87,8 +206,10 @@ export function toMonitorStateFromPayload(
     crossingAlerts: crossingAlert ? [crossingAlert] : [],
     crossingAckWindows: [],
     config: payload.config,
-    units: [],
+    units: toPayloadUnits(payload.units, sensorStatus),
     pairings: [],
+    sensorStatus,
+    mapPolicy: toMapPolicy(payload.map_policy),
   };
 }
 

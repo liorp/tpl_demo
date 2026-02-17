@@ -80,6 +80,7 @@ export function useMonitorSocket(): {
             )
               ? null
               : incomingAlert;
+            const hasServerUnits = Array.isArray(payload.units);
             return {
               ...base,
               crossingAlerts: mergeCrossingAlerts(
@@ -87,7 +88,9 @@ export function useMonitorSocket(): {
                 allowedAlert,
               ),
               crossingAckWindows: previous.crossingAckWindows,
-              units: mergeTelemetryUnits(previous.units, payload),
+              units: hasServerUnits
+                ? base.units
+                : mergeTelemetryUnits(previous.units, payload),
               pairings: previous.pairings,
             };
           });
@@ -156,6 +159,18 @@ export function useMonitorSocket(): {
   );
 
   const placeUnit = useCallback((unit: UnitPlacement) => {
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          cmd: 'set_unit_position',
+          unit_id: unit.id,
+          lat: unit.lat,
+          lng: unit.lng,
+        }),
+      );
+    }
+
     setState((previous) => {
       const next = upsertUnit(previous, unit);
       savePersistedMonitorConfig({
