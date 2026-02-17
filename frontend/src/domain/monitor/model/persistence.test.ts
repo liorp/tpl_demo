@@ -25,9 +25,7 @@ describe('monitor persistence', () => {
   test('round-trips units and pairings', () => {
     store.clear();
     const units: UnitPlacement[] = [{ id: 1, label: 'U1', lat: 32, lng: 34 }];
-    const pairings: PairLink[] = [
-      { side1Id: 1, side2Id: 2, enabled: true },
-    ];
+    const pairings: PairLink[] = [{ side1Id: 1, side2Id: 2, enabled: true }];
     savePersistedMonitorConfig({ units, pairings });
 
     const loaded = loadPersistedMonitorConfig();

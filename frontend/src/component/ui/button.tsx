@@ -11,8 +11,7 @@ const buttonVariants = cva(
       variant: {
         default:
           'bg-primary text-primary-foreground shadow-[0_1px_2px_oklch(0_0_0/0.3)] hover:brightness-110 active:brightness-95',
-        ghost:
-          'hover:bg-muted hover:text-foreground active:bg-muted/80',
+        ghost: 'hover:bg-muted hover:text-foreground active:bg-muted/80',
         outline:
           'border border-border bg-transparent text-foreground hover:bg-muted hover:border-border-bright',
         destructive:

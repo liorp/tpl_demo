@@ -20,20 +20,15 @@ export function EventLog({ events }: Props) {
         collapsed ? 'h-[30px]' : 'h-[25vh] min-h-36',
       )}
     >
-      <header
-        className="flex shrink-0 cursor-pointer select-none items-center gap-2 border-b border-border bg-card-elevated px-4 py-1.5 transition-colors hover:bg-card-elevated/80"
+      <button
+        type="button"
+        className="flex shrink-0 cursor-pointer select-none items-center gap-2 border-b border-border bg-card-elevated px-4 py-1.5 text-left transition-colors hover:bg-card-elevated/80"
         onClick={() => setCollapsed((v) => !v)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setCollapsed((v) => !v);
-          }
-        }}
-        role="button"
-        tabIndex={0}
         aria-expanded={!collapsed}
       >
         <svg
+          aria-hidden="true"
+          focusable="false"
           xmlns="http://www.w3.org/2000/svg"
           width="12"
           height="12"
@@ -51,6 +46,8 @@ export function EventLog({ events }: Props) {
           <path d="m6 9 6 6 6-6" />
         </svg>
         <svg
+          aria-hidden="true"
+          focusable="false"
           xmlns="http://www.w3.org/2000/svg"
           width="12"
           height="12"
@@ -73,7 +70,7 @@ export function EventLog({ events }: Props) {
         <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground/40">
           {events.length} entries
         </span>
-      </header>
+      </button>
       {!collapsed && (
         <div
           className="flex-1 overflow-y-auto text-sm"

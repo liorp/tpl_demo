@@ -45,10 +45,7 @@ function MapUnitsViewportController({ units }: { units: UnitPlacement[] }) {
 
   useEffect(() => {
     const signature = units
-      .map(
-        (unit) =>
-          `${unit.id}:${unit.lat.toFixed(5)}:${unit.lng.toFixed(5)}`,
-      )
+      .map((unit) => `${unit.id}:${unit.lat.toFixed(5)}:${unit.lng.toFixed(5)}`)
       .join('|');
 
     if (!signature || signature === lastUnitsSignature.current) {
@@ -150,9 +147,7 @@ export function MonitorMap({ units, pairings, links, focusPoint }: Props) {
               <div className="font-body text-xs">
                 <strong className="font-display">{unit.label}</strong>
                 <br />
-                <span className="text-muted-foreground">
-                  Sensor #{unit.id}
-                </span>
+                <span className="text-muted-foreground">Sensor #{unit.id}</span>
               </div>
             </Popup>
           </CircleMarker>

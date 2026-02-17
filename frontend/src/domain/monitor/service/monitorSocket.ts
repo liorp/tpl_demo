@@ -50,7 +50,7 @@ export function useMonitorSocket(): {
   const [state, setState] = useState<MonitorState>(() => {
     const next = createInitialMonitorState();
     const persisted = loadPersistedMonitorConfig();
-    return { ...next, units: [], pairings: persisted.pairings };
+    return { ...next, units: persisted.units, pairings: persisted.pairings };
   });
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -159,7 +159,7 @@ export function useMonitorSocket(): {
     setState((previous) => {
       const next = upsertUnit(previous, unit);
       savePersistedMonitorConfig({
-        units: [],
+        units: next.units,
         pairings: next.pairings,
       });
       return next;
@@ -171,7 +171,7 @@ export function useMonitorSocket(): {
       setState((previous) => {
         const next = setPairing(previous, side1Id, side2Id, enabled);
         savePersistedMonitorConfig({
-          units: [],
+          units: next.units,
           pairings: next.pairings,
         });
         return next;
