@@ -11,12 +11,15 @@ import {
 } from '@/component/ui/dialog';
 import { Input } from '@/component/ui/input';
 import { Label } from '@/component/ui/label';
+import { Switch } from '@/component/ui/switch';
 
 import type { MonitorConfig } from '../model/types';
 
 type Props = {
   config: MonitorConfig;
+  alarmSoundEnabled: boolean;
   onApply: (next: { threshold: number; val: number }) => void;
+  onAlarmSoundEnabledChange: (enabled: boolean) => void;
   onResetAll: () => void;
 };
 
@@ -27,7 +30,13 @@ function toKnownValue(value: number | null, fallback: number): string {
   return value !== null ? String(value) : String(fallback);
 }
 
-export function ConfigMenu({ config, onApply, onResetAll }: Props) {
+export function ConfigMenu({
+  config,
+  alarmSoundEnabled,
+  onApply,
+  onAlarmSoundEnabledChange,
+  onResetAll,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [threshold, setThreshold] = useState(
     toKnownValue(config.threshold, DEFAULT_THRESHOLD),
@@ -113,6 +122,25 @@ export function ConfigMenu({ config, onApply, onResetAll }: Props) {
               value={val}
               onChange={(event) => setVal(event.target.value)}
               className="bg-background font-mono tabular-nums"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border-bright bg-background/70 px-3 py-2">
+            <div className="space-y-0.5">
+              <Label
+                htmlFor="alarm-sound"
+                className="font-display text-xs tracking-wide text-muted-foreground"
+              >
+                Alarm Sound
+              </Label>
+              <p className="font-body text-xs text-muted-foreground/85">
+                Play a short alert sound when alarm is triggered.
+              </p>
+            </div>
+            <Switch
+              id="alarm-sound"
+              checked={alarmSoundEnabled}
+              onCheckedChange={onAlarmSoundEnabledChange}
+              aria-label="Alarm Sound"
             />
           </div>
         </div>

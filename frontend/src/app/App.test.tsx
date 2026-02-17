@@ -32,6 +32,7 @@ const state = {
   ],
   crossingAckWindows: [],
   config: { threshold: null, val: null },
+  globalSettings: { alarmSoundEnabled: true },
   units: [
     {
       id: 1,
@@ -73,9 +74,11 @@ const acknowledgeCrossing = vi.fn();
 const requestMap = vi.fn();
 const applyConfig = vi.fn();
 const resetAll = vi.fn();
+const setAlarmSoundEnabled = vi.fn();
 const placeUnit = vi.fn();
 const setUnitPairing = vi.fn();
 const monitorMapMock = vi.fn();
+const playAlarmSound = vi.fn();
 
 vi.mock('../domain/monitor/service/monitorSocket', () => ({
   useMonitorSocket: () => ({
@@ -83,6 +86,7 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
     acknowledgeCrossing,
     requestMap,
     applyConfig,
+    setAlarmSoundEnabled,
     resetAll,
     placeUnit,
     setUnitPairing,
@@ -118,6 +122,10 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
   ),
 }));
 
+vi.mock('../domain/monitor/service/alarmSound', () => ({
+  playAlarmSound: () => playAlarmSound(),
+}));
+
 describe('App', () => {
   beforeEach(() => {
     cleanup();
@@ -125,9 +133,13 @@ describe('App', () => {
     requestMap.mockClear();
     applyConfig.mockClear();
     resetAll.mockClear();
+    setAlarmSoundEnabled.mockClear();
     placeUnit.mockClear();
     setUnitPairing.mockClear();
     monitorMapMock.mockClear();
+    playAlarmSound.mockClear();
+    state.globalSettings = { alarmSoundEnabled: true };
+    state.alarm = 'clear';
   });
 
   test('renders refresh map as map HUD and hides live feed indicator', () => {
@@ -188,5 +200,30 @@ describe('App', () => {
     expect(acknowledgeCrossing).toHaveBeenCalledWith(
       expect.objectContaining({ sensorA: 1, sensorB: 2 }),
     );
+  });
+
+  test('plays alarm sound when alarm state enters alarm and sound is enabled', () => {
+    state.globalSettings = { alarmSoundEnabled: true };
+    state.alarm = 'clear';
+    const { rerender } = render(<App />);
+
+    expect(playAlarmSound).toHaveBeenCalledTimes(0);
+
+    state.alarm = 'alarm';
+    rerender(<App />);
+
+    expect(playAlarmSound).toHaveBeenCalledTimes(1);
+
+    rerender(<App />);
+    expect(playAlarmSound).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not play alarm sound when global setting is disabled', () => {
+    state.globalSettings = { alarmSoundEnabled: false };
+    state.alarm = 'alarm';
+
+    render(<App />);
+
+    expect(playAlarmSound).toHaveBeenCalledTimes(0);
   });
 });

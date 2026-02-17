@@ -48,6 +48,10 @@ export type MonitorConfig = {
   val: number | null;
 };
 
+export type GlobalSettings = {
+  alarmSoundEnabled: boolean;
+};
+
 export type SensorStatus = {
   active: boolean;
   lastSeen: number | null;
@@ -105,6 +109,7 @@ export type MonitorState = {
   crossingAlerts: CrossingAlert[];
   crossingAckWindows: CrossingAckWindow[];
   config: MonitorConfig;
+  globalSettings: GlobalSettings;
   units: UnitPlacement[];
   pairings: PairLink[];
   sensorStatus: SensorStatusMap;

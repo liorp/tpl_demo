@@ -7,6 +7,7 @@ import type {
   MapBounds,
   MapPolicy,
 } from '../domain/monitor/model/types';
+import { playAlarmSound } from '../domain/monitor/service/alarmSound';
 import { useMonitorSocket } from '../domain/monitor/service/monitorSocket';
 import { CommandStatusPanel } from '../domain/monitor/ui/CommandStatusPanel';
 import { ConfigMenu } from '../domain/monitor/ui/ConfigMenu';
@@ -64,6 +65,7 @@ export function App() {
     requestMap,
     acknowledgeCrossing,
     applyConfig,
+    setAlarmSoundEnabled,
     resetAll,
     placeUnit,
     setUnitPairing,
@@ -172,6 +174,16 @@ export function App() {
     setSelectedUnitId(null);
     setPlacementMode(false);
   }, [selectedUnit]);
+
+  useEffect(() => {
+    if (!state.globalSettings.alarmSoundEnabled) {
+      return;
+    }
+    if (state.alarm !== 'alarm') {
+      return;
+    }
+    playAlarmSound();
+  }, [state.alarm, state.globalSettings.alarmSoundEnabled]);
 
   const handlePlaceAt = useCallback(
     (lat: number, lng: number) => {
@@ -301,7 +313,9 @@ export function App() {
         <footer className="flex h-12 items-center justify-between border-t border-border bg-card/80 px-4 backdrop-blur-sm">
           <ConfigMenu
             config={state.config}
+            alarmSoundEnabled={state.globalSettings.alarmSoundEnabled}
             onApply={applyConfig}
+            onAlarmSoundEnabledChange={setAlarmSoundEnabled}
             onResetAll={resetAll}
           />
           <ConnectionIndicator state={state} />

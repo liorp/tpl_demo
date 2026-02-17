@@ -5,9 +5,16 @@ const KEY = 'monitor:persisted:v1';
 type PersistedMonitorConfig = {
   units: UnitPlacement[];
   pairings: PairLink[];
+  globalSettings: {
+    alarmSoundEnabled: boolean;
+  };
 };
 
-const EMPTY: PersistedMonitorConfig = { units: [], pairings: [] };
+const EMPTY: PersistedMonitorConfig = {
+  units: [],
+  pairings: [],
+  globalSettings: { alarmSoundEnabled: true },
+};
 
 function normalizePairings(value: unknown): PairLink[] {
   if (!Array.isArray(value)) {
@@ -37,6 +44,22 @@ function normalizePairings(value: unknown): PairLink[] {
   });
 }
 
+function normalizeGlobalSettings(
+  value: unknown,
+): PersistedMonitorConfig['globalSettings'] {
+  if (!value || typeof value !== 'object') {
+    return EMPTY.globalSettings;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return {
+    alarmSoundEnabled:
+      typeof candidate.alarmSoundEnabled === 'boolean'
+        ? candidate.alarmSoundEnabled
+        : true,
+  };
+}
+
 export function loadPersistedMonitorConfig(): PersistedMonitorConfig {
   try {
     const raw = localStorage.getItem(KEY);
@@ -50,6 +73,7 @@ export function loadPersistedMonitorConfig(): PersistedMonitorConfig {
     return {
       units: parsed.units,
       pairings: normalizePairings(parsed.pairings),
+      globalSettings: normalizeGlobalSettings(parsed.globalSettings),
     };
   } catch {
     return EMPTY;

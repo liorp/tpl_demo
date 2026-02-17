@@ -14,7 +14,9 @@ describe('ConfigMenu', () => {
     render(
       <ConfigMenu
         config={{ threshold: 640, val: 777 }}
+        alarmSoundEnabled
         onApply={vi.fn()}
+        onAlarmSoundEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
       />,
     );
@@ -34,7 +36,9 @@ describe('ConfigMenu', () => {
     render(
       <ConfigMenu
         config={{ threshold: null, val: null }}
+        alarmSoundEnabled
         onApply={onApply}
+        onAlarmSoundEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
       />,
     );
@@ -60,7 +64,9 @@ describe('ConfigMenu', () => {
     render(
       <ConfigMenu
         config={{ threshold: null, val: null }}
+        alarmSoundEnabled
         onApply={vi.fn()}
+        onAlarmSoundEnabledChange={vi.fn()}
         onResetAll={onResetAll}
       />,
     );
@@ -69,5 +75,24 @@ describe('ConfigMenu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset all' }));
 
     expect(onResetAll).toHaveBeenCalledTimes(1);
+  });
+
+  test('toggles alarm sound setting', () => {
+    const onAlarmSoundEnabledChange = vi.fn();
+
+    render(
+      <ConfigMenu
+        config={{ threshold: null, val: null }}
+        alarmSoundEnabled
+        onApply={vi.fn()}
+        onAlarmSoundEnabledChange={onAlarmSoundEnabledChange}
+        onResetAll={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Alarm Sound' }));
+
+    expect(onAlarmSoundEnabledChange).toHaveBeenCalledWith(false);
   });
 });

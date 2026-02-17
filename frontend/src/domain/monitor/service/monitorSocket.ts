@@ -43,6 +43,7 @@ export function useMonitorSocket(): {
   acknowledgeCrossing: (alert: CrossingAlert) => void;
   requestMap: () => void;
   applyConfig: (value: { threshold: number; val: number }) => void;
+  setAlarmSoundEnabled: (enabled: boolean) => void;
   resetAll: () => void;
   placeUnit: (unit: UnitPlacement) => void;
   setUnitPairing: (side1Id: number, side2Id: number, enabled: boolean) => void;
@@ -50,7 +51,12 @@ export function useMonitorSocket(): {
   const [state, setState] = useState<MonitorState>(() => {
     const next = createInitialMonitorState();
     const persisted = loadPersistedMonitorConfig();
-    return { ...next, units: persisted.units, pairings: persisted.pairings };
+    return {
+      ...next,
+      units: persisted.units,
+      pairings: persisted.pairings,
+      globalSettings: persisted.globalSettings,
+    };
   });
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -92,6 +98,7 @@ export function useMonitorSocket(): {
                 ? base.units
                 : mergeTelemetryUnits(previous.units, payload),
               pairings: previous.pairings,
+              globalSettings: previous.globalSettings,
             };
           });
         }
@@ -106,6 +113,7 @@ export function useMonitorSocket(): {
         units: previous.units,
         pairings: previous.pairings,
         config: previous.config,
+        globalSettings: previous.globalSettings,
       }));
     };
 
@@ -176,6 +184,7 @@ export function useMonitorSocket(): {
       savePersistedMonitorConfig({
         units: next.units,
         pairings: next.pairings,
+        globalSettings: next.globalSettings,
       });
       return next;
     });
@@ -188,6 +197,7 @@ export function useMonitorSocket(): {
         savePersistedMonitorConfig({
           units: next.units,
           pairings: next.pairings,
+          globalSettings: next.globalSettings,
         });
         return next;
       });
@@ -195,9 +205,32 @@ export function useMonitorSocket(): {
     [],
   );
 
+  const setAlarmSoundEnabled = useCallback((enabled: boolean) => {
+    setState((previous) => {
+      const next = {
+        ...previous,
+        globalSettings: {
+          ...previous.globalSettings,
+          alarmSoundEnabled: enabled,
+        },
+      };
+      savePersistedMonitorConfig({
+        units: next.units,
+        pairings: next.pairings,
+        globalSettings: next.globalSettings,
+      });
+      return next;
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     clearPersistedMonitorConfig();
-    setState((previous) => ({ ...previous, units: [], pairings: [] }));
+    setState((previous) => ({
+      ...previous,
+      units: [],
+      pairings: [],
+      globalSettings: { alarmSoundEnabled: true },
+    }));
   }, []);
 
   return {
@@ -205,6 +238,7 @@ export function useMonitorSocket(): {
     acknowledgeCrossing,
     requestMap,
     applyConfig,
+    setAlarmSoundEnabled,
     resetAll,
     placeUnit,
     setUnitPairing,

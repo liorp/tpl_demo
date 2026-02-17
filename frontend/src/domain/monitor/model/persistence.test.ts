@@ -26,12 +26,17 @@ describe('monitor persistence', () => {
     store.clear();
     const units: UnitPlacement[] = [{ id: 1, label: 'U1', lat: 32, lng: 34 }];
     const pairings: PairLink[] = [{ side1Id: 1, side2Id: 2, enabled: true }];
-    savePersistedMonitorConfig({ units, pairings });
+    savePersistedMonitorConfig({
+      units,
+      pairings,
+      globalSettings: { alarmSoundEnabled: false },
+    });
 
     const loaded = loadPersistedMonitorConfig();
 
     expect(loaded.units).toEqual(units);
     expect(loaded.pairings).toEqual(pairings);
+    expect(loaded.globalSettings).toEqual({ alarmSoundEnabled: false });
   });
 
   test('returns defaults when payload is invalid', () => {
@@ -40,7 +45,11 @@ describe('monitor persistence', () => {
 
     const loaded = loadPersistedMonitorConfig();
 
-    expect(loaded).toEqual({ units: [], pairings: [] });
+    expect(loaded).toEqual({
+      units: [],
+      pairings: [],
+      globalSettings: { alarmSoundEnabled: true },
+    });
   });
 
   test('drops invalid pairing payloads', () => {
@@ -63,10 +72,15 @@ describe('monitor persistence', () => {
     savePersistedMonitorConfig({
       units: [{ id: 1, label: 'U1', lat: 32, lng: 34 }],
       pairings: [{ side1Id: 1, side2Id: 2, enabled: true }],
+      globalSettings: { alarmSoundEnabled: false },
     });
 
     clearPersistedMonitorConfig();
 
-    expect(loadPersistedMonitorConfig()).toEqual({ units: [], pairings: [] });
+    expect(loadPersistedMonitorConfig()).toEqual({
+      units: [],
+      pairings: [],
+      globalSettings: { alarmSoundEnabled: true },
+    });
   });
 });
