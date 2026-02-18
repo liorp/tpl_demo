@@ -33,6 +33,19 @@ def test_prioritizes_usb_style_ports_over_other_ports(monkeypatch):
     assert list_serial_ports("") == ["/dev/cu.usbmodem1101", "/dev/ttyACM0"]
 
 
+def test_ignores_non_usb_ports_when_no_usb_candidates_exist(monkeypatch):
+    monkeypatch.setattr(
+        "serial.tools.list_ports.comports",
+        lambda: [
+            SimpleNamespace(device="/dev/cu.debug-console"),
+            SimpleNamespace(device="/dev/tty.debug-console"),
+            SimpleNamespace(device="/dev/cu.Bluetooth-Incoming-Port"),
+        ],
+    )
+
+    assert list_serial_ports("") == []
+
+
 def test_disconnects_immediately_when_port_disappears_during_idle(monkeypatch):
     port = "/dev/cu.usbmodem1101"
 

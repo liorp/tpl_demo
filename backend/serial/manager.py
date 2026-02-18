@@ -32,7 +32,7 @@ def list_serial_ports(forced_port: str) -> list[str]:
         ):
             preferred.append(port)
 
-    return preferred or non_bluetooth or ports
+    return preferred
 
 
 class SerialManager:
