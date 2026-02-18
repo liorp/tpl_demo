@@ -12,4 +12,22 @@ describe('offline shell assets', () => {
     expect(indexHtml).not.toContain('fonts.googleapis.com');
     expect(indexHtml).not.toContain('fonts.gstatic.com');
   });
+
+  test('ships offline map tiles with high native zoom levels', () => {
+    const manifestRaw = readFileSync(
+      new URL('../../public/tiles/manifest.json', import.meta.url),
+      'utf-8',
+    );
+    const manifest = JSON.parse(manifestRaw) as {
+      format?: unknown;
+      min_zoom?: unknown;
+      max_zoom?: unknown;
+      tile_count?: unknown;
+    };
+
+    expect(manifest.format).toBe('xyz');
+    expect(manifest.min_zoom).toBe(7);
+    expect(manifest.max_zoom).toBeGreaterThanOrEqual(14);
+    expect(manifest.tile_count).toBeTypeOf('number');
+  });
 });

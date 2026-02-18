@@ -13,7 +13,7 @@ import { getUnitBounds } from '../model/mapViewport';
 import type { PairLink, SignalLinkState, UnitPlacement } from '../model/types';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
-const ONLINE_NATIVE_MAX_ZOOM = 19;
+const ONLINE_TILE_NATIVE_MAX_ZOOM = 19;
 const ISRAEL_BOUNDS: [[number, number], [number, number]] = [
   [29.2, 34.1],
   [33.55, 36.05],
@@ -49,18 +49,19 @@ function MapFocusController({
 
 function MapUnitsViewportController({ units }: { units: UnitPlacement[] }) {
   const map = useMap();
-  const lastUnitsSignature = useRef('');
+  const lastUnitsIdentity = useRef('');
 
   useEffect(() => {
-    const signature = units
-      .map((unit) => `${unit.id}:${unit.lat.toFixed(5)}:${unit.lng.toFixed(5)}`)
+    const identity = units
+      .map((unit) => unit.id)
+      .sort((a, b) => a - b)
       .join('|');
 
-    if (!signature || signature === lastUnitsSignature.current) {
+    if (!identity || identity === lastUnitsIdentity.current) {
       return;
     }
 
-    lastUnitsSignature.current = signature;
+    lastUnitsIdentity.current = identity;
     const bounds = getUnitBounds(units);
     if (!bounds) {
       return;
@@ -130,7 +131,7 @@ export function MonitorMap({
     ? offlineZoomRange.maxZoom
     : useOfflineTiles
       ? 12
-      : ONLINE_NATIVE_MAX_ZOOM;
+      : ONLINE_TILE_NATIVE_MAX_ZOOM;
 
   useEffect(() => {
     if (!useOfflineTiles) {
@@ -186,7 +187,6 @@ export function MonitorMap({
         center={DEFAULT_CENTER}
         zoom={12}
         minZoom={minZoom}
-        maxZoom={maxNativeZoom}
         maxBounds={mapBounds ?? ISRAEL_BOUNDS}
         maxBoundsViscosity={1}
         attributionControl={false}
@@ -194,7 +194,6 @@ export function MonitorMap({
       >
         <TileLayer
           url={tileUrl}
-          maxZoom={maxNativeZoom}
           maxNativeZoom={maxNativeZoom}
           eventHandlers={{
             tileerror: () => {

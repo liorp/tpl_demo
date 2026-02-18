@@ -19,6 +19,9 @@ const markerEvents = new Map<
     }) => void;
   }>
 >();
+const mapFlyTo = vi.fn();
+const mapSetView = vi.fn();
+const mapFitBounds = vi.fn();
 
 vi.mock('react-leaflet', () => ({
   MapContainer: ({
@@ -32,7 +35,7 @@ vi.mock('react-leaflet', () => ({
     center: [number, number];
     zoom: number;
     minZoom: number;
-    maxZoom: number;
+    maxZoom?: number;
     maxBounds: [[number, number], [number, number]];
     children: React.ReactNode;
   }) => (
@@ -53,7 +56,7 @@ vi.mock('react-leaflet', () => ({
     maxNativeZoom,
   }: {
     url: string;
-    maxZoom: number;
+    maxZoom?: number;
     maxNativeZoom: number;
   }) => (
     <div
@@ -89,10 +92,10 @@ vi.mock('react-leaflet', () => ({
     return {};
   },
   useMap: () => ({
-    flyTo: vi.fn(),
+    flyTo: mapFlyTo,
     getZoom: () => 8,
-    setView: vi.fn(),
-    fitBounds: vi.fn(),
+    setView: mapSetView,
+    fitBounds: mapFitBounds,
   }),
 }));
 
@@ -101,6 +104,9 @@ describe('MonitorMap', () => {
     mapEvents.click = undefined;
     markerEvents.clear();
     vi.restoreAllMocks();
+    mapFlyTo.mockClear();
+    mapSetView.mockClear();
+    mapFitBounds.mockClear();
   });
   afterEach(() => {
     cleanup();
@@ -220,10 +226,70 @@ describe('MonitorMap', () => {
         .getAllByTestId('map-container')
         .at(-1)
         ?.getAttribute('data-max-zoom'),
-    ).toBe('19');
+    ).toBeNull();
     expect(
       screen.getAllByTestId('tile-layer').at(-1)?.getAttribute('data-max-zoom'),
+    ).toBeNull();
+    expect(
+      screen
+        .getAllByTestId('tile-layer')
+        .at(-1)
+        ?.getAttribute('data-max-native-zoom'),
     ).toBe('19');
+  });
+
+  test('does not auto-shift viewport when existing unit positions change', () => {
+    const { rerender } = render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.4, lng: 35.9, status: 'active' },
+        ]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(mapFitBounds).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MonitorMap
+        units={[
+          {
+            id: 1,
+            label: 'Sensor 1',
+            lat: 33.21,
+            lng: 35.71,
+            status: 'active',
+          },
+          {
+            id: 2,
+            label: 'Sensor 2',
+            lat: 33.41,
+            lng: 35.91,
+            status: 'active',
+          },
+        ]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(mapFitBounds).toHaveBeenCalledTimes(1);
   });
 
   test('calls move callback when marker drag ends', () => {
@@ -315,9 +381,9 @@ describe('MonitorMap', () => {
     await waitFor(() => {
       const mapContainer = screen.getAllByTestId('map-container').at(-1);
       expect(mapContainer?.getAttribute('data-min-zoom')).toBe('7');
-      expect(mapContainer?.getAttribute('data-max-zoom')).toBe('12');
+      expect(mapContainer?.getAttribute('data-max-zoom')).toBeNull();
       const tileLayer = screen.getAllByTestId('tile-layer').at(-1);
-      expect(tileLayer?.getAttribute('data-max-zoom')).toBe('12');
+      expect(tileLayer?.getAttribute('data-max-zoom')).toBeNull();
       expect(tileLayer?.getAttribute('data-max-native-zoom')).toBe('12');
     });
   });
@@ -344,9 +410,10 @@ describe('MonitorMap', () => {
     );
 
     const mapContainer = screen.getAllByTestId('map-container').at(-1);
-    expect(mapContainer?.getAttribute('data-max-zoom')).toBe('12');
+    expect(mapContainer?.getAttribute('data-max-zoom')).toBeNull();
     expect(mapContainer?.getAttribute('data-min-zoom')).toBe('7');
     const tileLayer = screen.getAllByTestId('tile-layer').at(-1);
+    expect(tileLayer?.getAttribute('data-max-zoom')).toBeNull();
     expect(tileLayer?.getAttribute('data-max-native-zoom')).toBe('12');
   });
 });

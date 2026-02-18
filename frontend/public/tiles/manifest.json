@@ -10,9 +10,9 @@
     "west": 34.19
   },
   "min_zoom": 7,
-  "max_zoom": 12,
-  "tile_count": 1917,
+  "max_zoom": 14,
+  "tile_count": 24449,
   "source": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-  "generated_at_unix": 1771392553,
+  "generated_at_unix": 1771412583,
   "padding_tiles": 1
 }
