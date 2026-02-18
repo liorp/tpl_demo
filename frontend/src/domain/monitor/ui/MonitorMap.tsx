@@ -14,6 +14,7 @@ import type { PairLink, SignalLinkState, UnitPlacement } from '../model/types';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
 const ONLINE_TILE_NATIVE_MAX_ZOOM = 19;
+const OFFLINE_DEFAULT_NATIVE_MAX_ZOOM = 14;
 const ISRAEL_BOUNDS: [[number, number], [number, number]] = [
   [29.2, 34.1],
   [33.55, 36.05],
@@ -123,15 +124,20 @@ export function MonitorMap({
     minZoom: number;
     maxZoom: number;
   } | null>(null);
-  const useOfflineTiles = offlineRequired || offlineModeEnabled;
+  const policyForcesOffline =
+    offlineRequired &&
+    typeof navigator !== 'undefined' &&
+    navigator.onLine === false;
+  const useOfflineTiles = offlineModeEnabled || policyForcesOffline;
   const unitById = new Map(units.map((unit) => [unit.id, unit] as const));
   const tileUrl = toTileUrl(tileRoot, useOfflineTiles);
   const minZoom = offlineZoomRange ? offlineZoomRange.minZoom : 7;
   const maxNativeZoom = offlineZoomRange
     ? offlineZoomRange.maxZoom
     : useOfflineTiles
-      ? 12
+      ? OFFLINE_DEFAULT_NATIVE_MAX_ZOOM
       : ONLINE_TILE_NATIVE_MAX_ZOOM;
+  const onlineHighZoomFallbackMinZoom = maxNativeZoom + 1;
 
   useEffect(() => {
     if (!useOfflineTiles) {
@@ -194,6 +200,7 @@ export function MonitorMap({
       >
         <TileLayer
           url={tileUrl}
+          maxZoom={useOfflineTiles ? maxNativeZoom : undefined}
           maxNativeZoom={maxNativeZoom}
           eventHandlers={{
             tileerror: () => {
@@ -203,6 +210,13 @@ export function MonitorMap({
             },
           }}
         />
+        {useOfflineTiles ? (
+          <TileLayer
+            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            minZoom={onlineHighZoomFallbackMinZoom}
+            maxNativeZoom={ONLINE_TILE_NATIVE_MAX_ZOOM}
+          />
+        ) : null}
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
         {pairings.map((pair) => {

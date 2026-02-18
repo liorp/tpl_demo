@@ -52,16 +52,19 @@ vi.mock('react-leaflet', () => ({
   ),
   TileLayer: ({
     url,
+    minZoom,
     maxZoom,
     maxNativeZoom,
   }: {
     url: string;
+    minZoom?: number;
     maxZoom?: number;
     maxNativeZoom: number;
   }) => (
     <div
       data-testid="tile-layer"
       data-url={url}
+      data-min-zoom={minZoom}
       data-max-zoom={maxZoom}
       data-max-native-zoom={maxNativeZoom}
     />
@@ -178,9 +181,10 @@ describe('MonitorMap', () => {
       />,
     );
 
-    expect(
-      screen.getAllByTestId('tile-layer').at(-1)?.getAttribute('data-url'),
-    ).toBe('/custom-tiles/{z}/{x}/{y}.png');
+    let tileLayers = screen.getAllByTestId('tile-layer');
+    expect(tileLayers[0]?.getAttribute('data-url')).toBe(
+      '/custom-tiles/{z}/{x}/{y}.png',
+    );
 
     rerender(
       <MonitorMap
@@ -197,9 +201,10 @@ describe('MonitorMap', () => {
       />,
     );
 
-    expect(
-      screen.getAllByTestId('tile-layer').at(-1)?.getAttribute('data-url'),
-    ).toBe('/tiles/{z}/{x}/{y}.png');
+    tileLayers = screen.getAllByTestId('tile-layer');
+    expect(tileLayers[0]?.getAttribute('data-url')).toBe(
+      '/tiles/{z}/{x}/{y}.png',
+    );
   });
 
   test('uses internet tiles when offline mode is disabled and offline is not required', () => {
@@ -236,6 +241,27 @@ describe('MonitorMap', () => {
         .at(-1)
         ?.getAttribute('data-max-native-zoom'),
     ).toBe('19');
+  });
+
+  test('respects offline toggle and uses internet tiles when disabled, even if policy is offline-required', () => {
+    render(
+      <MonitorMap
+        units={[]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={'/custom-tiles'}
+        offlineRequired={true}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getAllByTestId('tile-layer').at(-1)?.getAttribute('data-url'),
+    ).toBe('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
   });
 
   test('does not auto-shift viewport when existing unit positions change', () => {
@@ -382,9 +408,65 @@ describe('MonitorMap', () => {
       const mapContainer = screen.getAllByTestId('map-container').at(-1);
       expect(mapContainer?.getAttribute('data-min-zoom')).toBe('7');
       expect(mapContainer?.getAttribute('data-max-zoom')).toBeNull();
-      const tileLayer = screen.getAllByTestId('tile-layer').at(-1);
-      expect(tileLayer?.getAttribute('data-max-zoom')).toBeNull();
-      expect(tileLayer?.getAttribute('data-max-native-zoom')).toBe('12');
+      const tileLayers = screen.getAllByTestId('tile-layer');
+      expect(tileLayers).toHaveLength(2);
+      const offlineLayer = tileLayers[0];
+      expect(offlineLayer?.getAttribute('data-max-zoom')).toBe('12');
+      expect(offlineLayer?.getAttribute('data-max-native-zoom')).toBe('12');
+      const onlineFallbackLayer = tileLayers[1];
+      expect(onlineFallbackLayer?.getAttribute('data-min-zoom')).toBe('13');
+      expect(onlineFallbackLayer?.getAttribute('data-max-native-zoom')).toBe(
+        '19',
+      );
+    });
+  });
+
+  test('adds an online fallback layer above offline native max zoom', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          format: 'xyz',
+          min_zoom: 7,
+          max_zoom: 14,
+        }),
+      }),
+    );
+
+    render(
+      <MonitorMap
+        units={[]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={'/tiles'}
+        offlineRequired={true}
+        offlineModeEnabled={true}
+        mapBounds={null}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      const tileLayers = screen.getAllByTestId('tile-layer');
+      expect(tileLayers).toHaveLength(2);
+      const offlineLayer = tileLayers[0];
+      expect(offlineLayer?.getAttribute('data-url')).toBe(
+        '/tiles/{z}/{x}/{y}.png',
+      );
+      expect(offlineLayer?.getAttribute('data-max-native-zoom')).toBe('14');
+      expect(offlineLayer?.getAttribute('data-max-zoom')).toBe('14');
+
+      const onlineFallbackLayer = tileLayers[1];
+      expect(onlineFallbackLayer?.getAttribute('data-url')).toBe(
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      );
+      expect(onlineFallbackLayer?.getAttribute('data-min-zoom')).toBe('15');
+      expect(onlineFallbackLayer?.getAttribute('data-max-native-zoom')).toBe(
+        '19',
+      );
     });
   });
 
@@ -412,8 +494,15 @@ describe('MonitorMap', () => {
     const mapContainer = screen.getAllByTestId('map-container').at(-1);
     expect(mapContainer?.getAttribute('data-max-zoom')).toBeNull();
     expect(mapContainer?.getAttribute('data-min-zoom')).toBe('7');
-    const tileLayer = screen.getAllByTestId('tile-layer').at(-1);
-    expect(tileLayer?.getAttribute('data-max-zoom')).toBeNull();
-    expect(tileLayer?.getAttribute('data-max-native-zoom')).toBe('12');
+    const tileLayers = screen.getAllByTestId('tile-layer');
+    expect(tileLayers).toHaveLength(2);
+    const offlineLayer = tileLayers[0];
+    expect(offlineLayer?.getAttribute('data-max-zoom')).toBe('14');
+    expect(offlineLayer?.getAttribute('data-max-native-zoom')).toBe('14');
+    const onlineFallbackLayer = tileLayers[1];
+    expect(onlineFallbackLayer?.getAttribute('data-min-zoom')).toBe('15');
+    expect(onlineFallbackLayer?.getAttribute('data-max-native-zoom')).toBe(
+      '19',
+    );
   });
 });
