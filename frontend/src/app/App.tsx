@@ -71,7 +71,6 @@ export function App() {
     placeUnit,
     setUnitPairing,
   } = useMonitorSocket();
-  const [placementMode, setPlacementMode] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const [focusedAlertPoint, setFocusedAlertPoint] = useState<{
     lat: number;
@@ -86,17 +85,6 @@ export function App() {
   const activeUnits = useMemo(
     () => state.units.filter((unit) => unit.status !== 'inactive'),
     [state.units],
-  );
-  const selectableUnits = useMemo(
-    () => [...activeUnits].sort((a, b) => a.id - b.id),
-    [activeUnits],
-  );
-  const selectedUnit = useMemo(
-    () =>
-      selectableUnits.find((unit) => unit.id === selectedUnitId) ??
-      selectableUnits[0] ??
-      null,
-    [selectableUnits, selectedUnitId],
   );
   const mapBounds = useMemo(
     () =>
@@ -168,13 +156,17 @@ export function App() {
   }, [selectedSensorStatus, selectedUnitId, state.links]);
 
   useEffect(() => {
-    if (selectedUnit) {
-      setSelectedUnitId(selectedUnit.id);
+    if (selectedUnitId === null) {
       return;
     }
-    setSelectedUnitId(null);
-    setPlacementMode(false);
-  }, [selectedUnit]);
+    const selectedUnitExists = activeUnits.some(
+      (unit) => unit.id === selectedUnitId,
+    );
+    if (selectedUnitExists) {
+      return;
+    }
+    setSelectedUnitId(activeUnits[0]?.id ?? null);
+  }, [activeUnits, selectedUnitId]);
 
   useEffect(() => {
     if (!state.globalSettings.alarmSoundEnabled) {
@@ -186,19 +178,20 @@ export function App() {
     playAlarmSound();
   }, [state.alarm, state.globalSettings.alarmSoundEnabled]);
 
-  const handlePlaceAt = useCallback(
-    (lat: number, lng: number) => {
-      if (!placementMode || !selectedUnit) {
+  const handleMoveUnit = useCallback(
+    (unitId: number, lat: number, lng: number) => {
+      const unit = activeUnits.find((candidate) => candidate.id === unitId);
+      if (!unit) {
         return;
       }
       placeUnit({
-        ...selectedUnit,
+        ...unit,
         lat,
         lng,
       });
-      setPlacementMode(false);
+      setSelectedUnitId(unitId);
     },
-    [placeUnit, placementMode, selectedUnit],
+    [activeUnits, placeUnit],
   );
 
   const handleFocusAlert = useCallback((alert: CrossingAlert) => {
@@ -244,42 +237,6 @@ export function App() {
                 </svg>
                 REFRESH MAP
               </Button>
-              <div className="flex items-center gap-2">
-                <label
-                  htmlFor="placement-unit"
-                  className="font-display text-xs tracking-wide text-muted-foreground"
-                >
-                  UNIT
-                </label>
-                <select
-                  id="placement-unit"
-                  className="rounded border border-border-bright bg-card px-2 py-1 font-body text-xs text-foreground"
-                  value={selectedUnit?.id ?? ''}
-                  onChange={(event) =>
-                    setSelectedUnitId(Number.parseInt(event.target.value, 10))
-                  }
-                  disabled={selectableUnits.length === 0}
-                >
-                  {selectableUnits.length === 0 ? (
-                    <option value="">No active units</option>
-                  ) : (
-                    selectableUnits.map((unit) => (
-                      <option key={unit.id} value={unit.id}>
-                        {unit.label}
-                      </option>
-                    ))
-                  )}
-                </select>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={placementMode ? 'default' : 'outline'}
-                  onClick={() => setPlacementMode((current) => !current)}
-                  disabled={!selectedUnit}
-                >
-                  {placementMode ? 'Placing…' : 'Place Unit'}
-                </Button>
-              </div>
             </div>
           </div>
           {selectedUnitId !== null && selectedSensorStatus ? (
@@ -302,8 +259,7 @@ export function App() {
             offlineRequired={mapPolicy.offlineRequired}
             offlineModeEnabled={state.globalSettings.offlineModeEnabled}
             mapBounds={mapBounds}
-            placementMode={placementMode}
-            onPlaceAt={handlePlaceAt}
+            onMoveUnit={handleMoveUnit}
             onSelectUnit={setSelectedUnitId}
           />
         </div>

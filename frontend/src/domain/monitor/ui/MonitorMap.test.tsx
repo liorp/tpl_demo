@@ -10,6 +10,15 @@ const mapEvents = {
     | ((event: { latlng: { lat: number; lng: number } }) => void)
     | undefined,
 };
+const markerEvents = new Map<
+  number,
+  Partial<{
+    click: () => void;
+    dragend: (event: {
+      target: { getLatLng: () => { lat: number; lng: number } };
+    }) => void;
+  }>
+>();
 
 vi.mock('react-leaflet', () => ({
   MapContainer: ({
@@ -38,10 +47,37 @@ vi.mock('react-leaflet', () => ({
       {children}
     </div>
   ),
-  TileLayer: ({ url }: { url: string }) => (
-    <div data-testid="tile-layer" data-url={url} />
+  TileLayer: ({
+    url,
+    maxZoom,
+    maxNativeZoom,
+  }: {
+    url: string;
+    maxZoom: number;
+    maxNativeZoom: number;
+  }) => (
+    <div
+      data-testid="tile-layer"
+      data-url={url}
+      data-max-zoom={maxZoom}
+      data-max-native-zoom={maxNativeZoom}
+    />
   ),
-  CircleMarker: () => null,
+  Marker: ({
+    position,
+    eventHandlers,
+  }: {
+    position: [number, number];
+    eventHandlers?: Partial<{
+      click: () => void;
+      dragend: (event: {
+        target: { getLatLng: () => { lat: number; lng: number } };
+      }) => void;
+    }>;
+  }) => {
+    markerEvents.set(position[0], eventHandlers ?? {});
+    return null;
+  },
   Polyline: () => null,
   Popup: () => null,
   useMapEvents: (
@@ -63,6 +99,7 @@ vi.mock('react-leaflet', () => ({
 describe('MonitorMap', () => {
   beforeEach(() => {
     mapEvents.click = undefined;
+    markerEvents.clear();
     vi.restoreAllMocks();
   });
   afterEach(() => {
@@ -80,8 +117,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={null}
-        placementMode={false}
-        onPlaceAt={vi.fn()}
+        onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
     );
@@ -108,8 +144,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={bounds}
-        placementMode={false}
-        onPlaceAt={vi.fn()}
+        onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
     );
@@ -132,8 +167,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={true}
         mapBounds={null}
-        placementMode={false}
-        onPlaceAt={vi.fn()}
+        onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
     );
@@ -152,8 +186,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={true}
         mapBounds={null}
-        placementMode={false}
-        onPlaceAt={vi.fn()}
+        onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
     );
@@ -174,8 +207,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={null}
-        placementMode={false}
-        onPlaceAt={vi.fn()}
+        onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
     );
@@ -189,13 +221,18 @@ describe('MonitorMap', () => {
         .at(-1)
         ?.getAttribute('data-max-zoom'),
     ).toBe('19');
+    expect(
+      screen.getAllByTestId('tile-layer').at(-1)?.getAttribute('data-max-zoom'),
+    ).toBe('19');
   });
 
-  test('calls placement callback on map click only in placement mode', () => {
-    const onPlaceAt = vi.fn();
-    const { rerender } = render(
+  test('calls move callback when marker drag ends', () => {
+    const onMoveUnit = vi.fn();
+    render(
       <MonitorMap
-        units={[]}
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+        ]}
         pairings={[]}
         links={[]}
         focusPoint={null}
@@ -203,34 +240,19 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={null}
-        placementMode={false}
-        onPlaceAt={onPlaceAt}
+        onMoveUnit={onMoveUnit}
         onSelectUnit={vi.fn()}
       />,
     );
 
-    expect(mapEvents.click).toBeTypeOf('function');
-    mapEvents.click?.({ latlng: { lat: 33.2, lng: 35.7 } });
-    expect(onPlaceAt).not.toHaveBeenCalled();
-
-    rerender(
-      <MonitorMap
-        units={[]}
-        pairings={[]}
-        links={[]}
-        focusPoint={null}
-        tileRoot={null}
-        offlineRequired={false}
-        offlineModeEnabled={false}
-        mapBounds={null}
-        placementMode={true}
-        onPlaceAt={onPlaceAt}
-        onSelectUnit={vi.fn()}
-      />,
-    );
-
-    mapEvents.click?.({ latlng: { lat: 33.21, lng: 35.71 } });
-    expect(onPlaceAt).toHaveBeenCalledWith(33.21, 35.71);
+    const handlers = markerEvents.get(33.2);
+    expect(handlers?.dragend).toBeTypeOf('function');
+    handlers?.dragend?.({
+      target: {
+        getLatLng: () => ({ lat: 33.21, lng: 35.71 }),
+      },
+    });
+    expect(onMoveUnit).toHaveBeenCalledWith(1, 33.21, 35.71);
   });
 
   test('shows explicit offline map error when manifest is placeholder', async () => {
@@ -252,8 +274,7 @@ describe('MonitorMap', () => {
         offlineRequired={true}
         offlineModeEnabled={true}
         mapBounds={null}
-        placementMode={false}
-        onPlaceAt={vi.fn()}
+        onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
     );
@@ -263,7 +284,7 @@ describe('MonitorMap', () => {
     ).not.toBeNull();
   });
 
-  test('caps map zoom range to offline manifest levels', async () => {
+  test('allows map zoom to global max while keeping offline native levels', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -286,8 +307,7 @@ describe('MonitorMap', () => {
         offlineRequired={true}
         offlineModeEnabled={true}
         mapBounds={null}
-        placementMode={false}
-        onPlaceAt={vi.fn()}
+        onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
     );
@@ -296,6 +316,9 @@ describe('MonitorMap', () => {
       const mapContainer = screen.getAllByTestId('map-container').at(-1);
       expect(mapContainer?.getAttribute('data-min-zoom')).toBe('7');
       expect(mapContainer?.getAttribute('data-max-zoom')).toBe('12');
+      const tileLayer = screen.getAllByTestId('tile-layer').at(-1);
+      expect(tileLayer?.getAttribute('data-max-zoom')).toBe('12');
+      expect(tileLayer?.getAttribute('data-max-native-zoom')).toBe('12');
     });
   });
 
@@ -315,8 +338,7 @@ describe('MonitorMap', () => {
         offlineRequired={true}
         offlineModeEnabled={true}
         mapBounds={null}
-        placementMode={false}
-        onPlaceAt={vi.fn()}
+        onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
     );
@@ -324,5 +346,7 @@ describe('MonitorMap', () => {
     const mapContainer = screen.getAllByTestId('map-container').at(-1);
     expect(mapContainer?.getAttribute('data-max-zoom')).toBe('12');
     expect(mapContainer?.getAttribute('data-min-zoom')).toBe('7');
+    const tileLayer = screen.getAllByTestId('tile-layer').at(-1);
+    expect(tileLayer?.getAttribute('data-max-native-zoom')).toBe('12');
   });
 });

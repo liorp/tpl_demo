@@ -1,19 +1,19 @@
+import { divIcon } from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
 import {
-  CircleMarker,
   MapContainer,
+  Marker,
   Polyline,
   Popup,
   TileLayer,
   useMap,
-  useMapEvents,
 } from 'react-leaflet';
 
 import { getUnitBounds } from '../model/mapViewport';
 import type { PairLink, SignalLinkState, UnitPlacement } from '../model/types';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
-const ONLINE_MAX_ZOOM = 19;
+const ONLINE_NATIVE_MAX_ZOOM = 19;
 const ISRAEL_BOUNDS: [[number, number], [number, number]] = [
   [29.2, 34.1],
   [33.55, 36.05],
@@ -28,8 +28,7 @@ type Props = {
   offlineRequired: boolean;
   offlineModeEnabled: boolean;
   mapBounds: [[number, number], [number, number]] | null;
-  placementMode: boolean;
-  onPlaceAt: (lat: number, lng: number) => void;
+  onMoveUnit: (unitId: number, lat: number, lng: number) => void;
   onSelectUnit: (unitId: number) => void;
 };
 
@@ -99,25 +98,12 @@ function toTileUrl(tileRoot: string | null, useOfflineTiles: boolean): string {
   const root = (tileRoot ?? '/tiles').replace(/\/+$/, '');
   return `${root}/{z}/{x}/{y}.png`;
 }
-
-function MapPlacementController({
-  placementMode,
-  onPlaceAt,
-}: {
-  placementMode: boolean;
-  onPlaceAt: (lat: number, lng: number) => void;
-}) {
-  useMapEvents({
-    click: (event) => {
-      if (!placementMode) {
-        return;
-      }
-      onPlaceAt(event.latlng.lat, event.latlng.lng);
-    },
-  });
-
-  return null;
-}
+const unitPinIcon = divIcon({
+  className: '',
+  html: '<span style="display:block;width:14px;height:14px;border-radius:9999px;border:2px solid #67e8f9;background:#06b6d4;box-shadow:0 0 0 2px rgba(15,23,42,0.35);"></span>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
 
 export function MonitorMap({
   units,
@@ -128,8 +114,7 @@ export function MonitorMap({
   offlineRequired,
   offlineModeEnabled,
   mapBounds,
-  placementMode,
-  onPlaceAt,
+  onMoveUnit,
   onSelectUnit,
 }: Props) {
   const [offlineTilePackMissing, setOfflineTilePackMissing] = useState(false);
@@ -141,11 +126,11 @@ export function MonitorMap({
   const unitById = new Map(units.map((unit) => [unit.id, unit] as const));
   const tileUrl = toTileUrl(tileRoot, useOfflineTiles);
   const minZoom = offlineZoomRange ? offlineZoomRange.minZoom : 7;
-  const maxZoom = offlineZoomRange
+  const maxNativeZoom = offlineZoomRange
     ? offlineZoomRange.maxZoom
     : useOfflineTiles
       ? 12
-      : ONLINE_MAX_ZOOM;
+      : ONLINE_NATIVE_MAX_ZOOM;
 
   useEffect(() => {
     if (!useOfflineTiles) {
@@ -201,7 +186,7 @@ export function MonitorMap({
         center={DEFAULT_CENTER}
         zoom={12}
         minZoom={minZoom}
-        maxZoom={maxZoom}
+        maxZoom={maxNativeZoom}
         maxBounds={mapBounds ?? ISRAEL_BOUNDS}
         maxBoundsViscosity={1}
         attributionControl={false}
@@ -209,8 +194,8 @@ export function MonitorMap({
       >
         <TileLayer
           url={tileUrl}
-          maxZoom={maxZoom}
-          maxNativeZoom={maxZoom}
+          maxZoom={maxNativeZoom}
+          maxNativeZoom={maxNativeZoom}
           eventHandlers={{
             tileerror: () => {
               if (useOfflineTiles) {
@@ -221,10 +206,6 @@ export function MonitorMap({
         />
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
-        <MapPlacementController
-          placementMode={placementMode}
-          onPlaceAt={onPlaceAt}
-        />
         {pairings.map((pair) => {
           const side1 = unitById.get(pair.side1Id);
           const side2 = unitById.get(pair.side2Id);
@@ -253,18 +234,17 @@ export function MonitorMap({
           );
         })}
         {units.map((unit) => (
-          <CircleMarker
+          <Marker
             key={unit.id}
-            center={[unit.lat, unit.lng]}
-            radius={7}
-            pathOptions={{
-              color: '#67e8f9',
-              weight: 2,
-              fillColor: '#06b6d4',
-              fillOpacity: 0.65,
-            }}
+            position={[unit.lat, unit.lng]}
+            draggable={true}
+            icon={unitPinIcon}
             eventHandlers={{
               click: () => onSelectUnit(unit.id),
+              dragend: (event) => {
+                const next = event.target.getLatLng();
+                onMoveUnit(unit.id, next.lat, next.lng);
+              },
             }}
           >
             <Popup>
@@ -274,7 +254,7 @@ export function MonitorMap({
                 <span className="text-muted-foreground">Sensor #{unit.id}</span>
               </div>
             </Popup>
-          </CircleMarker>
+          </Marker>
         ))}
       </MapContainer>
       {offlineModeEnabled && offlineTilePackMissing ? (

@@ -99,10 +99,12 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
   MonitorMap: ({
     units,
     onSelectUnit,
+    onMoveUnit,
     focusPoint,
   }: {
     units: { id: number; label: string }[];
     onSelectUnit: (unitId: number) => void;
+    onMoveUnit: (unitId: number, lat: number, lng: number) => void;
     focusPoint: { lat: number; lng: number } | null;
   }) => (
     <div
@@ -112,13 +114,17 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
     >
       {monitorMapMock({ focusPoint })}
       {units.map((unit) => (
-        <button
-          key={unit.id}
-          type="button"
-          onClick={() => onSelectUnit(unit.id)}
-        >
-          Select {unit.label}
-        </button>
+        <div key={unit.id}>
+          <button type="button" onClick={() => onSelectUnit(unit.id)}>
+            Select {unit.label}
+          </button>
+          <button
+            type="button"
+            onClick={() => onMoveUnit(unit.id, 33.25, 35.75)}
+          >
+            Move {unit.label}
+          </button>
+        </div>
       ))}
     </div>
   ),
@@ -152,8 +158,23 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.queryByText('Place unit ID:')).toBeNull();
+    expect(screen.queryByText('UNIT')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Place Unit' })).toBeNull();
     expect(screen.getByRole('button', { name: 'REFRESH MAP' })).not.toBeNull();
     expect(screen.queryByText('Live Feed')).toBeNull();
+  });
+
+  test('moves a unit when map drag callback is triggered', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move Sensor 1' }));
+    expect(placeUnit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 1,
+        lat: 33.25,
+        lng: 35.75,
+      }),
+    );
   });
 
   test('shows command status panel for selected sensor from map click', () => {
