@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { MonitorMap } from './MonitorMap';
 
@@ -15,11 +15,15 @@ vi.mock('react-leaflet', () => ({
   MapContainer: ({
     center,
     zoom,
+    minZoom,
+    maxZoom,
     maxBounds,
     children,
   }: {
     center: [number, number];
     zoom: number;
+    minZoom: number;
+    maxZoom: number;
     maxBounds: [[number, number], [number, number]];
     children: React.ReactNode;
   }) => (
@@ -27,6 +31,8 @@ vi.mock('react-leaflet', () => ({
       data-testid="map-container"
       data-center={JSON.stringify(center)}
       data-zoom={zoom}
+      data-min-zoom={minZoom}
+      data-max-zoom={maxZoom}
       data-max-bounds={JSON.stringify(maxBounds)}
     >
       {children}
@@ -57,6 +63,10 @@ vi.mock('react-leaflet', () => ({
 describe('MonitorMap', () => {
   beforeEach(() => {
     mapEvents.click = undefined;
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    cleanup();
   });
 
   test('defaults to Mount Hermon area viewport', () => {
@@ -67,6 +77,8 @@ describe('MonitorMap', () => {
         links={[]}
         focusPoint={null}
         tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
         mapBounds={null}
         placementMode={false}
         onPlaceAt={vi.fn()}
@@ -93,6 +105,8 @@ describe('MonitorMap', () => {
         links={[]}
         focusPoint={null}
         tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
         mapBounds={bounds}
         placementMode={false}
         onPlaceAt={vi.fn()}
@@ -107,7 +121,7 @@ describe('MonitorMap', () => {
     );
   });
 
-  test('uses local tile root when provided and falls back to /tiles', () => {
+  test('uses local tile root when provided and falls back to /tiles in offline mode', () => {
     const { rerender } = render(
       <MonitorMap
         units={[]}
@@ -115,6 +129,8 @@ describe('MonitorMap', () => {
         links={[]}
         focusPoint={null}
         tileRoot={'/custom-tiles'}
+        offlineRequired={false}
+        offlineModeEnabled={true}
         mapBounds={null}
         placementMode={false}
         onPlaceAt={vi.fn()}
@@ -133,6 +149,8 @@ describe('MonitorMap', () => {
         links={[]}
         focusPoint={null}
         tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={true}
         mapBounds={null}
         placementMode={false}
         onPlaceAt={vi.fn()}
@@ -145,6 +163,34 @@ describe('MonitorMap', () => {
     ).toBe('/tiles/{z}/{x}/{y}.png');
   });
 
+  test('uses internet tiles when offline mode is disabled and offline is not required', () => {
+    render(
+      <MonitorMap
+        units={[]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={'/custom-tiles'}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        placementMode={false}
+        onPlaceAt={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getAllByTestId('tile-layer').at(-1)?.getAttribute('data-url'),
+    ).toBe('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+    expect(
+      screen
+        .getAllByTestId('map-container')
+        .at(-1)
+        ?.getAttribute('data-max-zoom'),
+    ).toBe('19');
+  });
+
   test('calls placement callback on map click only in placement mode', () => {
     const onPlaceAt = vi.fn();
     const { rerender } = render(
@@ -154,6 +200,8 @@ describe('MonitorMap', () => {
         links={[]}
         focusPoint={null}
         tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
         mapBounds={null}
         placementMode={false}
         onPlaceAt={onPlaceAt}
@@ -172,6 +220,8 @@ describe('MonitorMap', () => {
         links={[]}
         focusPoint={null}
         tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
         mapBounds={null}
         placementMode={true}
         onPlaceAt={onPlaceAt}
@@ -181,5 +231,98 @@ describe('MonitorMap', () => {
 
     mapEvents.click?.({ latlng: { lat: 33.21, lng: 35.71 } });
     expect(onPlaceAt).toHaveBeenCalledWith(33.21, 35.71);
+  });
+
+  test('shows explicit offline map error when manifest is placeholder', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ format: 'placeholder' }),
+      }),
+    );
+
+    render(
+      <MonitorMap
+        units={[]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={'/tiles'}
+        offlineRequired={true}
+        offlineModeEnabled={true}
+        mapBounds={null}
+        placementMode={false}
+        onPlaceAt={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(
+      await screen.findByText('Offline map tiles are unavailable.'),
+    ).not.toBeNull();
+  });
+
+  test('caps map zoom range to offline manifest levels', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          format: 'xyz',
+          min_zoom: 7,
+          max_zoom: 12,
+        }),
+      }),
+    );
+
+    render(
+      <MonitorMap
+        units={[]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={'/tiles'}
+        offlineRequired={true}
+        offlineModeEnabled={true}
+        mapBounds={null}
+        placementMode={false}
+        onPlaceAt={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      const mapContainer = screen.getAllByTestId('map-container').at(-1);
+      expect(mapContainer?.getAttribute('data-min-zoom')).toBe('7');
+      expect(mapContainer?.getAttribute('data-max-zoom')).toBe('12');
+    });
+  });
+
+  test('uses conservative offline zoom defaults before manifest resolves', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => {})),
+    );
+
+    render(
+      <MonitorMap
+        units={[]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={'/tiles'}
+        offlineRequired={true}
+        offlineModeEnabled={true}
+        mapBounds={null}
+        placementMode={false}
+        onPlaceAt={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    const mapContainer = screen.getAllByTestId('map-container').at(-1);
+    expect(mapContainer?.getAttribute('data-max-zoom')).toBe('12');
+    expect(mapContainer?.getAttribute('data-min-zoom')).toBe('7');
   });
 });

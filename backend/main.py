@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 import logging
 import threading
 import time
@@ -17,7 +18,6 @@ from backend.serial.manager import SerialManager
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("tpl-signum")
 
-app = FastAPI()
 state = SensorState()
 broadcaster = Broadcaster()
 serial_manager = SerialManager(state=state, forced_port=SERIAL_PORT)
@@ -38,7 +38,6 @@ deps = AppDeps(
     layout_state_path=layout_state_path,
     save_layout=save_layout_state,
 )
-register_routes(app, deps)
 
 
 def _broadcast_snapshot() -> None:
@@ -75,14 +74,19 @@ def serial_reader_thread() -> None:
     )
 
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     persisted = load_layout_state(layout_state_path)
     with state.lock:
         state.units = persisted["units"]
         state.map_policy = persisted["map_policy"]
     asyncio.create_task(broadcaster.start())
     threading.Thread(target=serial_reader_thread, daemon=True).start()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+register_routes(app, deps)
 
 
 if __name__ == "__main__":

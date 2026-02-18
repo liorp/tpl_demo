@@ -50,6 +50,7 @@ export type MonitorConfig = {
 
 export type GlobalSettings = {
   alarmSoundEnabled: boolean;
+  offlineModeEnabled: boolean;
 };
 
 export type SensorStatus = {

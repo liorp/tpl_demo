@@ -29,14 +29,17 @@ describe('monitor persistence', () => {
     savePersistedMonitorConfig({
       units,
       pairings,
-      globalSettings: { alarmSoundEnabled: false },
+      globalSettings: { alarmSoundEnabled: false, offlineModeEnabled: false },
     });
 
     const loaded = loadPersistedMonitorConfig();
 
     expect(loaded.units).toEqual(units);
     expect(loaded.pairings).toEqual(pairings);
-    expect(loaded.globalSettings).toEqual({ alarmSoundEnabled: false });
+    expect(loaded.globalSettings).toEqual({
+      alarmSoundEnabled: false,
+      offlineModeEnabled: false,
+    });
   });
 
   test('returns defaults when payload is invalid', () => {
@@ -48,7 +51,7 @@ describe('monitor persistence', () => {
     expect(loaded).toEqual({
       units: [],
       pairings: [],
-      globalSettings: { alarmSoundEnabled: true },
+      globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     });
   });
 
@@ -72,7 +75,7 @@ describe('monitor persistence', () => {
     savePersistedMonitorConfig({
       units: [{ id: 1, label: 'U1', lat: 32, lng: 34 }],
       pairings: [{ side1Id: 1, side2Id: 2, enabled: true }],
-      globalSettings: { alarmSoundEnabled: false },
+      globalSettings: { alarmSoundEnabled: false, offlineModeEnabled: false },
     });
 
     clearPersistedMonitorConfig();
@@ -80,7 +83,7 @@ describe('monitor persistence', () => {
     expect(loadPersistedMonitorConfig()).toEqual({
       units: [],
       pairings: [],
-      globalSettings: { alarmSoundEnabled: true },
+      globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     });
   });
 });

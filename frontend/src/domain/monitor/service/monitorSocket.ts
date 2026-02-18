@@ -44,6 +44,7 @@ export function useMonitorSocket(): {
   requestMap: () => void;
   applyConfig: (value: { threshold: number; val: number }) => void;
   setAlarmSoundEnabled: (enabled: boolean) => void;
+  setOfflineModeEnabled: (enabled: boolean) => void;
   resetAll: () => void;
   placeUnit: (unit: UnitPlacement) => void;
   setUnitPairing: (side1Id: number, side2Id: number, enabled: boolean) => void;
@@ -223,13 +224,31 @@ export function useMonitorSocket(): {
     });
   }, []);
 
+  const setOfflineModeEnabled = useCallback((enabled: boolean) => {
+    setState((previous) => {
+      const next = {
+        ...previous,
+        globalSettings: {
+          ...previous.globalSettings,
+          offlineModeEnabled: enabled,
+        },
+      };
+      savePersistedMonitorConfig({
+        units: next.units,
+        pairings: next.pairings,
+        globalSettings: next.globalSettings,
+      });
+      return next;
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     clearPersistedMonitorConfig();
     setState((previous) => ({
       ...previous,
       units: [],
       pairings: [],
-      globalSettings: { alarmSoundEnabled: true },
+      globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     }));
   }, []);
 
@@ -239,6 +258,7 @@ export function useMonitorSocket(): {
     requestMap,
     applyConfig,
     setAlarmSoundEnabled,
+    setOfflineModeEnabled,
     resetAll,
     placeUnit,
     setUnitPairing,

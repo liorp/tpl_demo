@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CircleMarker,
   MapContainer,
@@ -13,6 +13,7 @@ import { getUnitBounds } from '../model/mapViewport';
 import type { PairLink, SignalLinkState, UnitPlacement } from '../model/types';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
+const ONLINE_MAX_ZOOM = 19;
 const ISRAEL_BOUNDS: [[number, number], [number, number]] = [
   [29.2, 34.1],
   [33.55, 36.05],
@@ -24,6 +25,8 @@ type Props = {
   links: SignalLinkState[];
   focusPoint: { lat: number; lng: number } | null;
   tileRoot: string | null;
+  offlineRequired: boolean;
+  offlineModeEnabled: boolean;
   mapBounds: [[number, number], [number, number]] | null;
   placementMode: boolean;
   onPlaceAt: (lat: number, lng: number) => void;
@@ -89,7 +92,10 @@ function toSignalColor(link: SignalLinkState | undefined): string {
   return '#ef4444';
 }
 
-function toTileUrl(tileRoot: string | null): string {
+function toTileUrl(tileRoot: string | null, useOfflineTiles: boolean): string {
+  if (!useOfflineTiles) {
+    return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  }
   const root = (tileRoot ?? '/tiles').replace(/\/+$/, '');
   return `${root}/{z}/{x}/{y}.png`;
 }
@@ -119,26 +125,100 @@ export function MonitorMap({
   links,
   focusPoint,
   tileRoot,
+  offlineRequired,
+  offlineModeEnabled,
   mapBounds,
   placementMode,
   onPlaceAt,
   onSelectUnit,
 }: Props) {
+  const [offlineTilePackMissing, setOfflineTilePackMissing] = useState(false);
+  const [offlineZoomRange, setOfflineZoomRange] = useState<{
+    minZoom: number;
+    maxZoom: number;
+  } | null>(null);
+  const useOfflineTiles = offlineRequired || offlineModeEnabled;
   const unitById = new Map(units.map((unit) => [unit.id, unit] as const));
+  const tileUrl = toTileUrl(tileRoot, useOfflineTiles);
+  const minZoom = offlineZoomRange ? offlineZoomRange.minZoom : 7;
+  const maxZoom = offlineZoomRange
+    ? offlineZoomRange.maxZoom
+    : useOfflineTiles
+      ? 12
+      : ONLINE_MAX_ZOOM;
+
+  useEffect(() => {
+    if (!useOfflineTiles) {
+      setOfflineTilePackMissing(false);
+      setOfflineZoomRange(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const manifestUrl = `${(tileRoot ?? '/tiles').replace(/\/+$/, '')}/manifest.json`;
+    fetch(manifestUrl, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('missing manifest');
+        }
+        return response.json() as Promise<{
+          format?: unknown;
+          min_zoom?: unknown;
+          max_zoom?: unknown;
+        }>;
+      })
+      .then((manifest) => {
+        setOfflineTilePackMissing(manifest.format === 'placeholder');
+        if (
+          typeof manifest.min_zoom === 'number' &&
+          Number.isFinite(manifest.min_zoom) &&
+          typeof manifest.max_zoom === 'number' &&
+          Number.isFinite(manifest.max_zoom)
+        ) {
+          const nextMin = Math.max(0, Math.floor(manifest.min_zoom));
+          const nextMax = Math.max(nextMin, Math.floor(manifest.max_zoom));
+          setOfflineZoomRange({ minZoom: nextMin, maxZoom: nextMax });
+          return;
+        }
+        setOfflineZoomRange(null);
+      })
+      .catch(() => {
+        setOfflineTilePackMissing(true);
+        setOfflineZoomRange(null);
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [tileRoot, useOfflineTiles]);
 
   return (
-    <section className="min-h-0 flex-1">
+    <section className="relative min-h-0 flex-1">
       <MapContainer
         center={DEFAULT_CENTER}
         zoom={12}
-        minZoom={7}
-        maxZoom={16}
+        minZoom={minZoom}
+        maxZoom={maxZoom}
         maxBounds={mapBounds ?? ISRAEL_BOUNDS}
         maxBoundsViscosity={1}
         attributionControl={false}
         className="h-full w-full"
       >
-        <TileLayer url={toTileUrl(tileRoot)} maxZoom={16} />
+        <TileLayer
+          url={tileUrl}
+          maxZoom={maxZoom}
+          maxNativeZoom={maxZoom}
+          eventHandlers={{
+            tileerror: () => {
+              if (useOfflineTiles) {
+                setOfflineTilePackMissing(true);
+              }
+            },
+          }}
+        />
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
         <MapPlacementController
@@ -197,6 +277,11 @@ export function MonitorMap({
           </CircleMarker>
         ))}
       </MapContainer>
+      {offlineModeEnabled && offlineTilePackMissing ? (
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-[1300] rounded border border-red-500/50 bg-red-950/90 px-3 py-2 text-xs text-red-100">
+          Offline map tiles are unavailable.
+        </div>
+      ) : null}
     </section>
   );
 }

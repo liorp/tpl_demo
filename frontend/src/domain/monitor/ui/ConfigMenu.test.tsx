@@ -15,8 +15,10 @@ describe('ConfigMenu', () => {
       <ConfigMenu
         config={{ threshold: 640, val: 777 }}
         alarmSoundEnabled
+        offlineModeEnabled
         onApply={vi.fn()}
         onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
       />,
     );
@@ -37,8 +39,10 @@ describe('ConfigMenu', () => {
       <ConfigMenu
         config={{ threshold: null, val: null }}
         alarmSoundEnabled
+        offlineModeEnabled
         onApply={onApply}
         onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
       />,
     );
@@ -65,8 +69,10 @@ describe('ConfigMenu', () => {
       <ConfigMenu
         config={{ threshold: null, val: null }}
         alarmSoundEnabled
+        offlineModeEnabled
         onApply={vi.fn()}
         onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={vi.fn()}
         onResetAll={onResetAll}
       />,
     );
@@ -84,8 +90,10 @@ describe('ConfigMenu', () => {
       <ConfigMenu
         config={{ threshold: null, val: null }}
         alarmSoundEnabled
+        offlineModeEnabled
         onApply={vi.fn()}
         onAlarmSoundEnabledChange={onAlarmSoundEnabledChange}
+        onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
       />,
     );
@@ -94,5 +102,26 @@ describe('ConfigMenu', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Alarm Sound' }));
 
     expect(onAlarmSoundEnabledChange).toHaveBeenCalledWith(false);
+  });
+
+  test('toggles offline mode setting', () => {
+    const onOfflineModeEnabledChange = vi.fn();
+
+    render(
+      <ConfigMenu
+        config={{ threshold: null, val: null }}
+        alarmSoundEnabled
+        offlineModeEnabled
+        onApply={vi.fn()}
+        onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={onOfflineModeEnabledChange}
+        onResetAll={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Offline Mode' }));
+
+    expect(onOfflineModeEnabledChange).toHaveBeenCalledWith(false);
   });
 });

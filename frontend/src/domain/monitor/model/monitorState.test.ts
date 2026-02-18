@@ -172,8 +172,8 @@ describe('monitor state model', () => {
     expect(state.mapPolicy).toEqual({
       bounds: null,
       bufferKm: null,
-      tileRoot: null,
-      offlineRequired: false,
+      tileRoot: '/tiles',
+      offlineRequired: true,
     });
   });
 

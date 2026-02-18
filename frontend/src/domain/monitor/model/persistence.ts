@@ -7,13 +7,14 @@ type PersistedMonitorConfig = {
   pairings: PairLink[];
   globalSettings: {
     alarmSoundEnabled: boolean;
+    offlineModeEnabled: boolean;
   };
 };
 
 const EMPTY: PersistedMonitorConfig = {
   units: [],
   pairings: [],
-  globalSettings: { alarmSoundEnabled: true },
+  globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
 };
 
 function normalizePairings(value: unknown): PairLink[] {
@@ -56,6 +57,10 @@ function normalizeGlobalSettings(
     alarmSoundEnabled:
       typeof candidate.alarmSoundEnabled === 'boolean'
         ? candidate.alarmSoundEnabled
+        : true,
+    offlineModeEnabled:
+      typeof candidate.offlineModeEnabled === 'boolean'
+        ? candidate.offlineModeEnabled
         : true,
   };
 }

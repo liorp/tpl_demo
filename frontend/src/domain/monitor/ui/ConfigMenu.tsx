@@ -18,8 +18,10 @@ import type { MonitorConfig } from '../model/types';
 type Props = {
   config: MonitorConfig;
   alarmSoundEnabled: boolean;
+  offlineModeEnabled: boolean;
   onApply: (next: { threshold: number; val: number }) => void;
   onAlarmSoundEnabledChange: (enabled: boolean) => void;
+  onOfflineModeEnabledChange: (enabled: boolean) => void;
   onResetAll: () => void;
 };
 
@@ -33,8 +35,10 @@ function toKnownValue(value: number | null, fallback: number): string {
 export function ConfigMenu({
   config,
   alarmSoundEnabled,
+  offlineModeEnabled,
   onApply,
   onAlarmSoundEnabledChange,
+  onOfflineModeEnabledChange,
   onResetAll,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -141,6 +145,25 @@ export function ConfigMenu({
               checked={alarmSoundEnabled}
               onCheckedChange={onAlarmSoundEnabledChange}
               aria-label="Alarm Sound"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border-bright bg-background/70 px-3 py-2">
+            <div className="space-y-0.5">
+              <Label
+                htmlFor="offline-mode"
+                className="font-display text-xs tracking-wide text-muted-foreground"
+              >
+                Offline Mode
+              </Label>
+              <p className="font-body text-xs text-muted-foreground/85">
+                Use local tiles. Disable to fetch maps from the internet.
+              </p>
+            </div>
+            <Switch
+              id="offline-mode"
+              checked={offlineModeEnabled}
+              onCheckedChange={onOfflineModeEnabledChange}
+              aria-label="Offline Mode"
             />
           </div>
         </div>

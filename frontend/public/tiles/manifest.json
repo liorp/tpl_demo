@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "tile_root": "/tiles",
-  "format": "placeholder",
+  "format": "xyz",
   "offline_required": true,
   "bounds": {
     "north": 33.44,
@@ -9,7 +9,10 @@
     "east": 35.96,
     "west": 34.19
   },
-  "placeholders": [
-    "0/0/0.txt"
-  ]
+  "min_zoom": 7,
+  "max_zoom": 12,
+  "tile_count": 1917,
+  "source": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  "generated_at_unix": 1771392553,
+  "padding_tiles": 1
 }

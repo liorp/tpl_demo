@@ -66,6 +66,7 @@ export function App() {
     acknowledgeCrossing,
     applyConfig,
     setAlarmSoundEnabled,
+    setOfflineModeEnabled,
     resetAll,
     placeUnit,
     setUnitPairing,
@@ -79,8 +80,8 @@ export function App() {
   const mapPolicy: MapPolicy = state.mapPolicy ?? {
     bounds: null,
     bufferKm: null,
-    tileRoot: null,
-    offlineRequired: false,
+    tileRoot: '/tiles',
+    offlineRequired: true,
   };
   const activeUnits = useMemo(
     () => state.units.filter((unit) => unit.status !== 'inactive'),
@@ -298,6 +299,8 @@ export function App() {
             links={state.links}
             focusPoint={focusedAlertPoint}
             tileRoot={mapPolicy.tileRoot}
+            offlineRequired={mapPolicy.offlineRequired}
+            offlineModeEnabled={state.globalSettings.offlineModeEnabled}
             mapBounds={mapBounds}
             placementMode={placementMode}
             onPlaceAt={handlePlaceAt}
@@ -314,8 +317,10 @@ export function App() {
           <ConfigMenu
             config={state.config}
             alarmSoundEnabled={state.globalSettings.alarmSoundEnabled}
+            offlineModeEnabled={state.globalSettings.offlineModeEnabled}
             onApply={applyConfig}
             onAlarmSoundEnabledChange={setAlarmSoundEnabled}
+            onOfflineModeEnabledChange={setOfflineModeEnabled}
             onResetAll={resetAll}
           />
           <ConnectionIndicator state={state} />

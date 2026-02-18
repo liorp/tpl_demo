@@ -68,8 +68,8 @@ function toDefaultMapPolicy(): MapPolicy {
   return {
     bounds: null,
     bufferKm: null,
-    tileRoot: null,
-    offlineRequired: false,
+    tileRoot: '/tiles',
+    offlineRequired: true,
   };
 }
 
@@ -185,7 +185,7 @@ export function createInitialMonitorState(): MonitorState {
     crossingAlerts: [],
     crossingAckWindows: [],
     config: { threshold: null, val: null },
-    globalSettings: { alarmSoundEnabled: true },
+    globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     units: [],
     pairings: [],
     sensorStatus: {},
@@ -207,7 +207,7 @@ export function toMonitorStateFromPayload(
     crossingAlerts: crossingAlert ? [crossingAlert] : [],
     crossingAckWindows: [],
     config: payload.config,
-    globalSettings: { alarmSoundEnabled: true },
+    globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     units: toPayloadUnits(payload.units, sensorStatus),
     pairings: [],
     sensorStatus,

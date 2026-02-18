@@ -111,6 +111,10 @@ describe('monitor socket lifecycle', () => {
       JSON.stringify({
         units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
         pairings: [{ side1Id: 7, side2Id: 8, enabled: true }],
+        globalSettings: {
+          alarmSoundEnabled: false,
+          offlineModeEnabled: false,
+        },
       }),
     );
 
@@ -120,6 +124,10 @@ describe('monitor socket lifecycle', () => {
     const firstState = onState.mock.calls[0][0] as {
       units: Array<{ id: number }>;
       pairings: Array<{ side1Id: number; side2Id: number; enabled: boolean }>;
+      globalSettings: {
+        alarmSoundEnabled: boolean;
+        offlineModeEnabled: boolean;
+      };
     };
     expect(firstState.units).toEqual([
       { id: 7, label: 'S7', lat: 33.31, lng: 35.78 },
@@ -127,6 +135,10 @@ describe('monitor socket lifecycle', () => {
     expect(firstState.pairings).toEqual([
       { side1Id: 7, side2Id: 8, enabled: true },
     ]);
+    expect(firstState.globalSettings).toEqual({
+      alarmSoundEnabled: false,
+      offlineModeEnabled: false,
+    });
   });
 
   test('placeUnit sends set_unit_position command and applies optimistic unit update', async () => {

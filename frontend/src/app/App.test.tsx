@@ -32,7 +32,7 @@ const state = {
   ],
   crossingAckWindows: [],
   config: { threshold: null, val: null },
-  globalSettings: { alarmSoundEnabled: true },
+  globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
   units: [
     {
       id: 1,
@@ -75,6 +75,7 @@ const requestMap = vi.fn();
 const applyConfig = vi.fn();
 const resetAll = vi.fn();
 const setAlarmSoundEnabled = vi.fn();
+const setOfflineModeEnabled = vi.fn();
 const placeUnit = vi.fn();
 const setUnitPairing = vi.fn();
 const monitorMapMock = vi.fn();
@@ -87,6 +88,7 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
     requestMap,
     applyConfig,
     setAlarmSoundEnabled,
+    setOfflineModeEnabled,
     resetAll,
     placeUnit,
     setUnitPairing,
@@ -134,11 +136,15 @@ describe('App', () => {
     applyConfig.mockClear();
     resetAll.mockClear();
     setAlarmSoundEnabled.mockClear();
+    setOfflineModeEnabled.mockClear();
     placeUnit.mockClear();
     setUnitPairing.mockClear();
     monitorMapMock.mockClear();
     playAlarmSound.mockClear();
-    state.globalSettings = { alarmSoundEnabled: true };
+    state.globalSettings = {
+      alarmSoundEnabled: true,
+      offlineModeEnabled: true,
+    };
     state.alarm = 'clear';
   });
 
@@ -203,7 +209,10 @@ describe('App', () => {
   });
 
   test('plays alarm sound when alarm state enters alarm and sound is enabled', () => {
-    state.globalSettings = { alarmSoundEnabled: true };
+    state.globalSettings = {
+      alarmSoundEnabled: true,
+      offlineModeEnabled: true,
+    };
     state.alarm = 'clear';
     const { rerender } = render(<App />);
 
@@ -219,7 +228,10 @@ describe('App', () => {
   });
 
   test('does not play alarm sound when global setting is disabled', () => {
-    state.globalSettings = { alarmSoundEnabled: false };
+    state.globalSettings = {
+      alarmSoundEnabled: false,
+      offlineModeEnabled: true,
+    };
     state.alarm = 'alarm';
 
     render(<App />);
