@@ -7,7 +7,7 @@ import {
   screen,
   within,
 } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { App } from './App';
 
@@ -135,6 +135,10 @@ vi.mock('../domain/monitor/service/alarmSound', () => ({
 }));
 
 describe('App', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     cleanup();
     acknowledgeCrossing.mockClear();
@@ -152,6 +156,33 @@ describe('App', () => {
       offlineModeEnabled: true,
     };
     state.alarm = 'clear';
+    const nowSec = Math.floor(Date.now() / 1000);
+    state.units = [
+      {
+        id: 1,
+        label: 'Sensor 1',
+        lat: 33.3,
+        lng: 35.7,
+        status: 'active',
+        lastSeenAt: nowSec,
+      },
+      {
+        id: 2,
+        label: 'Sensor 2',
+        lat: 33.31,
+        lng: 35.71,
+        status: 'active',
+        lastSeenAt: nowSec,
+      },
+      {
+        id: 3,
+        label: 'Sensor 3',
+        lat: 33.32,
+        lng: 35.72,
+        status: 'active',
+        lastSeenAt: nowSec,
+      },
+    ];
   });
 
   test('renders refresh map as map HUD and hides live feed indicator', () => {
@@ -258,5 +289,48 @@ describe('App', () => {
     render(<App />);
 
     expect(playAlarmSound).toHaveBeenCalledTimes(0);
+  });
+
+  test('hides stale sensors and sensors without lastSeenAt', () => {
+    const nowMs = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockReturnValue(nowMs);
+    const nowSec = Math.floor(nowMs / 1000);
+    state.units = [
+      {
+        id: 1,
+        label: 'Sensor 1',
+        lat: 33.3,
+        lng: 35.7,
+        status: 'active',
+        lastSeenAt: nowSec - 30,
+      },
+      {
+        id: 2,
+        label: 'Sensor 2',
+        lat: 33.31,
+        lng: 35.71,
+        status: 'active',
+        lastSeenAt: nowSec - 61,
+      },
+      {
+        id: 3,
+        label: 'Sensor 3',
+        lat: 33.32,
+        lng: 35.72,
+        status: 'active',
+      },
+    ];
+
+    render(<App />);
+
+    expect(
+      screen.getByRole('button', { name: 'Select Sensor 1' }),
+    ).not.toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Select Sensor 2' }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Select Sensor 3' }),
+    ).toBeNull();
   });
 });

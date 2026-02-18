@@ -425,4 +425,28 @@ describe('monitor state model', () => {
       { id: 99, status: 'inactive' },
     ]);
   });
+
+  test('assigns lastSeenAt for telemetry-discovered active sensors', () => {
+    const payload = {
+      connected: true,
+      port: '/dev/cu.usbserial-0001',
+      alarm: 'clear' as const,
+      events: [
+        { time: '21:55:46', msg: 'MAP from 2 ver=0.4c10 gain=32 v=2112' },
+      ],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+    };
+
+    const next = mergeTelemetryUnits([], payload, 1_700_000_120);
+
+    expect(next).toEqual([
+      expect.objectContaining({
+        id: 2,
+        status: 'active',
+        lastSeenAt: 1_700_000_120,
+      }),
+    ]);
+  });
 });

@@ -60,6 +60,12 @@ class SerialManager:
             self.state.serial_conn = ser
         return ser
 
+    def _is_port_available(self, port: str) -> bool:
+        if self.forced_port:
+            ports = [entry.device for entry in serial.tools.list_ports.comports()]
+            return port in ports
+        return port in list_serial_ports(self.forced_port)
+
     def serial_reader_loop(
         self,
         on_event: Callable[[Event], None],
@@ -94,6 +100,8 @@ class SerialManager:
                     while True:
                         data = ser.read(ser.in_waiting or 1)
                         if not data:
+                            if not self._is_port_available(port):
+                                break
                             on_idle()
                             continue
 

@@ -320,9 +320,14 @@ function discoverUnitIds(payload: MonitorPayload): number[] {
     .sort((a, b) => a - b);
 }
 
+function nowSeconds(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
 export function mergeTelemetryUnits(
   previousUnits: UnitPlacement[],
   payload: MonitorPayload,
+  observedAt = nowSeconds(),
 ): UnitPlacement[] {
   const discoveredIds = new Set(discoverUnitIds(payload));
   const previousById = new Map(
@@ -333,7 +338,11 @@ export function mergeTelemetryUnits(
   for (const unitId of discoveredIds) {
     const existingUnit = previousById.get(unitId);
     if (existingUnit) {
-      nextUnits.push({ ...existingUnit, status: 'active' });
+      nextUnits.push({
+        ...existingUnit,
+        status: 'active',
+        lastSeenAt: observedAt,
+      });
       continue;
     }
     const fallback = toDefaultUnitPosition(unitId);
@@ -343,6 +352,7 @@ export function mergeTelemetryUnits(
       lat: fallback.lat,
       lng: fallback.lng,
       status: 'active',
+      lastSeenAt: observedAt,
     });
   }
 

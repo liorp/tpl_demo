@@ -22,6 +22,13 @@ const DEFAULT_MAP_BOUNDS: [[number, number], [number, number]] = [
   [29.2, 34.1],
   [33.55, 36.05],
 ];
+const SENSOR_STALE_AFTER_SECONDS = 60;
+
+function toUnixSeconds(timestamp: number): number {
+  return timestamp > 1_000_000_000_000
+    ? Math.floor(timestamp / 1000)
+    : Math.floor(timestamp);
+}
 
 function toLeafletBounds(
   bounds: MapBounds | null,
@@ -76,15 +83,39 @@ export function App() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [nowSeconds, setNowSeconds] = useState(() =>
+    Math.floor(Date.now() / 1000),
+  );
   const mapPolicy: MapPolicy = state.mapPolicy ?? {
     bounds: null,
     bufferKm: null,
     tileRoot: '/tiles',
     offlineRequired: true,
   };
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowSeconds(Math.floor(Date.now() / 1000));
+    }, 1000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   const activeUnits = useMemo(
-    () => state.units.filter((unit) => unit.status !== 'inactive'),
-    [state.units],
+    () =>
+      state.units.filter((unit) => {
+        if (unit.status === 'inactive') {
+          return false;
+        }
+        if (typeof unit.lastSeenAt !== 'number') {
+          return false;
+        }
+        return (
+          nowSeconds - toUnixSeconds(unit.lastSeenAt) <=
+          SENSOR_STALE_AFTER_SECONDS
+        );
+      }),
+    [nowSeconds, state.units],
   );
   const mapBounds = useMemo(
     () =>
