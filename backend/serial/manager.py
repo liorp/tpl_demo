@@ -11,6 +11,7 @@ from backend.core.models import Event, SensorState
 from backend.parsing.parser import parse_line
 
 logger = logging.getLogger("tpl-signum")
+PROTOCOL_VALIDATION_TIMEOUT_SEC = 2.0
 
 
 def list_serial_ports(forced_port: str) -> list[str]:
@@ -87,7 +88,6 @@ class SerialManager:
                     ser = self._connect(port)
                     connected_any = True
 
-                    on_connected(port)
                     time.sleep(0.5)
                     ser.reset_input_buffer()
                     self.send_serial("/")
@@ -97,10 +97,21 @@ class SerialManager:
                     self.send_serial("re 3 4")
 
                     buffer = ""
+                    validated_protocol = False
+                    validation_started_at = time.monotonic()
                     while True:
                         data = ser.read(ser.in_waiting or 1)
                         if not data:
                             if not self._is_port_available(port):
+                                break
+                            if (
+                                not validated_protocol
+                                and time.monotonic() - validation_started_at
+                                >= PROTOCOL_VALIDATION_TIMEOUT_SEC
+                            ):
+                                self.state.add_log(
+                                    f"Ignoring {port}: no valid protocol events"
+                                )
                                 break
                             on_idle()
                             continue
@@ -110,6 +121,9 @@ class SerialManager:
                             line, buffer = buffer.split("\n", 1)
                             event = parse_line(line)
                             if event:
+                                if not validated_protocol:
+                                    validated_protocol = True
+                                    on_connected(port)
                                 on_event(event)
                 except serial.SerialException:
                     continue
