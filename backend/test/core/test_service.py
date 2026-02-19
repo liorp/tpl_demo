@@ -1,4 +1,5 @@
 import backend.core.models as models
+import backend.core.service as service
 import pytest
 from backend.core.layout_store import (
     ALLOWED_BOUNDS,
@@ -164,7 +165,10 @@ def test_handle_config_event_updates_config_values():
     assert state.config == {"threshold": 777, "val": 799}
 
 
-def test_handle_connected_and_map_update_sensor_status_graph():
+def test_handle_connected_and_map_update_sensor_status_graph(monkeypatch):
+    clock = [1001]
+    monkeypatch.setattr(service, "now_ts", lambda: float(clock[0]))
+
     state = SensorState()
 
     connected_changed = handle_event(
@@ -176,9 +180,10 @@ def test_handle_connected_and_map_update_sensor_status_graph():
             "id_peer": "B",
             "peer": 2,
             "connected": True,
-            "device_ts": 1001,
+            "device_ts": 5000,
         },
     )
+    clock[0] = 1002
     disconnected_changed = handle_event(
         state,
         {
@@ -188,9 +193,10 @@ def test_handle_connected_and_map_update_sensor_status_graph():
             "id_peer": "B",
             "peer": 2,
             "connected": False,
-            "device_ts": 1002,
+            "device_ts": 6000,
         },
     )
+    clock[0] = 1003
     map_changed = handle_event(
         state,
         {
@@ -202,7 +208,7 @@ def test_handle_connected_and_map_update_sensor_status_graph():
             "links": [
                 {"side1": 7, "side2": 8, "quality": 88, "intensity": 73},
             ],
-            "device_ts": 1003,
+            "device_ts": 7000,
         },
     )
 

@@ -31,9 +31,6 @@ def _normalize_side_links(raw_links: list[dict]) -> list[dict]:
 
 
 def _event_last_seen(event: Event) -> int:
-    marker = event.get("device_ts")
-    if isinstance(marker, int):
-        return marker
     return int(now_ts())
 
 
