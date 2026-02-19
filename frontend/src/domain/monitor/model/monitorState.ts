@@ -177,6 +177,7 @@ function toPayloadUnits(
 
 export function createInitialMonitorState(): MonitorState {
   return {
+    serverOnline: false,
     connected: false,
     port: 'None',
     alarm: 'disconnected',
@@ -199,6 +200,7 @@ export function toMonitorStateFromPayload(
   const crossingAlert = toCrossingAlert(payload.crossing_alert);
   const sensorStatus = toSensorStatusMap(payload.sensor_status);
   return {
+    serverOnline: true,
     connected: payload.connected,
     port: payload.port,
     alarm: payload.alarm,

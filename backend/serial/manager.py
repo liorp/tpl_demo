@@ -1,11 +1,12 @@
 import logging
+import os
 import re
 import time
-from typing import Callable
+from collections.abc import Callable
 
-import serial
 import serial.tools.list_ports
 
+import serial
 from backend.config import BAUD_RATE
 from backend.core.models import Event, SensorState
 from backend.parsing.parser import parse_line
@@ -63,8 +64,7 @@ class SerialManager:
 
     def _is_port_available(self, port: str) -> bool:
         if self.forced_port:
-            ports = [entry.device for entry in serial.tools.list_ports.comports()]
-            return port in ports
+            return os.path.exists(port)
         return port in list_serial_ports(self.forced_port)
 
     def serial_reader_loop(

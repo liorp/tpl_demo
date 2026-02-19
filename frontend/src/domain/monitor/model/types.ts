@@ -102,6 +102,7 @@ export type MonitorPayload = {
 };
 
 export type MonitorState = {
+  serverOnline: boolean;
   connected: boolean;
   port: string;
   alarm: AlarmState;

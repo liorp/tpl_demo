@@ -12,6 +12,18 @@ type Props = {
 };
 
 export function ConnectionIndicator({ state }: Props) {
+  const dotColor = state.connected
+    ? 'bg-emerald-400 shadow-[0_0_6px_oklch(0.65_0.19_155/0.5)]'
+    : state.serverOnline
+      ? 'bg-amber-400/80'
+      : 'bg-red-500/80';
+
+  const tooltip = state.connected
+    ? `Connected to sensor on port ${state.port}`
+    : state.serverOnline
+      ? 'Server online — waiting for sensor'
+      : 'Server offline — retrying...';
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -23,9 +35,7 @@ export function ConnectionIndicator({ state }: Props) {
             <span
               className={cn(
                 'relative inline-flex h-2.5 w-2.5 rounded-full',
-                state.connected
-                  ? 'bg-emerald-400 shadow-[0_0_6px_oklch(0.65_0.19_155/0.5)]'
-                  : 'bg-red-500/80',
+                dotColor,
               )}
             />
           </span>
@@ -38,17 +48,15 @@ export function ConnectionIndicator({ state }: Props) {
                   {state.port}
                 </span>
               </>
+            ) : state.serverOnline ? (
+              <span className="text-amber-400/80">No sensor</span>
             ) : (
-              <span className="text-red-400/80">Searching...</span>
+              <span className="text-red-400/80">Server offline</span>
             )}
           </span>
         </div>
       </TooltipTrigger>
-      <TooltipContent>
-        {state.connected
-          ? `Connected to sensor on port ${state.port}`
-          : 'Searching for sensor connection'}
-      </TooltipContent>
+      <TooltipContent>{tooltip}</TooltipContent>
     </Tooltip>
   );
 }

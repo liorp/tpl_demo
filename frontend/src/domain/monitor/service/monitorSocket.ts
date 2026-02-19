@@ -62,68 +62,84 @@ export function useMonitorSocket(): {
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const socket = new WebSocket(createAppWebSocketUrl('/ws'));
-    socketRef.current = socket;
-    let shouldCloseAfterOpen = false;
     let disposed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    socket.onopen = () => {
-      if (!disposed && !shouldCloseAfterOpen) {
-        return;
-      }
-      socket.close();
-    };
+    function connect() {
+      if (disposed) return;
 
-    socket.onmessage = (event: MessageEvent<string>) => {
-      try {
-        const payload: unknown = JSON.parse(event.data);
-        if (isPayload(payload)) {
-          setState((previous) => {
-            const base = toMonitorStateFromPayload(payload);
-            const incomingAlert = base.crossingAlerts[0] ?? null;
-            const allowedAlert = isCrossingAlertSuppressed(
-              incomingAlert,
-              previous.crossingAckWindows,
-            )
-              ? null
-              : incomingAlert;
-            const hasServerUnits = Array.isArray(payload.units);
-            return {
-              ...base,
-              crossingAlerts: mergeCrossingAlerts(
-                previous.crossingAlerts,
-                allowedAlert,
-              ),
-              crossingAckWindows: previous.crossingAckWindows,
-              units: hasServerUnits
-                ? base.units
-                : mergeTelemetryUnits(previous.units, payload),
-              pairings: previous.pairings,
-              globalSettings: previous.globalSettings,
-            };
-          });
+      const socket = new WebSocket(createAppWebSocketUrl('/ws'));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (disposed) {
+          socket.close();
+          return;
         }
-      } catch {
-        // Ignore malformed websocket payloads.
-      }
-    };
+        setState((previous) => ({ ...previous, serverOnline: true }));
+      };
 
-    socket.onclose = () => {
-      setState((previous) => ({
-        ...createInitialMonitorState(),
-        units: previous.units,
-        pairings: previous.pairings,
-        config: previous.config,
-        globalSettings: previous.globalSettings,
-      }));
-    };
+      socket.onmessage = (event: MessageEvent<string>) => {
+        try {
+          const payload: unknown = JSON.parse(event.data);
+          if (isPayload(payload)) {
+            setState((previous) => {
+              const base = toMonitorStateFromPayload(payload);
+              const incomingAlert = base.crossingAlerts[0] ?? null;
+              const allowedAlert = isCrossingAlertSuppressed(
+                incomingAlert,
+                previous.crossingAckWindows,
+              )
+                ? null
+                : incomingAlert;
+              const hasServerUnits = Array.isArray(payload.units);
+              return {
+                ...base,
+                crossingAlerts: mergeCrossingAlerts(
+                  previous.crossingAlerts,
+                  allowedAlert,
+                ),
+                crossingAckWindows: previous.crossingAckWindows,
+                units: hasServerUnits
+                  ? base.units
+                  : mergeTelemetryUnits(previous.units, payload),
+                pairings: previous.pairings,
+                globalSettings: previous.globalSettings,
+              };
+            });
+          }
+        } catch {
+          // Ignore malformed websocket payloads.
+        }
+      };
+
+      socket.onclose = () => {
+        socketRef.current = null;
+        setState((previous) => ({
+          ...createInitialMonitorState(),
+          units: previous.units,
+          pairings: previous.pairings,
+          config: previous.config,
+          globalSettings: previous.globalSettings,
+        }));
+        if (!disposed) {
+          retryTimer = setTimeout(connect, 5_000);
+        }
+      };
+    }
+
+    connect();
 
     return () => {
       disposed = true;
-      if (socket.readyState === WebSocket.CONNECTING) {
-        shouldCloseAfterOpen = true;
-      } else if (socket.readyState === WebSocket.OPEN) {
-        socket.close();
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      const socket = socketRef.current;
+      if (socket) {
+        if (socket.readyState === WebSocket.CONNECTING) {
+          socket.onopen = () => socket.close();
+        } else if (socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        }
       }
       socketRef.current = null;
     };

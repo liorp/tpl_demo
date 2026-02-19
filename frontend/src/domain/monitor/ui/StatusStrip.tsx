@@ -39,6 +39,11 @@ const alarmLabel: Record<AlarmState, string> = {
   disconnected: 'DISCONNECTED',
 };
 
+function resolveLabel(state: MonitorState): string {
+  if (state.alarm !== 'disconnected') return alarmLabel[state.alarm];
+  return state.serverOnline ? 'NO SENSOR' : 'SERVER OFFLINE';
+}
+
 export function StatusStrip({ state }: Props) {
   const config = alarmConfig[state.alarm];
 
@@ -53,7 +58,7 @@ export function StatusStrip({ state }: Props) {
       <div className="flex items-center gap-3">
         <span className="text-2xl leading-none opacity-80">{config.icon}</span>
         <h1 className="font-display text-xl font-bold tracking-[0.12em] text-white/95 sm:text-2xl">
-          {alarmLabel[state.alarm]}
+          {resolveLabel(state)}
         </h1>
       </div>
       <span className="ml-auto font-display text-xs font-medium tracking-[0.2em] text-white/30 uppercase">
