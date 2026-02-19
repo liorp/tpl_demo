@@ -289,6 +289,7 @@ export function App() {
               units={activeUnits}
               pairings={state.pairings}
               links={state.links}
+              crossingAlerts={state.crossingAlerts}
               focusPoint={focusedAlertPoint}
               tileRoot={mapPolicy.tileRoot}
               offlineRequired={mapPolicy.offlineRequired}

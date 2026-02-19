@@ -3,7 +3,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { MonitorMap } from './MonitorMap';
+import { alertPinIcon, MonitorMap, unitPinIcon } from './MonitorMap';
 
 const mapEvents = {
   click: undefined as
@@ -19,6 +19,7 @@ const markerEvents = new Map<
     }) => void;
   }>
 >();
+const markerIcons = new Map<number, unknown>();
 const mapFlyTo = vi.fn();
 const mapSetView = vi.fn();
 const mapFitBounds = vi.fn();
@@ -71,9 +72,11 @@ vi.mock('react-leaflet', () => ({
   ),
   Marker: ({
     position,
+    icon,
     eventHandlers,
   }: {
     position: [number, number];
+    icon?: unknown;
     eventHandlers?: Partial<{
       click: () => void;
       dragend: (event: {
@@ -82,6 +85,7 @@ vi.mock('react-leaflet', () => ({
     }>;
   }) => {
     markerEvents.set(position[0], eventHandlers ?? {});
+    markerIcons.set(position[0], icon);
     return null;
   },
   Polyline: () => null,
@@ -106,6 +110,7 @@ describe('MonitorMap', () => {
   beforeEach(() => {
     mapEvents.click = undefined;
     markerEvents.clear();
+    markerIcons.clear();
     vi.restoreAllMocks();
     mapFlyTo.mockClear();
     mapSetView.mockClear();
@@ -126,6 +131,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -153,6 +159,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={bounds}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -176,6 +183,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={true}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -196,6 +204,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={true}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -218,6 +227,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -254,6 +264,7 @@ describe('MonitorMap', () => {
         offlineRequired={true}
         offlineModeEnabled={false}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -278,6 +289,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -310,6 +322,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -332,6 +345,7 @@ describe('MonitorMap', () => {
         offlineRequired={false}
         offlineModeEnabled={false}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={onMoveUnit}
         onSelectUnit={vi.fn()}
       />,
@@ -366,6 +380,7 @@ describe('MonitorMap', () => {
         offlineRequired={true}
         offlineModeEnabled={true}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -399,6 +414,7 @@ describe('MonitorMap', () => {
         offlineRequired={true}
         offlineModeEnabled={true}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -444,6 +460,7 @@ describe('MonitorMap', () => {
         offlineRequired={true}
         offlineModeEnabled={true}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -470,6 +487,74 @@ describe('MonitorMap', () => {
     });
   });
 
+  test('uses red icon for sensors involved in unacknowledged crossing alerts', () => {
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'active' },
+          { id: 3, label: 'Sensor 3', lat: 33.4, lng: 35.9, status: 'active' },
+        ]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[
+          {
+            sensorA: 1,
+            sensorB: 2,
+            at: 1_700_000,
+            lat: 33.25,
+            lng: 35.75,
+            acknowledged: false,
+          },
+        ]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(markerIcons.get(33.2)).toBe(alertPinIcon);
+    expect(markerIcons.get(33.3)).toBe(alertPinIcon);
+    expect(markerIcons.get(33.4)).toBe(unitPinIcon);
+  });
+
+  test('uses default icon for sensors in acknowledged crossing alerts', () => {
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'active' },
+        ]}
+        pairings={[]}
+        links={[]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[
+          {
+            sensorA: 1,
+            sensorB: 2,
+            at: 1_700_000,
+            lat: 33.25,
+            lng: 35.75,
+            acknowledged: true,
+          },
+        ]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(markerIcons.get(33.2)).toBe(unitPinIcon);
+    expect(markerIcons.get(33.3)).toBe(unitPinIcon);
+  });
+
   test('uses conservative offline zoom defaults before manifest resolves', () => {
     vi.stubGlobal(
       'fetch',
@@ -486,6 +571,7 @@ describe('MonitorMap', () => {
         offlineRequired={true}
         offlineModeEnabled={true}
         mapBounds={null}
+        crossingAlerts={[]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,

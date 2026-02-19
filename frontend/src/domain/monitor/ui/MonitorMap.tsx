@@ -10,7 +10,12 @@ import {
 } from 'react-leaflet';
 
 import { getUnitBounds } from '../model/mapViewport';
-import type { PairLink, SignalLinkState, UnitPlacement } from '../model/types';
+import type {
+  CrossingAlert,
+  PairLink,
+  SignalLinkState,
+  UnitPlacement,
+} from '../model/types';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
 const ONLINE_TILE_NATIVE_MAX_ZOOM = 19;
@@ -24,6 +29,7 @@ type Props = {
   units: UnitPlacement[];
   pairings: PairLink[];
   links: SignalLinkState[];
+  crossingAlerts: CrossingAlert[];
   focusPoint: { lat: number; lng: number } | null;
   tileRoot: string | null;
   offlineRequired: boolean;
@@ -100,9 +106,16 @@ function toTileUrl(tileRoot: string | null, useOfflineTiles: boolean): string {
   const root = (tileRoot ?? '/tiles').replace(/\/+$/, '');
   return `${root}/{z}/{x}/{y}.png`;
 }
-const unitPinIcon = divIcon({
+export const unitPinIcon = divIcon({
   className: '',
   html: '<span style="display:block;width:14px;height:14px;border-radius:9999px;border:2px solid #67e8f9;background:#06b6d4;box-shadow:0 0 0 2px rgba(15,23,42,0.35);"></span>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
+
+export const alertPinIcon = divIcon({
+  className: '',
+  html: '<span style="display:block;width:14px;height:14px;border-radius:9999px;border:2px solid #fca5a5;background:#ef4444;box-shadow:0 0 0 2px rgba(15,23,42,0.35);"></span>',
   iconSize: [14, 14],
   iconAnchor: [7, 7],
 });
@@ -111,6 +124,7 @@ export function MonitorMap({
   units,
   pairings,
   links,
+  crossingAlerts,
   focusPoint,
   tileRoot,
   offlineRequired,
@@ -129,6 +143,11 @@ export function MonitorMap({
     typeof navigator !== 'undefined' &&
     navigator.onLine === false;
   const useOfflineTiles = offlineModeEnabled || policyForcesOffline;
+  const alertingSensorIds = new Set(
+    crossingAlerts
+      .filter((alert) => !alert.acknowledged)
+      .flatMap((alert) => [alert.sensorA, alert.sensorB]),
+  );
   const unitById = new Map(units.map((unit) => [unit.id, unit] as const));
   const tileUrl = toTileUrl(tileRoot, useOfflineTiles);
   const minZoom = offlineZoomRange ? offlineZoomRange.minZoom : 7;
@@ -251,7 +270,7 @@ export function MonitorMap({
             key={unit.id}
             position={[unit.lat, unit.lng]}
             draggable={true}
-            icon={unitPinIcon}
+            icon={alertingSensorIds.has(unit.id) ? alertPinIcon : unitPinIcon}
             eventHandlers={{
               click: () => onSelectUnit(unit.id),
               dragend: (event) => {
