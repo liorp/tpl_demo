@@ -94,14 +94,33 @@ export function PairingPanel({ units, pairings, onTogglePairing }: Props) {
                 return (
                   <div
                     key={`${side1.id}-${side2.id}`}
+                    role="switch"
+                    aria-checked={enabled}
+                    tabIndex={0}
                     className={cn(
                       'flex cursor-pointer items-center gap-3 rounded-md px-2 py-1 transition-colors hover:bg-muted/40',
                       enabled && 'bg-primary/5',
                     )}
+                    onClick={(e) => {
+                      if (
+                        (e.target as HTMLElement).closest(
+                          '[data-slot="switch"]',
+                        )
+                      )
+                        return;
+                      onTogglePairing(side1.id, side2.id, !enabled);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onTogglePairing(side1.id, side2.id, !enabled);
+                      }
+                    }}
                   >
                     <Switch
                       size="sm"
                       checked={enabled}
+                      tabIndex={-1}
                       onCheckedChange={(checked) =>
                         onTogglePairing(side1.id, side2.id, checked === true)
                       }
