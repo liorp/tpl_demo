@@ -14,6 +14,7 @@
     "watch": "bun run build:clean && bun run build:html && bunx --bun concurrently -k -n JS,CSS -c magenta,blue \"bun run watch:js\" \"bun run watch:css\"",
     "format": "biome format --write .",
     "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

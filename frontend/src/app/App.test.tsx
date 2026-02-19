@@ -9,12 +9,14 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import type { MonitorState } from '../domain/monitor/model/types';
 import { App } from './App';
 
-const state = {
+const state: MonitorState = {
+  serverOnline: true,
   connected: true,
   port: '/dev/cu.usbserial-0001',
-  alarm: 'clear' as const,
+  alarm: 'clear',
   events: [],
   links: [
     { side1: 1, side2: 2, quality: 90, intensity: 70, updatedAt: 1_700_000 },
@@ -30,7 +32,6 @@ const state = {
       acknowledged: false,
     },
   ],
-  crossingAckWindows: [],
   config: { threshold: null, val: null },
   globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
   units: [
@@ -39,21 +40,21 @@ const state = {
       label: 'Sensor 1',
       lat: 33.3,
       lng: 35.7,
-      status: 'active' as const,
+      status: 'active',
     },
     {
       id: 2,
       label: 'Sensor 2',
       lat: 33.31,
       lng: 35.71,
-      status: 'active' as const,
+      status: 'active',
     },
     {
       id: 3,
       label: 'Sensor 3',
       lat: 33.32,
       lng: 35.72,
-      status: 'active' as const,
+      status: 'active',
     },
   ],
   pairings: [],

@@ -3,11 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '@/component/ErrorBoundary';
 import { Button } from '@/component/ui/button';
 import { TooltipProvider } from '@/component/ui/tooltip';
-import type {
-  CrossingAlert,
-  MapBounds,
-  MapPolicy,
-} from '../domain/monitor/model/types';
+import {
+  ISRAEL_MAP_BOUNDS,
+  toLeafletBounds,
+  toUnixSeconds,
+} from '../domain/monitor/model/mapViewport';
+import { getSelectedSensorLinks } from '../domain/monitor/model/monitorState';
+import type { CrossingAlert, MapPolicy } from '../domain/monitor/model/types';
 import { playAlarmSound } from '../domain/monitor/service/alarmSound';
 import { useMonitorSocket } from '../domain/monitor/service/monitorSocket';
 import { CommandStatusPanel } from '../domain/monitor/ui/CommandStatusPanel';
@@ -19,53 +21,7 @@ import { MonitorMap } from '../domain/monitor/ui/MonitorMap';
 import { PairingPanel } from '../domain/monitor/ui/PairingPanel';
 import { StatusStrip } from '../domain/monitor/ui/StatusStrip';
 
-const DEFAULT_MAP_BOUNDS: [[number, number], [number, number]] = [
-  [29.2, 34.1],
-  [33.55, 36.05],
-];
 const SENSOR_STALE_AFTER_SECONDS = 60;
-
-function toUnixSeconds(timestamp: number): number {
-  return timestamp > 1_000_000_000_000
-    ? Math.floor(timestamp / 1000)
-    : Math.floor(timestamp);
-}
-
-function toLeafletBounds(
-  bounds: MapBounds | null,
-  bufferKm: number | null,
-): [[number, number], [number, number]] | null {
-  if (!bounds) {
-    return null;
-  }
-  if (
-    !Number.isFinite(bounds.north) ||
-    !Number.isFinite(bounds.south) ||
-    !Number.isFinite(bounds.east) ||
-    !Number.isFinite(bounds.west)
-  ) {
-    return null;
-  }
-
-  const north = Math.max(bounds.north, bounds.south);
-  const south = Math.min(bounds.north, bounds.south);
-  const east = Math.max(bounds.east, bounds.west);
-  const west = Math.min(bounds.east, bounds.west);
-  const safeBufferKm =
-    typeof bufferKm === 'number' && Number.isFinite(bufferKm)
-      ? Math.max(bufferKm, 0)
-      : 0;
-
-  const midLat = (north + south) / 2;
-  const latBuffer = safeBufferKm / 111;
-  const lngScale = Math.max(0.1, Math.abs(Math.cos((midLat * Math.PI) / 180)));
-  const lngBuffer = safeBufferKm / (111 * lngScale);
-
-  return [
-    [south - latBuffer, west - lngBuffer],
-    [north + latBuffer, east + lngBuffer],
-  ];
-}
 
 export function App() {
   const {
@@ -96,7 +52,7 @@ export function App() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setNowSeconds(Math.floor(Date.now() / 1000));
-    }, 1000);
+    }, 5_000);
     return () => {
       window.clearInterval(intervalId);
     };
@@ -121,7 +77,7 @@ export function App() {
   const mapBounds = useMemo(
     () =>
       toLeafletBounds(mapPolicy.bounds, mapPolicy.bufferKm) ??
-      DEFAULT_MAP_BOUNDS,
+      ISRAEL_MAP_BOUNDS,
     [mapPolicy.bounds, mapPolicy.bufferKm],
   );
   const selectedSensorStatus = useMemo(
@@ -131,61 +87,11 @@ export function App() {
         : (state.sensorStatus[String(selectedUnitId)] ?? null),
     [selectedUnitId, state.sensorStatus],
   );
-  const selectedSensorLinks = useMemo(() => {
-    if (selectedUnitId === null || !selectedSensorStatus) {
-      return [];
-    }
-
-    const byPeer = new Map<
-      number,
-      {
-        peerId: number;
-        direction: 'IN' | 'OUT';
-        quality: number | null;
-        intensity: number | null;
-      }
-    >();
-
-    for (const peerId of selectedSensorStatus.connectedPeers) {
-      const link = state.links.find(
-        (candidate) =>
-          (candidate.side1 === selectedUnitId && candidate.side2 === peerId) ||
-          (candidate.side1 === peerId && candidate.side2 === selectedUnitId),
-      );
-
-      byPeer.set(peerId, {
-        peerId,
-        direction: link
-          ? link.side1 === selectedUnitId
-            ? 'OUT'
-            : 'IN'
-          : 'OUT',
-        quality: link ? link.quality : null,
-        intensity: link ? link.intensity : null,
-      });
-    }
-
-    for (const link of state.links) {
-      if (link.side1 === selectedUnitId) {
-        byPeer.set(link.side2, {
-          peerId: link.side2,
-          direction: 'OUT',
-          quality: link.quality,
-          intensity: link.intensity,
-        });
-      }
-      if (link.side2 === selectedUnitId) {
-        byPeer.set(link.side1, {
-          peerId: link.side1,
-          direction: 'IN',
-          quality: link.quality,
-          intensity: link.intensity,
-        });
-      }
-    }
-
-    return [...byPeer.values()].sort((a, b) => a.peerId - b.peerId);
-  }, [selectedSensorStatus, selectedUnitId, state.links]);
+  const selectedSensorLinks = useMemo(
+    () =>
+      getSelectedSensorLinks(selectedUnitId, state.sensorStatus, state.links),
+    [selectedUnitId, state.sensorStatus, state.links],
+  );
 
   useEffect(() => {
     if (selectedUnitId === null) {
@@ -236,7 +142,7 @@ export function App() {
   return (
     <TooltipProvider>
       <main className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-        <StatusStrip state={state} />
+        <StatusStrip alarm={state.alarm} serverOnline={state.serverOnline} />
         <ErrorBoundary section="Alerts">
           <CrossingAlertBanner
             alerts={state.crossingAlerts}
@@ -319,7 +225,11 @@ export function App() {
               onOfflineModeEnabledChange={setOfflineModeEnabled}
               onResetAll={resetAll}
             />
-            <ConnectionIndicator state={state} />
+            <ConnectionIndicator
+              connected={state.connected}
+              serverOnline={state.serverOnline}
+              port={state.port}
+            />
           </footer>
         </ErrorBoundary>
       </main>

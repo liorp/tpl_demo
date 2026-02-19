@@ -1,5 +1,8 @@
-import contextlib
+import math
+from collections.abc import Callable
+from pathlib import Path
 
+from backend.core.layout_store import ALLOWED_BOUNDS
 from backend.core.models import Event, SensorState, now_ts
 
 
@@ -30,7 +33,7 @@ def _normalize_side_links(raw_links: list[dict]) -> list[dict]:
     return normalized
 
 
-def _event_last_seen(event: Event) -> int:
+def _event_last_seen() -> int:
     return int(now_ts())
 
 
@@ -157,7 +160,7 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         return True
     if etype == "connected":
-        last_seen = _event_last_seen(event)
+        last_seen = _event_last_seen()
         _update_sensor_link_status(
             state,
             sensor_id=event["unit"],
@@ -180,7 +183,7 @@ def handle_event(state: SensorState, event: Event) -> bool:
     if etype == "map":
         state.links = _normalize_side_links(list(event.get("links", [])))
         _refresh_sensor_status_from_map(
-            state, unit_id=event["unit_id"], last_seen=_event_last_seen(event)
+            state, unit_id=event["unit_id"], last_seen=_event_last_seen()
         )
         state.add_log(
             f"MAP from {event['unit_id']} ver={event['version']}"
@@ -210,11 +213,52 @@ def check_auto_reset(state: SensorState, now_ts_value: float, timeout_sec: float
 
 def mark_disconnected(state: SensorState, reason: str | None = None) -> bool:
     set_connection_state(state, False, "None", "disconnected")
-    with state.serial_lock:
-        if state.serial_conn:
-            with contextlib.suppress(Exception):
-                state.serial_conn.close()
-            state.serial_conn = None
     if reason:
         state.add_log(reason)
+    return True
+
+
+def _within_bounds(lat: float, lng: float, bounds: dict[str, float] | None) -> bool:
+    if not bounds:
+        bounds = ALLOWED_BOUNDS
+    return bounds["south"] <= lat <= bounds["north"] and bounds["west"] <= lng <= bounds["east"]
+
+
+def set_unit_position(
+    state: SensorState,
+    unit_id: int,
+    lat: float,
+    lng: float,
+    save_fn: Callable,
+    layout_path: str | Path,
+) -> bool:
+    if unit_id < 0:
+        return False
+    next_lat = float(lat)
+    next_lng = float(lng)
+    if not math.isfinite(next_lat) or not math.isfinite(next_lng):
+        return False
+    bounds = state.map_policy.get("bounds")
+    if not isinstance(bounds, dict) or not _within_bounds(next_lat, next_lng, bounds):
+        return False
+
+    updated = False
+    for unit in state.units:
+        if unit.get("id") == unit_id:
+            unit["lat"] = next_lat
+            unit["lng"] = next_lng
+            if "label" not in unit:
+                unit["label"] = f"S{unit_id}"
+            updated = True
+            break
+    if not updated:
+        state.units.append(
+            {"id": unit_id, "label": f"S{unit_id}", "lat": next_lat, "lng": next_lng}
+        )
+
+    persisted = save_fn(
+        layout_path, {"units": list(state.units), "map_policy": dict(state.map_policy)}
+    )
+    state.units = persisted["units"]
+    state.map_policy = persisted["map_policy"]
     return True

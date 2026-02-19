@@ -323,16 +323,16 @@ export function useMonitorSocket(): {
   }, []);
 
   // Compose final MonitorState from the three sources
+  const safeServerState = serverState ?? createInitialServerState();
   const state: MonitorState = useMemo(
     () => ({
-      ...serverState,
+      ...safeServerState,
       crossingAlerts,
-      crossingAckWindows: crossingAckWindowsRef.current,
       units: clientState.units,
       pairings: clientState.pairings,
       globalSettings: clientState.globalSettings,
     }),
-    [serverState, crossingAlerts, clientState],
+    [safeServerState, crossingAlerts, clientState],
   );
 
   return {

@@ -1,5 +1,4 @@
 import json
-import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.core.layout_store import ALLOWED_BOUNDS, save_layout_state
 from backend.core.models import SensorState, snapshot
-from backend.core.service import acknowledge_alarm
+from backend.core.service import acknowledge_alarm, set_unit_position
 from backend.realtime.broadcaster import Broadcaster
 
 
@@ -43,16 +42,9 @@ def _build_serial_command(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def _within_bounds(lat: float, lng: float, bounds: dict[str, float] | None) -> bool:
-    if not bounds:
-        bounds = ALLOWED_BOUNDS
-    return bounds["south"] <= lat <= bounds["north"] and bounds["west"] <= lng <= bounds["east"]
-
-
-def _set_unit_position(deps: AppDeps, payload: dict[str, Any]) -> bool:
+def _handle_unit_position(deps: AppDeps, payload: dict[str, Any]) -> bool:
     if payload.get("cmd") != "set_unit_position":
         return False
-
     unit_id = payload.get("unit_id")
     lat = payload.get("lat")
     lng = payload.get("lng")
@@ -62,47 +54,13 @@ def _set_unit_position(deps: AppDeps, payload: dict[str, Any]) -> bool:
         or not isinstance(lng, (float, int))
     ):
         return False
-
-    if unit_id < 0:
-        return False
-
-    next_lat = float(lat)
-    next_lng = float(lng)
-    if not math.isfinite(next_lat) or not math.isfinite(next_lng):
-        return False
-    bounds = deps.state.map_policy.get("bounds")
-    if not isinstance(bounds, dict) or not _within_bounds(next_lat, next_lng, bounds):
-        return False
-
-    updated = False
-    for unit in deps.state.units:
-        if unit.get("id") == unit_id:
-            unit["lat"] = next_lat
-            unit["lng"] = next_lng
-            if "label" not in unit:
-                unit["label"] = f"S{unit_id}"
-            updated = True
-            break
-    if not updated:
-        deps.state.units.append(
-            {
-                "id": unit_id,
-                "label": f"S{unit_id}",
-                "lat": next_lat,
-                "lng": next_lng,
-            }
-        )
-    current_units = list(deps.state.units)
-    current_policy = dict(deps.state.map_policy)
-
-    persisted = deps.save_layout(
-        deps.layout_state_path,
-        {"units": current_units, "map_policy": current_policy},
+    changed = set_unit_position(
+        deps.state, unit_id, float(lat), float(lng),
+        deps.save_layout, deps.layout_state_path,
     )
-    deps.state.units = persisted["units"]
-    deps.state.map_policy = persisted["map_policy"]
-    deps.broadcaster.enqueue(snapshot(deps.state))
-    return True
+    if changed:
+        deps.broadcaster.enqueue(snapshot(deps.state))
+    return changed
 
 
 def register_routes(app: FastAPI, deps: AppDeps) -> None:
@@ -145,7 +103,7 @@ def register_routes(app: FastAPI, deps: AppDeps) -> None:
                     payload = None
                 if not isinstance(payload, dict):
                     continue
-                if _set_unit_position(deps, payload):
+                if _handle_unit_position(deps, payload):
                     continue
                 serial_cmd = _build_serial_command(payload)
                 if serial_cmd:

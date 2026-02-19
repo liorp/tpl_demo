@@ -121,7 +121,6 @@ export type MonitorState = {
   events: MonitorEvent[];
   links: SignalLinkState[];
   crossingAlerts: CrossingAlert[];
-  crossingAckWindows: CrossingAckWindow[];
   config: MonitorConfig;
   globalSettings: GlobalSettings;
   units: UnitPlacement[];

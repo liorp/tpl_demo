@@ -2,16 +2,12 @@ import { divIcon } from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 
-import { getUnitBounds } from '../model/mapViewport';
+import { getUnitBounds, ISRAEL_MAP_BOUNDS } from '../model/mapViewport';
 import type { CrossingAlert, UnitPlacement } from '../model/types';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
 const ONLINE_TILE_NATIVE_MAX_ZOOM = 19;
 const OFFLINE_DEFAULT_NATIVE_MAX_ZOOM = 14;
-const ISRAEL_BOUNDS: [[number, number], [number, number]] = [
-  [29.2, 34.1],
-  [33.55, 36.05],
-];
 
 type Props = {
   units: UnitPlacement[];
@@ -182,7 +178,7 @@ export function MonitorMap({
         center={DEFAULT_CENTER}
         zoom={12}
         minZoom={minZoom}
-        maxBounds={mapBounds ?? ISRAEL_BOUNDS}
+        maxBounds={mapBounds ?? ISRAEL_MAP_BOUNDS}
         maxBoundsViscosity={1}
         attributionControl={false}
         className="h-full w-full"

@@ -2,7 +2,6 @@ import threading
 from types import SimpleNamespace
 
 from backend.core.events import SerialConnected, SerialDisconnect, SerialEvent
-from backend.core.models import SensorState
 from backend.serial.manager import SerialManager, list_serial_ports
 
 import serial
@@ -93,7 +92,7 @@ def test_disconnects_immediately_when_port_disappears_during_idle(monkeypatch):
             return [port]
         return []
 
-    manager = SerialManager(state=SensorState(), forced_port="")
+    manager = SerialManager(forced_port="")
     stop = threading.Event()
     sink = _StoppingSink(stop)
 
@@ -133,7 +132,7 @@ def test_rejects_port_without_valid_protocol_event(monkeypatch):
         def close(self):
             self.is_open = False
 
-    manager = SerialManager(state=SensorState(), forced_port="")
+    manager = SerialManager(forced_port="")
     stop = threading.Event()
     sink = _StoppingSink(stop)
 
@@ -175,7 +174,7 @@ def test_marks_connected_after_first_valid_protocol_event(monkeypatch):
         def close(self):
             self.is_open = False
 
-    manager = SerialManager(state=SensorState(), forced_port="")
+    manager = SerialManager(forced_port="")
     stop = threading.Event()
     sink = _StoppingSink(stop)
 

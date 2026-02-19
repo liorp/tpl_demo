@@ -16,7 +16,7 @@ function formatLocation(alert: CrossingAlert): string | null {
   if (!hasLocation(alert)) {
     return null;
   }
-  return `${alert.lat.toFixed(5)}, ${alert.lng.toFixed(5)}`;
+  return `${alert.lat?.toFixed(5)}, ${alert.lng?.toFixed(5)}`;
 }
 
 export function CrossingAlertBanner({ alerts, onAcknowledge, onFocus }: Props) {

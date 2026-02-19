@@ -32,7 +32,7 @@ logger = logging.getLogger("tpl-signum")
 
 state = SensorState()
 broadcaster = Broadcaster()
-serial_manager = SerialManager(state=state, forced_port=SERIAL_PORT)
+serial_manager = SerialManager(forced_port=SERIAL_PORT)
 layout_state_path = (
     Path(LAYOUT_STATE_PATH).expanduser()
     if LAYOUT_STATE_PATH
@@ -77,6 +77,7 @@ async def _serial_consumer(queue: asyncio.Queue[SerialMessage]) -> None:
             if check_auto_reset(state, time.time(), AUTO_RESET_TIMEOUT):
                 broadcaster.enqueue(snapshot(state))
         elif isinstance(msg, SerialDisconnect):
+            serial_manager.close_connection()
             mark_disconnected(state, msg.reason)
             broadcaster.enqueue(snapshot(state))
 

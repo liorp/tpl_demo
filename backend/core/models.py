@@ -1,9 +1,6 @@
-import threading
 import time
 from datetime import datetime
-from typing import TypedDict
-
-import serial
+from typing import Literal, TypedDict
 
 
 class MapPolicy(TypedDict):
@@ -21,8 +18,8 @@ DEFAULT_MAP_POLICY: MapPolicy = {
 }
 
 
-class Event(TypedDict, total=False):
-    type: str
+class DetectionEvent(TypedDict):
+    type: Literal["detection"]
     id_a: str
     unit_a: int
     id_b: str
@@ -30,23 +27,47 @@ class Event(TypedDict, total=False):
     threshold: int
     value: int
     count: int
+    device_ts: int
+
+
+class CommLossEvent(TypedDict):
+    type: Literal["comm_loss"]
+    id_a: str
+    unit_a: int
+    id_b: str
+    unit_b: int
+    value: int
+    device_ts: int
+
+
+class ConnectedEvent(TypedDict):
+    type: Literal["connected"]
     id_unit: str
     unit: int
     id_peer: str
     peer: int
     connected: bool
+    device_ts: int
+
+
+class MapEvent(TypedDict):
+    type: Literal["map"]
     unit_id: int
     version: str
     gain: int
     voltage: int
     links: list[dict[str, int]]
-    side1: int
-    side2: int
-    quality: int
-    intensity: int
-    sensor_a: int
-    sensor_b: int
     device_ts: int
+
+
+class ConfigEvent(TypedDict):
+    type: Literal["config"]
+    threshold: int
+    value: int
+    device_ts: int
+
+
+Event = DetectionEvent | CommLossEvent | ConnectedEvent | MapEvent | ConfigEvent
 
 
 class SensorState:
@@ -64,16 +85,11 @@ class SensorState:
         self.sensor_status: dict = {}
         self.map_policy: MapPolicy = dict(DEFAULT_MAP_POLICY)
 
-        self._log_lock = threading.Lock()
-        self.serial_lock = threading.Lock()
-        self.serial_conn: serial.Serial | None = None
-
     def add_log(self, message: str):
         entry = {"time": datetime.now().strftime("%H:%M:%S"), "msg": message}
-        with self._log_lock:
-            self.logs.insert(0, entry)
-            if len(self.logs) > self.max_logs:
-                self.logs.pop()
+        self.logs.insert(0, entry)
+        if len(self.logs) > self.max_logs:
+            self.logs.pop()
 
 
 def snapshot(state: SensorState) -> dict:

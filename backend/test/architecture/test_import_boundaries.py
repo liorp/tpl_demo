@@ -12,3 +12,10 @@ def test_api_does_not_import_serial_module():
 
     assert "from backend.serial" not in content
     assert "import backend.serial" not in content
+
+
+def test_service_does_not_import_serial_or_contextlib():
+    service_file = Path("backend/core/service.py")
+    content = service_file.read_text()
+    assert "import serial" not in content
+    assert "import contextlib" not in content

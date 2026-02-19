@@ -1,5 +1,6 @@
 import re
-from typing import Any
+
+from backend.core.models import Event
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 TIMESTAMP_RE = re.compile(r"^\[(\d+)\]\s+I\s+(.*)")
@@ -19,7 +20,7 @@ MAP_LINK_RE = re.compile(r"\w+\((\d+)\)>\w+\((\d+)\)\s+q:(\d+)\s+i:(\d+)")
 CONFIG_RE = re.compile(r"CMD:CONFIG\s+threshold:(\d+)\s+val:(\d+)")
 
 
-def parse_line(raw_line: str) -> dict[str, Any] | None:
+def parse_line(raw_line: str) -> Event | None:
     line = ANSI_RE.sub("", raw_line).strip()
     if not line:
         return None

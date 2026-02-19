@@ -1,7 +1,10 @@
 let audioContext: AudioContext | null = null;
 
 export function playAlarmSound(): void {
-  const ContextCtor = window.AudioContext ?? window.webkitAudioContext;
+  const ContextCtor =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
   if (!ContextCtor) {
     return;
   }

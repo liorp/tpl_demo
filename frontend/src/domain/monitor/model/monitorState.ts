@@ -194,7 +194,6 @@ export function createInitialMonitorState(): MonitorState {
   return {
     ...createInitialServerState(),
     crossingAlerts: [],
-    crossingAckWindows: [],
     globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     units: [],
     pairings: [],
@@ -224,7 +223,6 @@ export function toMonitorStateFromPayload(
   return {
     ...serverState,
     crossingAlerts: crossingAlert ? [crossingAlert] : [],
-    crossingAckWindows: [],
     globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     units: toPayloadUnits(payload.units, serverState.sensorStatus),
     pairings: [],
@@ -473,4 +471,65 @@ export function isSignalFresh(
   staleMs = 10_000,
 ): boolean {
   return now - link.updatedAt < staleMs;
+}
+
+export function getSelectedSensorLinks(
+  selectedUnitId: number | null,
+  sensorStatus: SensorStatusMap,
+  links: SignalLinkState[],
+): {
+  peerId: number;
+  direction: 'IN' | 'OUT';
+  quality: number | null;
+  intensity: number | null;
+}[] {
+  if (selectedUnitId === null) return [];
+  const selectedSensorStatus = sensorStatus[String(selectedUnitId)] ?? null;
+  if (!selectedSensorStatus) return [];
+
+  const byPeer = new Map<
+    number,
+    {
+      peerId: number;
+      direction: 'IN' | 'OUT';
+      quality: number | null;
+      intensity: number | null;
+    }
+  >();
+
+  for (const peerId of selectedSensorStatus.connectedPeers) {
+    const link = links.find(
+      (candidate) =>
+        (candidate.side1 === selectedUnitId && candidate.side2 === peerId) ||
+        (candidate.side1 === peerId && candidate.side2 === selectedUnitId),
+    );
+
+    byPeer.set(peerId, {
+      peerId,
+      direction: link ? (link.side1 === selectedUnitId ? 'OUT' : 'IN') : 'OUT',
+      quality: link ? link.quality : null,
+      intensity: link ? link.intensity : null,
+    });
+  }
+
+  for (const link of links) {
+    if (link.side1 === selectedUnitId) {
+      byPeer.set(link.side2, {
+        peerId: link.side2,
+        direction: 'OUT',
+        quality: link.quality,
+        intensity: link.intensity,
+      });
+    }
+    if (link.side2 === selectedUnitId) {
+      byPeer.set(link.side1, {
+        peerId: link.side1,
+        direction: 'IN',
+        quality: link.quality,
+        intensity: link.intensity,
+      });
+    }
+  }
+
+  return [...byPeer.values()].sort((a, b) => a.peerId - b.peerId);
 }

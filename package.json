@@ -9,7 +9,7 @@
     "dev:backend": "uv run --project backend uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload",
     "build": "cd frontend && bun run build",
     "lint": "bun run lint:frontend && bun run lint:backend",
-    "lint:frontend": "cd frontend && bun run lint",
+    "lint:frontend": "cd frontend && bun run lint && bun run typecheck",
     "lint:backend": "uv run --project backend ruff check backend/ dummy_device.py",
     "test:frontend": "cd frontend && bun run test",
     "test:backend": "uv run --project backend pytest",

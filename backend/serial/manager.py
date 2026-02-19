@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import re
@@ -15,7 +16,6 @@ from backend.core.events import (
     SerialEvent,
     SerialIdle,
 )
-from backend.core.models import SensorState
 from backend.parsing.parser import parse_line
 
 logger = logging.getLogger("tpl-signum")
@@ -45,14 +45,22 @@ def list_serial_ports(forced_port: str) -> list[str]:
 
 
 class SerialManager:
-    def __init__(self, state: SensorState, forced_port: str):
-        self.state = state
+    def __init__(self, forced_port: str):
         self.forced_port = forced_port
+        self._serial_lock = threading.Lock()
+        self._serial_conn: serial.Serial | None = None
 
     def send_serial(self, cmd: str):
-        with self.state.serial_lock:
-            if self.state.serial_conn and self.state.serial_conn.is_open:
-                self.state.serial_conn.write((cmd + "\r").encode())
+        with self._serial_lock:
+            if self._serial_conn and self._serial_conn.is_open:
+                self._serial_conn.write((cmd + "\r").encode())
+
+    def close_connection(self):
+        with self._serial_lock:
+            if self._serial_conn:
+                with contextlib.suppress(Exception):
+                    self._serial_conn.close()
+                self._serial_conn = None
 
     def _connect(self, port: str) -> serial.Serial:
         ser = serial.Serial(
@@ -65,8 +73,8 @@ class SerialManager:
             xonxoff=False,
             rtscts=False,
         )
-        with self.state.serial_lock:
-            self.state.serial_conn = ser
+        with self._serial_lock:
+            self._serial_conn = ser
         return ser
 
     def _is_port_available(self, port: str) -> bool:
@@ -89,7 +97,7 @@ class SerialManager:
             connected_any = False
             for port in ports:
                 try:
-                    self.state.add_log(f"Trying port: {port}")
+                    logger.info("Trying port: %s", port)
                     ser = self._connect(port)
                     connected_any = True
 
@@ -114,9 +122,7 @@ class SerialManager:
                                 and time.monotonic() - validation_started_at
                                 >= PROTOCOL_VALIDATION_TIMEOUT_SEC
                             ):
-                                self.state.add_log(
-                                    f"Ignoring {port}: no valid protocol events"
-                                )
+                                logger.info("Ignoring %s: no valid protocol events", port)
                                 break
                             sink.put_nowait(SerialIdle())
                             continue

@@ -7,22 +7,7 @@ import { StatusStrip } from './StatusStrip';
 
 describe('StatusStrip', () => {
   test('does not render acknowledge button in alarm state', () => {
-    render(
-      <StatusStrip
-        state={{
-          connected: true,
-          port: '/dev/cu.usbserial-0001',
-          alarm: 'alarm',
-          events: [],
-          links: [],
-          crossingAlerts: [],
-          crossingAckWindows: [],
-          config: { threshold: null, val: null },
-          units: [],
-          pairings: [],
-        }}
-      />,
-    );
+    render(<StatusStrip alarm="alarm" serverOnline={true} />);
 
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
     expect(screen.getByText('TPL SIGNUM')).not.toBeNull();
