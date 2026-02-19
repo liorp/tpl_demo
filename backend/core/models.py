@@ -5,6 +5,7 @@ from typing import TypedDict
 
 import serial
 
+
 class MapPolicy(TypedDict):
     bounds: dict | None
     buffer_km: float | None

@@ -1,7 +1,8 @@
-from dataclasses import dataclass
 import json
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
@@ -54,7 +55,11 @@ def _set_unit_position(deps: AppDeps, payload: dict[str, Any]) -> bool:
     unit_id = payload.get("unit_id")
     lat = payload.get("lat")
     lng = payload.get("lng")
-    if not isinstance(unit_id, int) or not isinstance(lat, (float, int)) or not isinstance(lng, (float, int)):
+    if (
+        not isinstance(unit_id, int)
+        or not isinstance(lat, (float, int))
+        or not isinstance(lng, (float, int))
+    ):
         return False
 
     next_lat = float(lat)

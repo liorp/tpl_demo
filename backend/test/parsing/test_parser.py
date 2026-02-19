@@ -15,7 +15,10 @@ def test_parse_detection_event():
 
 
 def test_parse_map_response_with_signal_links():
-    line = "[321] I CMD:MAP_RSP from 7 ver:v1 gain:30 voltage:2600 scan:3 adv:4: AA(1)>BB(2) q:88 i:73, BB(2)>CC(3) q:61 i:55"
+    line = (
+        "[321] I CMD:MAP_RSP from 7 ver:v1 gain:30 voltage:2600 scan:3 adv:4:"
+        " AA(1)>BB(2) q:88 i:73, BB(2)>CC(3) q:61 i:55"
+    )
 
     event = parse_line(line)
 

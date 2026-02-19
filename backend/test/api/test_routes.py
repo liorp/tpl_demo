@@ -2,12 +2,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from backend.api.routes import AppDeps, register_routes
 from backend.core.layout_store import ALLOWED_BOUNDS, MAP_BUFFER_KM
 from backend.core.models import SensorState
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 @dataclass

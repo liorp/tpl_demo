@@ -1,8 +1,8 @@
 import asyncio
-from contextlib import asynccontextmanager
 import logging
 import threading
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,7 +11,12 @@ from backend.api.routes import AppDeps, register_routes
 from backend.config import AUTO_RESET_TIMEOUT, LAYOUT_STATE_PATH, SERIAL_PORT
 from backend.core.layout_store import load_layout_state, save_layout_state
 from backend.core.models import SensorState, snapshot
-from backend.core.service import check_auto_reset, handle_event, mark_disconnected, set_connection_state
+from backend.core.service import (
+    check_auto_reset,
+    handle_event,
+    mark_disconnected,
+    set_connection_state,
+)
 from backend.realtime.broadcaster import Broadcaster
 from backend.serial.manager import SerialManager
 

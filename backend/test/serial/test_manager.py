@@ -1,10 +1,10 @@
 from types import SimpleNamespace
 
 import pytest
-import serial
-
 from backend.core.models import SensorState
 from backend.serial.manager import SerialManager, list_serial_ports
+
+import serial
 
 
 def test_filters_out_bluetooth_incoming_port(monkeypatch):

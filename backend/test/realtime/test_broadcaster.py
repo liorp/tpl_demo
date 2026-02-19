@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 
 from backend.realtime.broadcaster import Broadcaster
 
@@ -29,9 +30,7 @@ def test_broadcaster_register_and_broadcast():
         assert '"connected": true' in ws.messages[-1]
 
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
     asyncio.run(run())

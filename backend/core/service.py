@@ -1,3 +1,5 @@
+import contextlib
+
 from backend.core.models import Event, SensorState, now_ts
 
 
@@ -184,7 +186,8 @@ def handle_event(state: SensorState, event: Event) -> bool:
             state, unit_id=event["unit_id"], last_seen=_event_last_seen(event)
         )
         state.add_log(
-            f"MAP from {event['unit_id']} ver={event['version']} gain={event['gain']} v={event['voltage']}"
+            f"MAP from {event['unit_id']} ver={event['version']}"
+            f" gain={event['gain']} v={event['voltage']}"
         )
         return True
     if etype == "config":
@@ -212,10 +215,8 @@ def mark_disconnected(state: SensorState, reason: str | None = None) -> bool:
     set_connection_state(state, False, "None", "disconnected")
     with state.serial_lock:
         if state.serial_conn:
-            try:
+            with contextlib.suppress(Exception):
                 state.serial_conn.close()
-            except Exception:
-                pass
             state.serial_conn = None
     if reason:
         state.add_log(reason)

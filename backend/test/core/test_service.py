@@ -1,7 +1,11 @@
-import pytest
-
 import backend.core.models as models
-from backend.core.layout_store import ALLOWED_BOUNDS, MAP_BUFFER_KM, load_layout_state, save_layout_state
+import pytest
+from backend.core.layout_store import (
+    ALLOWED_BOUNDS,
+    MAP_BUFFER_KM,
+    load_layout_state,
+    save_layout_state,
+)
 from backend.core.models import SensorState, snapshot
 from backend.core.service import handle_event
 
