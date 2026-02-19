@@ -26,10 +26,12 @@ Run all commands from repo root unless noted.
 - Backend follows standard Python conventions: 4-space indent, `snake_case` functions/modules, typed models in `backend/core/models.py`.
 
 ## Testing Guidelines
+- **Use TDD**: Write a failing test first, then implement the minimal fix, then verify all tests pass.
 - Backend: `pytest` with tests under `backend/test/` named `test_*.py`.
 - Frontend: `vitest` with colocated tests like `*.test.ts`.
 - Add or update tests in the same domain area as the change.
-- Before opening a PR, run `bun run test` and `bun run lint`.
+- Before claiming work is done, **always run `bun run test` and `bun run lint`** and verify they pass.
+- For UI and integration changes, verify with **Playwright via `bun run demo`** to confirm end-to-end behavior works.
 
 ## Commit & Pull Request Guidelines
 Current history uses short, imperative commit subjects (for example: `Add ...`, `Initial commit`). Keep commits focused and descriptive.
