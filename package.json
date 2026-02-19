@@ -3,11 +3,14 @@
   "private": true,
   "packageManager": "bun@1.3.2",
   "scripts": {
+    "demo": "rm -f /tmp/tpl-dummy-port && bunx --bun concurrently -k -n DEV,BE,FE -c yellow,green,cyan \"python dummy_device.py --port-file /tmp/tpl-dummy-port\" \"sleep 1 && SERIAL_PORT=$(cat /tmp/tpl-dummy-port) bun run dev:backend\" \"bun run dev:frontend\"",
     "dev": "bunx --bun concurrently -k -n FE,BE -c cyan,green \"bun run dev:frontend\" \"bun run dev:backend\"",
     "dev:frontend": "cd frontend && bun run watch",
     "dev:backend": "uv run --project backend uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload",
     "build": "cd frontend && bun run build",
-    "lint": "cd frontend && bun run lint",
+    "lint": "bun run lint:frontend && bun run lint:backend",
+    "lint:frontend": "cd frontend && bun run lint",
+    "lint:backend": "uv run --project backend ruff check backend/ dummy_device.py",
     "test:frontend": "cd frontend && bun run test",
     "test:backend": "uv run --project backend pytest",
     "test": "bun run test:frontend && bun run test:backend"

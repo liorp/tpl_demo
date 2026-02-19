@@ -59,18 +59,30 @@ def _drain_incoming(master_fd: int) -> None:
             break
 
 
+PORT_FILE = "/tmp/tpl-dummy-port"
+
+
 def _parse_args(argv: list[str] | None = None) -> Namespace:
     parser = ArgumentParser(description="Dummy TPL Signum device simulator")
+    parser.add_argument(
+        "--port-file",
+        default=None,
+        help="Write the slave PTY path to this file (default: none)",
+    )
     return parser.parse_args(argv)
 
 
 def main() -> None:
-    _parse_args()
+    args = _parse_args()
     master_fd, slave_fd = pty.openpty()
     flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
     fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
     slave_path = os.ttyname(slave_fd)
     commands = build_start_commands(slave_path)
+
+    if args.port_file:
+        with open(args.port_file, "w") as f:
+            f.write(slave_path)
 
     print(f"Dummy device ready on:  {slave_path}")
     print(f"Run backend with:       {commands['backend']}")
