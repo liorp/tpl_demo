@@ -261,4 +261,220 @@ describe('monitor socket lifecycle', () => {
       expect(latestState.mapPolicy.tileRoot).toBe('/tiles');
     });
   });
+
+  test('broadcast with old position does not overwrite optimistic placeUnit update', async () => {
+    const onState = vi.fn();
+    const onApi = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} onApi={onApi} />
+      </TestWrapper>,
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    socket.emitOpen();
+
+    // Backend sends initial state with unit at original position
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+      units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
+      sensor_status: {
+        '7': { active: true, last_seen: 100, connected_peers: [] },
+      },
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    await waitFor(() => {
+      const latest = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{ id: number; lat: number; lng: number }>;
+      };
+      expect(latest.units[0]?.lat).toBe(33.31);
+    });
+
+    // User moves unit to new position
+    const latestApi = onApi.mock.calls.at(-1)?.[0] as {
+      placeUnit: (unit: {
+        id: number;
+        label: string;
+        lat: number;
+        lng: number;
+      }) => void;
+    };
+    latestApi.placeUnit({ id: 7, label: 'S7', lat: 33.4, lng: 35.85 });
+
+    await waitFor(() => {
+      const latest = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{ id: number; lat: number; lng: number }>;
+      };
+      expect(latest.units[0]?.lat).toBe(33.4);
+    });
+
+    // A serial-event broadcast arrives with the OLD position
+    // (snapshot was taken before backend processed set_unit_position)
+    // Uses a new last_seen to prove the broadcast was processed.
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+      units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
+      sensor_status: {
+        '7': { active: true, last_seen: 101, connected_peers: [] },
+      },
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    // Wait for the stale broadcast to be fully processed
+    // (lastSeenAt update proves the message was applied)
+    // THEN verify the optimistic position was preserved
+    await waitFor(() => {
+      const latest = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{
+          id: number;
+          lat: number;
+          lng: number;
+          lastSeenAt: number;
+        }>;
+      };
+      expect(latest.units[0]?.lastSeenAt).toBe(101);
+      expect(latest.units[0]?.lat).toBe(33.4);
+      expect(latest.units[0]?.lng).toBe(35.85);
+    });
+  });
+
+  test('pending position clears once server confirms the new coordinates', async () => {
+    const onState = vi.fn();
+    const onApi = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} onApi={onApi} />
+      </TestWrapper>,
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    socket.emitOpen();
+
+    // Initial state
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+      units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
+      sensor_status: {
+        '7': { active: true, last_seen: 100, connected_peers: [] },
+      },
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    await waitFor(() => {
+      const latest = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{ id: number; lat: number; lng: number }>;
+      };
+      expect(latest.units[0]?.lat).toBe(33.31);
+    });
+
+    // User moves unit
+    const latestApi = onApi.mock.calls.at(-1)?.[0] as {
+      placeUnit: (unit: {
+        id: number;
+        label: string;
+        lat: number;
+        lng: number;
+      }) => void;
+    };
+    latestApi.placeUnit({ id: 7, label: 'S7', lat: 33.4, lng: 35.85 });
+
+    // Server confirms with matching position
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+      units: [{ id: 7, label: 'S7', lat: 33.4, lng: 35.85 }],
+      sensor_status: {
+        '7': { active: true, last_seen: 102, connected_peers: [] },
+      },
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    await waitFor(() => {
+      const latest = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{
+          id: number;
+          lat: number;
+          lng: number;
+          lastSeenAt: number;
+        }>;
+      };
+      expect(latest.units[0]?.lat).toBe(33.4);
+      expect(latest.units[0]?.lng).toBe(35.85);
+      // sensor status should be updated from the confirming broadcast
+      expect(latest.units[0]?.lastSeenAt).toBe(102);
+    });
+
+    // Subsequent broadcast with server position should be accepted now
+    // (pending was cleared on confirmation)
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { threshold: null, val: null },
+      units: [{ id: 7, label: 'S7', lat: 33.4, lng: 35.85 }],
+      sensor_status: {
+        '7': { active: true, last_seen: 103, connected_peers: [] },
+      },
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    await waitFor(() => {
+      const latest = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{ id: number; lastSeenAt: number }>;
+      };
+      expect(latest.units[0]?.lastSeenAt).toBe(103);
+    });
+  });
 });

@@ -83,6 +83,9 @@ export function useMonitorSocket(): {
   const crossingAckWindowsRef = useRef<CrossingAckWindow[]>([]);
 
   const socketRef = useRef<WebSocket | null>(null);
+  const pendingPositionsRef = useRef(
+    new Map<number, { lat: number; lng: number }>(),
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -129,10 +132,29 @@ export function useMonitorSocket(): {
             // Handle units (client state)
             const hasServerUnits = Array.isArray(payload.units);
             if (hasServerUnits) {
-              setClientState((prev) => ({
-                ...prev,
-                units: toPayloadUnits(payload.units, nextServer.sensorStatus),
-              }));
+              setClientState((prev) => {
+                const serverUnits = toPayloadUnits(
+                  payload.units,
+                  nextServer.sensorStatus,
+                );
+                const pending = pendingPositionsRef.current;
+                if (pending.size === 0) {
+                  return { ...prev, units: serverUnits };
+                }
+                const units = serverUnits.map((unit) => {
+                  const pendingPos = pending.get(unit.id);
+                  if (!pendingPos) return unit;
+                  if (
+                    Math.abs(unit.lat - pendingPos.lat) < 1e-6 &&
+                    Math.abs(unit.lng - pendingPos.lng) < 1e-6
+                  ) {
+                    pending.delete(unit.id);
+                    return unit;
+                  }
+                  return { ...unit, lat: pendingPos.lat, lng: pendingPos.lng };
+                });
+                return { ...prev, units };
+              });
             } else {
               setClientState((prev) => ({
                 ...prev,
@@ -218,6 +240,11 @@ export function useMonitorSocket(): {
         }),
       );
     }
+
+    pendingPositionsRef.current.set(unit.id, {
+      lat: unit.lat,
+      lng: unit.lng,
+    });
 
     setClientState((prev) => {
       const units = upsertUnitInList(prev.units, unit);
