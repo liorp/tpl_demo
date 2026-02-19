@@ -8,6 +8,8 @@ Usage:
     python dummy_device.py
 """
 
+import errno
+import fcntl
 import os
 import pty
 import select
@@ -65,6 +67,8 @@ def _parse_args(argv: list[str] | None = None) -> Namespace:
 def main() -> None:
     _parse_args()
     master_fd, slave_fd = pty.openpty()
+    flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+    fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
     slave_path = os.ttyname(slave_fd)
     commands = build_start_commands(slave_path)
 
@@ -98,7 +102,11 @@ def main() -> None:
                 line = f"[{device_ts}] I {payload}\r\n"
                 device_ts += 1
 
-                os.write(master_fd, line.encode())
+                try:
+                    os.write(master_fd, line.encode())
+                except OSError as e:
+                    if e.errno != errno.EAGAIN:
+                        raise
                 print(f"  [{offset:2d}s] {payload}")
 
             remaining = CYCLE_DURATION - prev_offset
