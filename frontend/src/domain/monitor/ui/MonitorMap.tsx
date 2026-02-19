@@ -1,21 +1,9 @@
 import { divIcon } from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
-import {
-  MapContainer,
-  Marker,
-  Polyline,
-  Popup,
-  TileLayer,
-  useMap,
-} from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 
 import { getUnitBounds } from '../model/mapViewport';
-import type {
-  CrossingAlert,
-  PairLink,
-  SignalLinkState,
-  UnitPlacement,
-} from '../model/types';
+import type { CrossingAlert, UnitPlacement } from '../model/types';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
 const ONLINE_TILE_NATIVE_MAX_ZOOM = 19;
@@ -27,8 +15,6 @@ const ISRAEL_BOUNDS: [[number, number], [number, number]] = [
 
 type Props = {
   units: UnitPlacement[];
-  pairings: PairLink[];
-  links: SignalLinkState[];
   crossingAlerts: CrossingAlert[];
   focusPoint: { lat: number; lng: number } | null;
   tileRoot: string | null;
@@ -86,19 +72,6 @@ function MapUnitsViewportController({ units }: { units: UnitPlacement[] }) {
   return null;
 }
 
-function toSignalColor(link: SignalLinkState | undefined): string {
-  if (!link) {
-    return '#475569';
-  }
-  if (link.quality >= 80) {
-    return '#22c55e';
-  }
-  if (link.quality >= 60) {
-    return '#eab308';
-  }
-  return '#ef4444';
-}
-
 function toTileUrl(tileRoot: string | null, useOfflineTiles: boolean): string {
   if (!useOfflineTiles) {
     return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -122,8 +95,6 @@ export const alertPinIcon = divIcon({
 
 export function MonitorMap({
   units,
-  pairings,
-  links,
   crossingAlerts,
   focusPoint,
   tileRoot,
@@ -148,7 +119,6 @@ export function MonitorMap({
       .filter((alert) => !alert.acknowledged)
       .flatMap((alert) => [alert.sensorA, alert.sensorB]),
   );
-  const unitById = new Map(units.map((unit) => [unit.id, unit] as const));
   const tileUrl = toTileUrl(tileRoot, useOfflineTiles);
   const minZoom = offlineZoomRange ? offlineZoomRange.minZoom : 7;
   const maxNativeZoom = offlineZoomRange
@@ -238,33 +208,6 @@ export function MonitorMap({
         ) : null}
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
-        {pairings.map((pair) => {
-          const side1 = unitById.get(pair.side1Id);
-          const side2 = unitById.get(pair.side2Id);
-          if (!side1 || !side2 || !pair.enabled) {
-            return null;
-          }
-          const signal = links.find(
-            (link) =>
-              (link.side1 === pair.side1Id && link.side2 === pair.side2Id) ||
-              (link.side1 === pair.side2Id && link.side2 === pair.side1Id),
-          );
-          return (
-            <Polyline
-              key={`${pair.side1Id}-${pair.side2Id}`}
-              positions={[
-                [side1.lat, side1.lng],
-                [side2.lat, side2.lng],
-              ]}
-              pathOptions={{
-                color: toSignalColor(signal),
-                weight: signal ? 2 + Math.round(signal.intensity / 35) : 2,
-                opacity: 0.85,
-                dashArray: signal ? undefined : '6 4',
-              }}
-            />
-          );
-        })}
         {units.map((unit) => (
           <Marker
             key={unit.id}

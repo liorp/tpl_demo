@@ -197,14 +197,14 @@ export function useMonitorSocket(): {
   }, [queryClient]);
 
   const acknowledgeCrossing = useCallback((alert: CrossingAlert) => {
+    setCrossingAlerts((prev) => acknowledgeCrossingAlert(prev, alert));
+    crossingAckWindowsRef.current = addCrossingAckWindow(
+      crossingAckWindowsRef.current,
+      alert,
+    );
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send('ack');
-      setCrossingAlerts((prev) => acknowledgeCrossingAlert(prev, alert));
-      crossingAckWindowsRef.current = addCrossingAckWindow(
-        crossingAckWindowsRef.current,
-        alert,
-      );
     }
   }, []);
 

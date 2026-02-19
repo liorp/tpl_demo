@@ -124,8 +124,6 @@ describe('MonitorMap', () => {
     render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -152,8 +150,6 @@ describe('MonitorMap', () => {
     render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -176,8 +172,6 @@ describe('MonitorMap', () => {
     const { rerender } = render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={'/custom-tiles'}
         offlineRequired={false}
@@ -197,8 +191,6 @@ describe('MonitorMap', () => {
     rerender(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -220,8 +212,6 @@ describe('MonitorMap', () => {
     render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={'/custom-tiles'}
         offlineRequired={false}
@@ -257,8 +247,6 @@ describe('MonitorMap', () => {
     render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={'/custom-tiles'}
         offlineRequired={true}
@@ -282,8 +270,6 @@ describe('MonitorMap', () => {
           { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
           { id: 2, label: 'Sensor 2', lat: 33.4, lng: 35.9, status: 'active' },
         ]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -315,8 +301,6 @@ describe('MonitorMap', () => {
             status: 'active',
           },
         ]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -338,8 +322,6 @@ describe('MonitorMap', () => {
         units={[
           { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
         ]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -373,8 +355,6 @@ describe('MonitorMap', () => {
     render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={'/tiles'}
         offlineRequired={true}
@@ -407,8 +387,6 @@ describe('MonitorMap', () => {
     render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={'/tiles'}
         offlineRequired={true}
@@ -453,8 +431,6 @@ describe('MonitorMap', () => {
     render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={'/tiles'}
         offlineRequired={true}
@@ -495,8 +471,6 @@ describe('MonitorMap', () => {
           { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'active' },
           { id: 3, label: 'Sensor 3', lat: 33.4, lng: 35.9, status: 'active' },
         ]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -529,8 +503,6 @@ describe('MonitorMap', () => {
           { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
           { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'active' },
         ]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -564,8 +536,6 @@ describe('MonitorMap', () => {
     render(
       <MonitorMap
         units={[]}
-        pairings={[]}
-        links={[]}
         focusPoint={null}
         tileRoot={'/tiles'}
         offlineRequired={true}

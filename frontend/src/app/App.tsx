@@ -287,8 +287,6 @@ export function App() {
             ) : null}
             <MonitorMap
               units={activeUnits}
-              pairings={state.pairings}
-              links={state.links}
               crossingAlerts={state.crossingAlerts}
               focusPoint={focusedAlertPoint}
               tileRoot={mapPolicy.tileRoot}
