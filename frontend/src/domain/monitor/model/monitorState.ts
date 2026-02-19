@@ -9,6 +9,7 @@ import type {
   MonitorState,
   PairLink,
   SensorStatusMap,
+  ServerState,
   SignalLinkState,
   UnitPlacement,
 } from './types';
@@ -21,7 +22,7 @@ const CROSSING_ALERT_DEDUP_WINDOW_MS = 10_000;
 const CROSSING_ACK_SUPPRESSION_WINDOW_MS = 2_000;
 const MAP_FROM_RE = /MAP from (\d+)/;
 
-function toCrossingAlert(
+export function toCrossingAlert(
   raw: MonitorPayload['crossing_alert'],
 ): CrossingAlert | null {
   if (!raw || typeof raw !== 'object') {
@@ -132,7 +133,7 @@ function toSensorStatusMap(
   return next;
 }
 
-function toPayloadUnits(
+export function toPayloadUnits(
   payloadUnits: MonitorPayload['units'],
   sensorStatus: SensorStatusMap,
 ): UnitPlacement[] {
@@ -175,7 +176,7 @@ function toPayloadUnits(
   return nextUnits.slice(0, MAX_UNITS);
 }
 
-export function createInitialMonitorState(): MonitorState {
+export function createInitialServerState(): ServerState {
   return {
     serverOnline: false,
     connected: false,
@@ -183,21 +184,24 @@ export function createInitialMonitorState(): MonitorState {
     alarm: 'disconnected',
     events: [],
     links: [],
-    crossingAlerts: [],
-    crossingAckWindows: [],
     config: { threshold: null, val: null },
-    globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
-    units: [],
-    pairings: [],
     sensorStatus: {},
     mapPolicy: toDefaultMapPolicy(),
   };
 }
 
-export function toMonitorStateFromPayload(
-  payload: MonitorPayload,
-): MonitorState {
-  const crossingAlert = toCrossingAlert(payload.crossing_alert);
+export function createInitialMonitorState(): MonitorState {
+  return {
+    ...createInitialServerState(),
+    crossingAlerts: [],
+    crossingAckWindows: [],
+    globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
+    units: [],
+    pairings: [],
+  };
+}
+
+export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
   const sensorStatus = toSensorStatusMap(payload.sensor_status);
   return {
     serverOnline: true,
@@ -206,14 +210,24 @@ export function toMonitorStateFromPayload(
     alarm: payload.alarm,
     events: payload.events.slice(0, MAX_EVENTS),
     links: payload.links,
-    crossingAlerts: crossingAlert ? [crossingAlert] : [],
-    crossingAckWindows: [],
     config: payload.config,
-    globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
-    units: toPayloadUnits(payload.units, sensorStatus),
-    pairings: [],
     sensorStatus,
     mapPolicy: toMapPolicy(payload.map_policy),
+  };
+}
+
+export function toMonitorStateFromPayload(
+  payload: MonitorPayload,
+): MonitorState {
+  const crossingAlert = toCrossingAlert(payload.crossing_alert);
+  const serverState = toServerStateFromPayload(payload);
+  return {
+    ...serverState,
+    crossingAlerts: crossingAlert ? [crossingAlert] : [],
+    crossingAckWindows: [],
+    globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
+    units: toPayloadUnits(payload.units, serverState.sensorStatus),
+    pairings: [],
   };
 }
 
@@ -376,20 +390,65 @@ export function isDetectionEvent(msg: string): boolean {
   return msg.includes('DETECTION');
 }
 
+export function upsertUnitInList(
+  units: UnitPlacement[],
+  unit: UnitPlacement,
+): UnitPlacement[] {
+  const existingIndex = units.findIndex((entry) => entry.id === unit.id);
+  if (existingIndex >= 0) {
+    const next = [...units];
+    next[existingIndex] = { ...next[existingIndex], ...unit };
+    return next;
+  }
+  if (units.length >= MAX_UNITS) {
+    return units;
+  }
+  return [...units, unit];
+}
+
+export function setPairingInList(
+  units: UnitPlacement[],
+  pairings: PairLink[],
+  side1Id: number,
+  side2Id: number,
+  enabled: boolean,
+): PairLink[] {
+  if (side1Id === side2Id) {
+    return pairings;
+  }
+  const hasSide1 = units.some((unit) => unit.id === side1Id);
+  const hasSide2 = units.some((unit) => unit.id === side2Id);
+  if (!hasSide1 || !hasSide2) {
+    return pairings;
+  }
+
+  const canonicalSide1 = Math.min(side1Id, side2Id);
+  const canonicalSide2 = Math.max(side1Id, side2Id);
+  const next = pairings.filter(
+    (pair) =>
+      !(
+        (pair.side1Id === canonicalSide1 && pair.side2Id === canonicalSide2) ||
+        (pair.side1Id === canonicalSide2 && pair.side2Id === canonicalSide1)
+      ),
+  );
+  if (!enabled) {
+    return next;
+  }
+
+  const pairing: PairLink = {
+    side1Id: canonicalSide1,
+    side2Id: canonicalSide2,
+    enabled: true,
+  };
+  return [...next, pairing];
+}
+
 export function upsertUnit(
   state: MonitorState,
   unit: UnitPlacement,
 ): MonitorState {
-  const existingIndex = state.units.findIndex((entry) => entry.id === unit.id);
-  if (existingIndex >= 0) {
-    const units = [...state.units];
-    units[existingIndex] = { ...units[existingIndex], ...unit };
-    return { ...state, units };
-  }
-  if (state.units.length >= MAX_UNITS) {
-    return state;
-  }
-  return { ...state, units: [...state.units, unit] };
+  const units = upsertUnitInList(state.units, unit);
+  return units === state.units ? state : { ...state, units };
 }
 
 export function setPairing(
@@ -398,34 +457,14 @@ export function setPairing(
   side2Id: number,
   enabled: boolean,
 ): MonitorState {
-  if (side1Id === side2Id) {
-    return state;
-  }
-  const hasSide1 = state.units.some((unit) => unit.id === side1Id);
-  const hasSide2 = state.units.some((unit) => unit.id === side2Id);
-  if (!hasSide1 || !hasSide2) {
-    return state;
-  }
-
-  const canonicalSide1 = Math.min(side1Id, side2Id);
-  const canonicalSide2 = Math.max(side1Id, side2Id);
-  const next = state.pairings.filter(
-    (pair) =>
-      !(
-        (pair.side1Id === canonicalSide1 && pair.side2Id === canonicalSide2) ||
-        (pair.side1Id === canonicalSide2 && pair.side2Id === canonicalSide1)
-      ),
+  const pairings = setPairingInList(
+    state.units,
+    state.pairings,
+    side1Id,
+    side2Id,
+    enabled,
   );
-  if (!enabled) {
-    return { ...state, pairings: next };
-  }
-
-  const pairing: PairLink = {
-    side1Id: canonicalSide1,
-    side2Id: canonicalSide2,
-    enabled: true,
-  };
-  return { ...state, pairings: [...next, pairing] };
+  return pairings === state.pairings ? state : { ...state, pairings };
 }
 
 export function isSignalFresh(

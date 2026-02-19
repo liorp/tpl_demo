@@ -1,14 +1,21 @@
 import logging
 import os
 import re
+import threading
 import time
-from collections.abc import Callable
 
 import serial.tools.list_ports
 
 import serial
 from backend.config import BAUD_RATE
-from backend.core.models import Event, SensorState
+from backend.core.events import (
+    MessageSink,
+    SerialConnected,
+    SerialDisconnect,
+    SerialEvent,
+    SerialIdle,
+)
+from backend.core.models import SensorState
 from backend.parsing.parser import parse_line
 
 logger = logging.getLogger("tpl-signum")
@@ -69,15 +76,13 @@ class SerialManager:
 
     def serial_reader_loop(
         self,
-        on_event: Callable[[Event], None],
-        on_connected: Callable[[str], None],
-        on_idle: Callable[[], None],
-        on_disconnect: Callable[[str | None], None],
+        sink: MessageSink,
+        stop_event: threading.Event | None = None,
     ) -> None:
-        while True:
+        while not (stop_event and stop_event.is_set()):
             ports = list_serial_ports(self.forced_port)
             if not ports:
-                on_disconnect("No serial ports found")
+                sink.put_nowait(SerialDisconnect("No serial ports found"))
                 time.sleep(2)
                 continue
 
@@ -99,7 +104,7 @@ class SerialManager:
                     buffer = ""
                     validated_protocol = False
                     validation_started_at = time.monotonic()
-                    while True:
+                    while not (stop_event and stop_event.is_set()):
                         data = ser.read(ser.in_waiting or 1)
                         if not data:
                             if not self._is_port_available(port):
@@ -113,7 +118,7 @@ class SerialManager:
                                     f"Ignoring {port}: no valid protocol events"
                                 )
                                 break
-                            on_idle()
+                            sink.put_nowait(SerialIdle())
                             continue
 
                         buffer += data.decode("utf-8", errors="replace")
@@ -123,15 +128,15 @@ class SerialManager:
                             if event:
                                 if not validated_protocol:
                                     validated_protocol = True
-                                    on_connected(port)
-                                on_event(event)
+                                    sink.put_nowait(SerialConnected(port))
+                                sink.put_nowait(SerialEvent(event))
                 except serial.SerialException:
                     continue
                 except Exception as exc:
                     logger.warning("Serial loop error on %s: %s", port, exc)
                 finally:
-                    on_disconnect(f"Disconnected from {port}")
+                    sink.put_nowait(SerialDisconnect(f"Disconnected from {port}"))
 
             if not connected_any:
-                on_disconnect(None)
+                sink.put_nowait(SerialDisconnect(None))
                 time.sleep(2)

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react';
-import { useEffect } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { useMonitorSocket } from './monitorSocket';
@@ -39,6 +40,21 @@ class FakeWebSocket {
       new MessageEvent('message', { data: JSON.stringify(payload) }),
     );
   }
+}
+
+function createTestQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+}
+
+function TestWrapper({ children }: { children: ReactNode }) {
+  const queryClient = createTestQueryClient();
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
 }
 
 function Harness() {
@@ -92,7 +108,11 @@ describe('monitor socket lifecycle', () => {
   });
 
   test('defers close until open when unmounted during connecting state', () => {
-    const { unmount } = render(<Harness />);
+    const { unmount } = render(
+      <TestWrapper>
+        <Harness />
+      </TestWrapper>,
+    );
 
     const socket = FakeWebSocket.instances[0];
     expect(socket).toBeDefined();
@@ -118,7 +138,11 @@ describe('monitor socket lifecycle', () => {
       }),
     );
 
-    render(<StateHarness onState={onState} />);
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} />
+      </TestWrapper>,
+    );
 
     expect(onState).toHaveBeenCalled();
     const firstState = onState.mock.calls[0][0] as {
@@ -144,7 +168,11 @@ describe('monitor socket lifecycle', () => {
   test('placeUnit sends set_unit_position command and applies optimistic unit update', async () => {
     const onState = vi.fn();
     const onApi = vi.fn();
-    render(<StateHarness onState={onState} onApi={onApi} />);
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} onApi={onApi} />
+      </TestWrapper>,
+    );
 
     const socket = FakeWebSocket.instances[0];
     socket.emitOpen();
@@ -180,7 +208,11 @@ describe('monitor socket lifecycle', () => {
 
   test('uses backend units payload when available', async () => {
     const onState = vi.fn();
-    render(<StateHarness onState={onState} />);
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} />
+      </TestWrapper>,
+    );
 
     const socket = FakeWebSocket.instances[0];
     socket.emitOpen();

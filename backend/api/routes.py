@@ -1,4 +1,5 @@
 import json
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,41 +63,44 @@ def _set_unit_position(deps: AppDeps, payload: dict[str, Any]) -> bool:
     ):
         return False
 
+    if unit_id < 0:
+        return False
+
     next_lat = float(lat)
     next_lng = float(lng)
+    if not math.isfinite(next_lat) or not math.isfinite(next_lng):
+        return False
     bounds = deps.state.map_policy.get("bounds")
     if not isinstance(bounds, dict) or not _within_bounds(next_lat, next_lng, bounds):
         return False
 
-    with deps.state.lock:
-        updated = False
-        for unit in deps.state.units:
-            if unit.get("id") == unit_id:
-                unit["lat"] = next_lat
-                unit["lng"] = next_lng
-                if "label" not in unit:
-                    unit["label"] = f"S{unit_id}"
-                updated = True
-                break
-        if not updated:
-            deps.state.units.append(
-                {
-                    "id": unit_id,
-                    "label": f"S{unit_id}",
-                    "lat": next_lat,
-                    "lng": next_lng,
-                }
-            )
-        current_units = list(deps.state.units)
-        current_policy = dict(deps.state.map_policy)
+    updated = False
+    for unit in deps.state.units:
+        if unit.get("id") == unit_id:
+            unit["lat"] = next_lat
+            unit["lng"] = next_lng
+            if "label" not in unit:
+                unit["label"] = f"S{unit_id}"
+            updated = True
+            break
+    if not updated:
+        deps.state.units.append(
+            {
+                "id": unit_id,
+                "label": f"S{unit_id}",
+                "lat": next_lat,
+                "lng": next_lng,
+            }
+        )
+    current_units = list(deps.state.units)
+    current_policy = dict(deps.state.map_policy)
 
     persisted = deps.save_layout(
         deps.layout_state_path,
         {"units": current_units, "map_policy": current_policy},
     )
-    with deps.state.lock:
-        deps.state.units = persisted["units"]
-        deps.state.map_policy = persisted["map_policy"]
+    deps.state.units = persisted["units"]
+    deps.state.map_policy = persisted["map_policy"]
     deps.broadcaster.enqueue(snapshot(deps.state))
     return True
 
@@ -111,14 +115,12 @@ def register_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.get("/api/map-policy")
     async def map_policy():
-        with deps.state.lock:
-            current = {
-                "bounds": dict(deps.state.map_policy.get("bounds") or ALLOWED_BOUNDS),
-                "buffer_km": deps.state.map_policy.get("buffer_km"),
-                "tile_root": deps.state.map_policy.get("tile_root"),
-                "offline_required": deps.state.map_policy.get("offline_required"),
-            }
-        return current
+        return {
+            "bounds": dict(deps.state.map_policy.get("bounds") or ALLOWED_BOUNDS),
+            "buffer_km": deps.state.map_policy.get("buffer_km"),
+            "tile_root": deps.state.map_policy.get("tile_root"),
+            "offline_required": deps.state.map_policy.get("offline_required"),
+        }
 
     @app.get("/favicon.ico")
     async def favicon():

@@ -1,10 +1,24 @@
+import threading
 from types import SimpleNamespace
 
-import pytest
+from backend.core.events import SerialConnected, SerialDisconnect, SerialEvent
 from backend.core.models import SensorState
 from backend.serial.manager import SerialManager, list_serial_ports
 
 import serial
+
+
+class _StoppingSink:
+    """Sink wrapper that collects messages and sets a stop event on disconnect."""
+
+    def __init__(self, stop: threading.Event):
+        self.messages: list = []
+        self._stop = stop
+
+    def put_nowait(self, msg):
+        self.messages.append(msg)
+        if isinstance(msg, SerialDisconnect):
+            self._stop.set()
 
 
 def test_filters_out_bluetooth_incoming_port(monkeypatch):
@@ -79,28 +93,19 @@ def test_disconnects_immediately_when_port_disappears_during_idle(monkeypatch):
             return [port]
         return []
 
-    class StopLoop(Exception):
-        pass
-
     manager = SerialManager(state=SensorState(), forced_port="")
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
 
     monkeypatch.setattr("backend.serial.manager.serial.Serial", FakeSerial)
     monkeypatch.setattr("backend.serial.manager.list_serial_ports", fake_list_serial_ports)
     monkeypatch.setattr("backend.serial.manager.time.sleep", lambda *_: None)
 
-    def on_disconnect(_reason: str | None):
-        raise StopLoop()
-
-    with pytest.raises(StopLoop):
-        manager.serial_reader_loop(
-            on_event=lambda _event: None,
-            on_connected=lambda _port: None,
-            on_idle=lambda: None,
-            on_disconnect=on_disconnect,
-        )
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
 
     assert FakeSerial.read_calls == 1
     assert port_list_calls["count"] >= 2
+    assert any(isinstance(m, SerialDisconnect) for m in sink.messages)
 
 
 def test_rejects_port_without_valid_protocol_event(monkeypatch):
@@ -128,11 +133,9 @@ def test_rejects_port_without_valid_protocol_event(monkeypatch):
         def close(self):
             self.is_open = False
 
-    class StopLoop(Exception):
-        pass
-
     manager = SerialManager(state=SensorState(), forced_port="")
-    connected_ports: list[str] = []
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
 
     monotonic_values = iter([0.0, 5.0])
     monkeypatch.setattr("backend.serial.manager.serial.Serial", FakeSerial)
@@ -142,18 +145,9 @@ def test_rejects_port_without_valid_protocol_event(monkeypatch):
         "backend.serial.manager.time.monotonic", lambda: next(monotonic_values, 5.0)
     )
 
-    def on_disconnect(_reason: str | None):
-        raise StopLoop()
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
 
-    with pytest.raises(StopLoop):
-        manager.serial_reader_loop(
-            on_event=lambda _event: None,
-            on_connected=lambda active_port: connected_ports.append(active_port),
-            on_idle=lambda: None,
-            on_disconnect=on_disconnect,
-        )
-
-    assert connected_ports == []
+    assert not any(isinstance(m, SerialConnected) for m in sink.messages)
 
 
 def test_marks_connected_after_first_valid_protocol_event(monkeypatch):
@@ -181,25 +175,16 @@ def test_marks_connected_after_first_valid_protocol_event(monkeypatch):
         def close(self):
             self.is_open = False
 
-    class StopLoop(Exception):
-        pass
-
     manager = SerialManager(state=SensorState(), forced_port="")
-    connected_ports: list[str] = []
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
 
     monkeypatch.setattr("backend.serial.manager.serial.Serial", FakeSerial)
     monkeypatch.setattr("backend.serial.manager.list_serial_ports", lambda _forced: [port])
     monkeypatch.setattr("backend.serial.manager.time.sleep", lambda *_: None)
 
-    def on_disconnect(_reason: str | None):
-        raise StopLoop()
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
 
-    with pytest.raises(StopLoop):
-        manager.serial_reader_loop(
-            on_event=lambda _event: None,
-            on_connected=lambda active_port: connected_ports.append(active_port),
-            on_idle=lambda: None,
-            on_disconnect=on_disconnect,
-        )
-
+    connected_ports = [m.port for m in sink.messages if isinstance(m, SerialConnected)]
     assert connected_ports == [port]
+    assert any(isinstance(m, SerialEvent) for m in sink.messages)

@@ -101,6 +101,18 @@ export type MonitorPayload = {
   map_policy?: BackendMapPolicy;
 };
 
+export type ServerState = {
+  serverOnline: boolean;
+  connected: boolean;
+  port: string;
+  alarm: AlarmState;
+  events: MonitorEvent[];
+  links: SignalLinkState[];
+  config: MonitorConfig;
+  sensorStatus: SensorStatusMap;
+  mapPolicy: MapPolicy;
+};
+
 export type MonitorState = {
   serverOnline: boolean;
   connected: boolean;

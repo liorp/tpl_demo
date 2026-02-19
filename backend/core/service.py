@@ -113,11 +113,10 @@ def _crossing_coordinates(
 def set_connection_state(
     state: SensorState, connected: bool, port: str = "None", alarm: str | None = None
 ) -> None:
-    with state.lock:
-        state.serial_connected = connected
-        state.current_port = port
-        if alarm is not None:
-            state.alarm_state = alarm
+    state.serial_connected = connected
+    state.current_port = port
+    if alarm is not None:
+        state.alarm_state = alarm
 
 
 def acknowledge_alarm(state: SensorState) -> bool:
@@ -196,11 +195,10 @@ def handle_event(state: SensorState, event: Event) -> bool:
 
 
 def check_auto_reset(state: SensorState, now_ts_value: float, timeout_sec: float) -> bool:
-    with state.lock:
-        should_reset = (
-            state.alarm_state == "alarm"
-            and (now_ts_value - state.last_detection_time > timeout_sec)
-        )
+    should_reset = (
+        state.alarm_state == "alarm"
+        and (now_ts_value - state.last_detection_time > timeout_sec)
+    )
     if should_reset:
         set_connection_state(state, True, state.current_port, "clear")
         state.add_log("Alarm cleared (auto-reset)")

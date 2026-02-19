@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createAppWebSocketUrl } from '@/config';
 import {
   acknowledgeCrossingAlert,
   addCrossingAckWindow,
-  createInitialMonitorState,
+  createInitialServerState,
   isCrossingAlertSuppressed,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
-  setPairing,
-  toMonitorStateFromPayload,
-  upsertUnit,
+  setPairingInList,
+  toCrossingAlert,
+  toPayloadUnits,
+  toServerStateFromPayload,
+  upsertUnitInList,
 } from '../model/monitorState';
 import {
   clearPersistedMonitorConfig,
@@ -17,11 +20,17 @@ import {
   savePersistedMonitorConfig,
 } from '../model/persistence';
 import type {
+  CrossingAckWindow,
   CrossingAlert,
+  GlobalSettings,
   MonitorPayload,
   MonitorState,
+  PairLink,
+  ServerState,
   UnitPlacement,
 } from '../model/types';
+
+const SERVER_QUERY_KEY = ['monitor', 'server'] as const;
 
 function isPayload(data: unknown): data is MonitorPayload {
   if (!data || typeof data !== 'object') {
@@ -49,16 +58,30 @@ export function useMonitorSocket(): {
   placeUnit: (unit: UnitPlacement) => void;
   setUnitPairing: (side1Id: number, side2Id: number, enabled: boolean) => void;
 } {
-  const [state, setState] = useState<MonitorState>(() => {
-    const next = createInitialMonitorState();
+  const queryClient = useQueryClient();
+
+  // Server state lives in the React Query cache, fed by the WebSocket below.
+  // skipToken = "data arrives via subscription (setQueryData), not via fetch".
+  const { data: serverState } = useQuery<ServerState>({
+    queryKey: SERVER_QUERY_KEY,
+    queryFn: skipToken,
+    initialData: createInitialServerState,
+  });
+
+  // Client state (persisted to localStorage)
+  const [clientState, setClientState] = useState(() => {
     const persisted = loadPersistedMonitorConfig();
     return {
-      ...next,
-      units: persisted.units,
-      pairings: persisted.pairings,
-      globalSettings: persisted.globalSettings,
+      units: persisted.units as UnitPlacement[],
+      pairings: persisted.pairings as PairLink[],
+      globalSettings: persisted.globalSettings as GlobalSettings,
     };
   });
+
+  // Transient state
+  const [crossingAlerts, setCrossingAlerts] = useState<CrossingAlert[]>([]);
+  const crossingAckWindowsRef = useRef<CrossingAckWindow[]>([]);
+
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -76,37 +99,46 @@ export function useMonitorSocket(): {
           socket.close();
           return;
         }
-        setState((previous) => ({ ...previous, serverOnline: true }));
+        queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, (prev) =>
+          prev
+            ? { ...prev, serverOnline: true }
+            : { ...createInitialServerState(), serverOnline: true },
+        );
       };
 
       socket.onmessage = (event: MessageEvent<string>) => {
         try {
           const payload: unknown = JSON.parse(event.data);
           if (isPayload(payload)) {
-            setState((previous) => {
-              const base = toMonitorStateFromPayload(payload);
-              const incomingAlert = base.crossingAlerts[0] ?? null;
-              const allowedAlert = isCrossingAlertSuppressed(
-                incomingAlert,
-                previous.crossingAckWindows,
-              )
-                ? null
-                : incomingAlert;
-              const hasServerUnits = Array.isArray(payload.units);
-              return {
-                ...base,
-                crossingAlerts: mergeCrossingAlerts(
-                  previous.crossingAlerts,
-                  allowedAlert,
-                ),
-                crossingAckWindows: previous.crossingAckWindows,
-                units: hasServerUnits
-                  ? base.units
-                  : mergeTelemetryUnits(previous.units, payload),
-                pairings: previous.pairings,
-                globalSettings: previous.globalSettings,
-              };
-            });
+            // Update server state in React Query cache
+            const nextServer = toServerStateFromPayload(payload);
+            queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, nextServer);
+
+            // Handle crossing alerts (transient)
+            const incomingAlert = toCrossingAlert(payload.crossing_alert);
+            const allowedAlert = isCrossingAlertSuppressed(
+              incomingAlert,
+              crossingAckWindowsRef.current,
+            )
+              ? null
+              : incomingAlert;
+            setCrossingAlerts((prev) =>
+              mergeCrossingAlerts(prev, allowedAlert),
+            );
+
+            // Handle units (client state)
+            const hasServerUnits = Array.isArray(payload.units);
+            if (hasServerUnits) {
+              setClientState((prev) => ({
+                ...prev,
+                units: toPayloadUnits(payload.units, nextServer.sensorStatus),
+              }));
+            } else {
+              setClientState((prev) => ({
+                ...prev,
+                units: mergeTelemetryUnits(prev.units, payload),
+              }));
+            }
           }
         } catch {
           // Ignore malformed websocket payloads.
@@ -115,13 +147,10 @@ export function useMonitorSocket(): {
 
       socket.onclose = () => {
         socketRef.current = null;
-        setState((previous) => ({
-          ...createInitialMonitorState(),
-          units: previous.units,
-          pairings: previous.pairings,
-          config: previous.config,
-          globalSettings: previous.globalSettings,
-        }));
+        queryClient.setQueryData<ServerState>(
+          SERVER_QUERY_KEY,
+          createInitialServerState(),
+        );
         if (!disposed) {
           retryTimer = setTimeout(connect, 5_000);
         }
@@ -143,23 +172,17 @@ export function useMonitorSocket(): {
       }
       socketRef.current = null;
     };
-  }, []);
+  }, [queryClient]);
 
   const acknowledgeCrossing = useCallback((alert: CrossingAlert) => {
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send('ack');
-      setState((previous) => ({
-        ...previous,
-        crossingAlerts: acknowledgeCrossingAlert(
-          previous.crossingAlerts,
-          alert,
-        ),
-        crossingAckWindows: addCrossingAckWindow(
-          previous.crossingAckWindows,
-          alert,
-        ),
-      }));
+      setCrossingAlerts((prev) => acknowledgeCrossingAlert(prev, alert));
+      crossingAckWindowsRef.current = addCrossingAckWindow(
+        crossingAckWindowsRef.current,
+        alert,
+      );
     }
   }, []);
 
@@ -196,8 +219,9 @@ export function useMonitorSocket(): {
       );
     }
 
-    setState((previous) => {
-      const next = upsertUnit(previous, unit);
+    setClientState((prev) => {
+      const units = upsertUnitInList(prev.units, unit);
+      const next = { ...prev, units };
       savePersistedMonitorConfig({
         units: next.units,
         pairings: next.pairings,
@@ -209,8 +233,15 @@ export function useMonitorSocket(): {
 
   const setUnitPairing = useCallback(
     (side1Id: number, side2Id: number, enabled: boolean) => {
-      setState((previous) => {
-        const next = setPairing(previous, side1Id, side2Id, enabled);
+      setClientState((prev) => {
+        const pairings = setPairingInList(
+          prev.units,
+          prev.pairings,
+          side1Id,
+          side2Id,
+          enabled,
+        );
+        const next = { ...prev, pairings };
         savePersistedMonitorConfig({
           units: next.units,
           pairings: next.pairings,
@@ -223,13 +254,10 @@ export function useMonitorSocket(): {
   );
 
   const setAlarmSoundEnabled = useCallback((enabled: boolean) => {
-    setState((previous) => {
+    setClientState((prev) => {
       const next = {
-        ...previous,
-        globalSettings: {
-          ...previous.globalSettings,
-          alarmSoundEnabled: enabled,
-        },
+        ...prev,
+        globalSettings: { ...prev.globalSettings, alarmSoundEnabled: enabled },
       };
       savePersistedMonitorConfig({
         units: next.units,
@@ -241,11 +269,11 @@ export function useMonitorSocket(): {
   }, []);
 
   const setOfflineModeEnabled = useCallback((enabled: boolean) => {
-    setState((previous) => {
+    setClientState((prev) => {
       const next = {
-        ...previous,
+        ...prev,
         globalSettings: {
-          ...previous.globalSettings,
+          ...prev.globalSettings,
           offlineModeEnabled: enabled,
         },
       };
@@ -260,13 +288,25 @@ export function useMonitorSocket(): {
 
   const resetAll = useCallback(() => {
     clearPersistedMonitorConfig();
-    setState((previous) => ({
-      ...previous,
+    setClientState({
       units: [],
       pairings: [],
       globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
-    }));
+    });
   }, []);
+
+  // Compose final MonitorState from the three sources
+  const state: MonitorState = useMemo(
+    () => ({
+      ...serverState,
+      crossingAlerts,
+      crossingAckWindows: crossingAckWindowsRef.current,
+      units: clientState.units,
+      pairings: clientState.pairings,
+      globalSettings: clientState.globalSettings,
+    }),
+    [serverState, crossingAlerts, clientState],
+  );
 
   return {
     state,

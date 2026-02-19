@@ -9,6 +9,13 @@ from fastapi import FastAPI
 
 from backend.api.routes import AppDeps, register_routes
 from backend.config import AUTO_RESET_TIMEOUT, LAYOUT_STATE_PATH, SERIAL_PORT
+from backend.core.events import (
+    SerialConnected,
+    SerialDisconnect,
+    SerialEvent,
+    SerialIdle,
+    SerialMessage,
+)
 from backend.core.layout_store import load_layout_state, save_layout_state
 from backend.core.models import SensorState, snapshot
 from backend.core.service import (
@@ -45,48 +52,49 @@ deps = AppDeps(
 )
 
 
-def _broadcast_snapshot() -> None:
-    broadcaster.enqueue(snapshot(state))
+class _AsyncSink:
+    """Bridges the sync serial thread to an async queue via call_soon_threadsafe."""
+
+    def __init__(self, queue: asyncio.Queue[SerialMessage], loop: asyncio.AbstractEventLoop):
+        self._queue = queue
+        self._loop = loop
+
+    def put_nowait(self, msg: SerialMessage) -> None:
+        self._loop.call_soon_threadsafe(self._queue.put_nowait, msg)
 
 
-def _on_serial_event(event: dict) -> None:
-    if handle_event(state, event):
-        _broadcast_snapshot()
-
-
-def _on_serial_connected(port: str) -> None:
-    set_connection_state(state, True, port, "clear")
-    state.add_log(f"Connected to {port}")
-    _broadcast_snapshot()
-
-
-def _on_serial_idle() -> None:
-    if check_auto_reset(state, time.time(), AUTO_RESET_TIMEOUT):
-        _broadcast_snapshot()
-
-
-def _on_serial_disconnect(reason: str | None) -> None:
-    mark_disconnected(state, reason)
-    _broadcast_snapshot()
-
-
-def serial_reader_thread() -> None:
-    serial_manager.serial_reader_loop(
-        on_event=_on_serial_event,
-        on_connected=_on_serial_connected,
-        on_idle=_on_serial_idle,
-        on_disconnect=_on_serial_disconnect,
-    )
+async def _serial_consumer(queue: asyncio.Queue[SerialMessage]) -> None:
+    while True:
+        msg = await queue.get()
+        if isinstance(msg, SerialEvent):
+            if handle_event(state, msg.event):
+                broadcaster.enqueue(snapshot(state))
+        elif isinstance(msg, SerialConnected):
+            set_connection_state(state, True, msg.port, "clear")
+            state.add_log(f"Connected to {msg.port}")
+            broadcaster.enqueue(snapshot(state))
+        elif isinstance(msg, SerialIdle):
+            if check_auto_reset(state, time.time(), AUTO_RESET_TIMEOUT):
+                broadcaster.enqueue(snapshot(state))
+        elif isinstance(msg, SerialDisconnect):
+            mark_disconnected(state, msg.reason)
+            broadcaster.enqueue(snapshot(state))
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     persisted = load_layout_state(layout_state_path)
-    with state.lock:
-        state.units = persisted["units"]
-        state.map_policy = persisted["map_policy"]
+    state.units = persisted["units"]
+    state.map_policy = persisted["map_policy"]
     asyncio.create_task(broadcaster.start())
-    threading.Thread(target=serial_reader_thread, daemon=True).start()
+
+    queue: asyncio.Queue[SerialMessage] = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    sink = _AsyncSink(queue, loop)
+    asyncio.create_task(_serial_consumer(queue))
+    threading.Thread(
+        target=serial_manager.serial_reader_loop, args=(sink,), daemon=True
+    ).start()
     yield
 
 

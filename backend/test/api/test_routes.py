@@ -154,6 +154,44 @@ def test_set_unit_position_rejects_out_of_bounds(tmp_path: Path):
     assert broadcaster.payload["units"] == []
 
 
+def test_set_unit_position_rejects_nan_coordinates(tmp_path: Path):
+    sent_cmds: list[str] = []
+    persisted_layouts: list[dict] = []
+    client, _, broadcaster = _build_app(tmp_path, sent_cmds, persisted_layouts)
+
+    with client.websocket_connect("/ws") as ws:
+        initial = ws.receive_json()
+        ws.send_text('{"cmd":"set_unit_position","unit_id":7,"lat":"NaN","lng":35.78}')
+
+    assert initial["units"] == []
+    assert persisted_layouts == []
+
+
+def test_set_unit_position_rejects_infinity_coordinates(tmp_path: Path):
+    sent_cmds: list[str] = []
+    persisted_layouts: list[dict] = []
+    client, _, broadcaster = _build_app(tmp_path, sent_cmds, persisted_layouts)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        payload = {"cmd": "set_unit_position", "unit_id": 7, "lat": float("inf"), "lng": 35.78}
+        ws.send_text(json.dumps(payload))
+
+    assert persisted_layouts == []
+
+
+def test_set_unit_position_rejects_negative_unit_id(tmp_path: Path):
+    sent_cmds: list[str] = []
+    persisted_layouts: list[dict] = []
+    client, _, broadcaster = _build_app(tmp_path, sent_cmds, persisted_layouts)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_unit_position","unit_id":-1,"lat":33.31,"lng":35.78}')
+
+    assert persisted_layouts == []
+
+
 def test_tiles_route_serves_local_file(tmp_path: Path):
     client, _, _ = _build_app(tmp_path, [])
     tile_file = tmp_path / "tiles" / "manifest.json"

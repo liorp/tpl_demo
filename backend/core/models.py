@@ -64,36 +64,35 @@ class SensorState:
         self.sensor_status: dict = {}
         self.map_policy: MapPolicy = dict(DEFAULT_MAP_POLICY)
 
-        self.lock = threading.Lock()
+        self._log_lock = threading.Lock()
         self.serial_lock = threading.Lock()
         self.serial_conn: serial.Serial | None = None
 
     def add_log(self, message: str):
         entry = {"time": datetime.now().strftime("%H:%M:%S"), "msg": message}
-        with self.lock:
+        with self._log_lock:
             self.logs.insert(0, entry)
             if len(self.logs) > self.max_logs:
                 self.logs.pop()
 
 
 def snapshot(state: SensorState) -> dict:
-    with state.lock:
-        map_policy: MapPolicy = {
-            **DEFAULT_MAP_POLICY,
-            **dict(state.map_policy),
-        }
-        return {
-            "connected": state.serial_connected,
-            "port": state.current_port,
-            "alarm": state.alarm_state,
-            "events": list(state.logs),
-            "links": list(state.links),
-            "crossing_alert": dict(state.crossing_alert) if state.crossing_alert else None,
-            "config": dict(state.config),
-            "units": list(state.units),
-            "sensor_status": dict(state.sensor_status),
-            "map_policy": map_policy,
-        }
+    map_policy: MapPolicy = {
+        **DEFAULT_MAP_POLICY,
+        **dict(state.map_policy),
+    }
+    return {
+        "connected": state.serial_connected,
+        "port": state.current_port,
+        "alarm": state.alarm_state,
+        "events": list(state.logs),
+        "links": list(state.links),
+        "crossing_alert": dict(state.crossing_alert) if state.crossing_alert else None,
+        "config": dict(state.config),
+        "units": list(state.units),
+        "sensor_status": dict(state.sensor_status),
+        "map_policy": map_policy,
+    }
 
 
 def now_ts() -> float:
