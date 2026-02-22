@@ -3,7 +3,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { alertPinIcon, MonitorMap, unitPinIcon } from './MonitorMap';
+import { MonitorMap } from './MonitorMap';
 
 const mapEvents = {
   click: undefined as
@@ -491,9 +491,15 @@ describe('MonitorMap', () => {
       />,
     );
 
-    expect(markerIcons.get(33.2)).toBe(alertPinIcon);
-    expect(markerIcons.get(33.3)).toBe(alertPinIcon);
-    expect(markerIcons.get(33.4)).toBe(unitPinIcon);
+    const icon1 = markerIcons.get(33.2) as { options: { html: string } };
+    const icon2 = markerIcons.get(33.3) as { options: { html: string } };
+    const icon3 = markerIcons.get(33.4) as { options: { html: string } };
+    expect(icon1.options.html).toContain('background:#ef4444');
+    expect(icon1.options.html).toContain('Sensor 1');
+    expect(icon2.options.html).toContain('background:#ef4444');
+    expect(icon2.options.html).toContain('Sensor 2');
+    expect(icon3.options.html).toContain('background:#06b6d4');
+    expect(icon3.options.html).toContain('Sensor 3');
   });
 
   test('uses default icon for sensors in acknowledged crossing alerts', () => {
@@ -523,8 +529,12 @@ describe('MonitorMap', () => {
       />,
     );
 
-    expect(markerIcons.get(33.2)).toBe(unitPinIcon);
-    expect(markerIcons.get(33.3)).toBe(unitPinIcon);
+    const icon1 = markerIcons.get(33.2) as { options: { html: string } };
+    const icon2 = markerIcons.get(33.3) as { options: { html: string } };
+    expect(icon1.options.html).toContain('background:#06b6d4');
+    expect(icon1.options.html).toContain('Sensor 1');
+    expect(icon2.options.html).toContain('background:#06b6d4');
+    expect(icon2.options.html).toContain('Sensor 2');
   });
 
   test('uses conservative offline zoom defaults before manifest resolves', () => {
