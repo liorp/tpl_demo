@@ -15,12 +15,6 @@ dependencies = [
   "websockets>=16.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-  "pytest>=9.0.0",
-  "ruff>=0.11.0",
-]
-
 [tool.pytest.ini_options]
 testpaths = ["test"]
 pythonpath = [".."]
@@ -35,3 +29,10 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["backend"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.0",
+    "ruff>=0.11.0",
+]
