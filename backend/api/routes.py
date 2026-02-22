@@ -64,7 +64,11 @@ def _handle_unit_position(deps: AppDeps, payload: dict[str, Any]) -> bool:
 
 
 def register_routes(app: FastAPI, deps: AppDeps) -> None:
-    app.mount("/asset", StaticFiles(directory=f"{deps.static_dir}/asset"), name="assets")
+    app.mount(
+        "/asset",
+        StaticFiles(directory=f"{deps.static_dir}/asset", check_dir=False),
+        name="assets",
+    )
     app.mount("/tiles", StaticFiles(directory=deps.tiles_dir, check_dir=False), name="tiles")
 
     @app.get("/")
