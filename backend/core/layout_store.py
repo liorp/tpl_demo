@@ -6,7 +6,9 @@ import tempfile
 from pathlib import Path
 from typing import Any, TypedDict
 
-ISRAEL_BOUNDS = {
+from backend.core.models import GeoBounds, MapPolicy, UnitPosition
+
+ISRAEL_BOUNDS: GeoBounds = {
     "north": 33.35,
     "south": 29.55,
     "east": 35.85,
@@ -25,7 +27,7 @@ def _buffer_lng_degrees(buffer_km: float, reference_lat: float) -> float:
     return buffer_km / (111.0 * lat_cos)
 
 
-def _with_buffer(bounds: dict[str, float], buffer_km: float) -> dict[str, float]:
+def _with_buffer(bounds: GeoBounds, buffer_km: float) -> GeoBounds:
     reference_lat = (bounds["north"] + bounds["south"]) / 2
     lat_delta = _buffer_lat_degrees(buffer_km)
     lng_delta = _buffer_lng_degrees(buffer_km, reference_lat)
@@ -37,12 +39,12 @@ def _with_buffer(bounds: dict[str, float], buffer_km: float) -> dict[str, float]
     }
 
 
-ALLOWED_BOUNDS = _with_buffer(ISRAEL_BOUNDS, MAP_BUFFER_KM)
+ALLOWED_BOUNDS: GeoBounds = _with_buffer(ISRAEL_BOUNDS, MAP_BUFFER_KM)
 
 
 class LayoutState(TypedDict):
-    units: list[dict[str, Any]]
-    map_policy: dict[str, Any]
+    units: list[UnitPosition]
+    map_policy: MapPolicy
 
 
 def _default_layout_state() -> LayoutState:
@@ -64,11 +66,11 @@ def _is_valid_coordinate(lat: float, lng: float) -> bool:
     )
 
 
-def _normalize_units(units: Any) -> list[dict[str, Any]]:
+def _normalize_units(units: Any) -> list[UnitPosition]:
     if not isinstance(units, list):
         return []
 
-    normalized: list[dict[str, Any]] = []
+    normalized: list[UnitPosition] = []
     for unit in units:
         if not isinstance(unit, dict):
             continue

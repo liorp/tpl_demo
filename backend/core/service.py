@@ -3,11 +3,20 @@ from collections.abc import Callable
 from pathlib import Path
 
 from backend.core.layout_store import ALLOWED_BOUNDS
-from backend.core.models import Event, SensorState, now_ts
+from backend.core.models import (
+    CrossingAlert,
+    Event,
+    GeoBounds,
+    SensorState,
+    SensorStatusEntry,
+    SideLink,
+    UnitPosition,
+    now_ts,
+)
 
 
-def _normalize_side_links(raw_links: list[dict]) -> list[dict]:
-    normalized: list[dict] = []
+def _normalize_side_links(raw_links: list[dict]) -> list[SideLink]:
+    normalized: list[SideLink] = []
     seen: set[tuple[int, int]] = set()
     for link in raw_links:
         side1_raw = link.get("side1")
@@ -37,7 +46,7 @@ def _event_last_seen() -> int:
     return int(now_ts())
 
 
-def _extract_peers(entry: dict, sensor_id: int) -> set[int]:
+def _extract_peers(entry: SensorStatusEntry, sensor_id: int) -> set[int]:
     raw_peers = entry.get("connected_peers", [])
     if not isinstance(raw_peers, list):
         return set()
@@ -58,11 +67,11 @@ def _update_sensor_link_status(
         peers.add(peer_id)
     else:
         peers.discard(peer_id)
-    state.sensor_status[sensor_key] = {
-        "active": len(peers) > 0,
-        "last_seen": last_seen,
-        "connected_peers": sorted(peers),
-    }
+    state.sensor_status[sensor_key] = SensorStatusEntry(
+        active=len(peers) > 0,
+        last_seen=last_seen,
+        connected_peers=sorted(peers),
+    )
 
 
 def _refresh_sensor_status_from_map(
@@ -82,20 +91,17 @@ def _refresh_sensor_status_from_map(
         touched.add(unit_id)
     for sensor_id in touched:
         peers = sorted(graph.get(sensor_id, set()))
-        state.sensor_status[str(sensor_id)] = {
-            "active": len(peers) > 0,
-            "last_seen": last_seen,
-            "connected_peers": peers,
-        }
+        state.sensor_status[str(sensor_id)] = SensorStatusEntry(
+            active=len(peers) > 0,
+            last_seen=last_seen,
+            connected_peers=peers,
+        )
 
 
 def _unit_coordinates(state: SensorState, unit_id: int) -> tuple[float, float] | None:
     for unit in state.units:
-        raw_id = unit.get("id", unit.get("sensor_id", unit.get("unit")))
-        lat = unit.get("lat")
-        lng = unit.get("lng")
-        if raw_id == unit_id and isinstance(lat, (float, int)) and isinstance(lng, (float, int)):
-            return (float(lat), float(lng))
+        if unit["id"] == unit_id:
+            return (float(unit["lat"]), float(unit["lng"]))
     return None
 
 
@@ -138,14 +144,14 @@ def handle_event(state: SensorState, event: Event) -> bool:
         crossing_lat, crossing_lng = _crossing_coordinates(state, event["unit_a"], event["unit_b"])
         state.last_detection_time = now_ts()
         set_connection_state(state, True, state.current_port, "alarm")
-        state.crossing_alert = {
-            "sensor_a": event["unit_a"],
-            "sensor_b": event["unit_b"],
-            "timestamp": event.get("device_ts"),
-            "lat": crossing_lat,
-            "lng": crossing_lng,
-            "acknowledged": False,
-        }
+        state.crossing_alert = CrossingAlert(
+            sensor_a=event["unit_a"],
+            sensor_b=event["unit_b"],
+            timestamp=event.get("device_ts"),
+            lat=crossing_lat,
+            lng=crossing_lng,
+            acknowledged=False,
+        )
         state.config["threshold"] = event["threshold"]
         state.config["val"] = event["value"]
         state.add_log(
@@ -218,7 +224,7 @@ def mark_disconnected(state: SensorState, reason: str | None = None) -> bool:
     return True
 
 
-def _within_bounds(lat: float, lng: float, bounds: dict[str, float] | None) -> bool:
+def _within_bounds(lat: float, lng: float, bounds: GeoBounds | None) -> bool:
     if not bounds:
         bounds = ALLOWED_BOUNDS
     return bounds["south"] <= lat <= bounds["north"] and bounds["west"] <= lng <= bounds["east"]
@@ -253,7 +259,7 @@ def set_unit_position(
             break
     if not updated:
         state.units.append(
-            {"id": unit_id, "label": f"S{unit_id}", "lat": next_lat, "lng": next_lng}
+            UnitPosition(id=unit_id, label=f"S{unit_id}", lat=next_lat, lng=next_lng)
         )
 
     persisted = save_fn(

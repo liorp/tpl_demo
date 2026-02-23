@@ -56,7 +56,7 @@ def test_snapshot_includes_command_map_defaults():
 
 def test_snapshot_includes_mutated_runtime_fields():
     state = SensorState()
-    state.units = [{"sensor_id": 1, "unit": 7}]
+    state.units = [{"id": 1, "label": "S1", "lat": 33.31, "lng": 35.78}]
     state.sensor_status = {
         "1": {"active": True, "last_seen": 1700000000, "connected_peers": [2, 3]}
     }
@@ -69,7 +69,7 @@ def test_snapshot_includes_mutated_runtime_fields():
 
     current = snapshot(state)
 
-    assert current["units"] == [{"sensor_id": 1, "unit": 7}]
+    assert current["units"] == [{"id": 1, "label": "S1", "lat": 33.31, "lng": 35.78}]
     assert current["sensor_status"] == {
         "1": {"active": True, "last_seen": 1700000000, "connected_peers": [2, 3]}
     }

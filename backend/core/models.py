@@ -3,8 +3,15 @@ from datetime import datetime
 from typing import Literal, TypedDict
 
 
+class GeoBounds(TypedDict):
+    north: float
+    south: float
+    east: float
+    west: float
+
+
 class MapPolicy(TypedDict):
-    bounds: dict | None
+    bounds: GeoBounds | None
     buffer_km: float | None
     tile_root: str | None
     offline_required: bool
@@ -70,23 +77,62 @@ class ConfigEvent(TypedDict):
 Event = DetectionEvent | CommLossEvent | ConnectedEvent | MapEvent | ConfigEvent
 
 
+class LogEntry(TypedDict):
+    time: str
+    msg: str
+
+
+class SideLink(TypedDict):
+    side1: int
+    side2: int
+    quality: int
+    intensity: int
+
+
+class CrossingAlert(TypedDict):
+    sensor_a: int
+    sensor_b: int
+    timestamp: int | None
+    lat: float | None
+    lng: float | None
+    acknowledged: bool
+
+
+class SensorConfig(TypedDict):
+    threshold: int | None
+    val: int | None
+
+
+class UnitPosition(TypedDict):
+    id: int | None
+    label: str | None
+    lat: float
+    lng: float
+
+
+class SensorStatusEntry(TypedDict):
+    active: bool
+    last_seen: int
+    connected_peers: list[int]
+
+
 class SensorState:
     def __init__(self):
         self.serial_connected = False
         self.current_port = "None"
         self.alarm_state = "disconnected"
         self.last_detection_time = 0.0
-        self.logs: list[dict] = []
+        self.logs: list[LogEntry] = []
         self.max_logs = 50
-        self.links: list[dict] = []
-        self.crossing_alert: dict | None = None
-        self.config = {"threshold": None, "val": None}
-        self.units: list[dict] = []
-        self.sensor_status: dict = {}
+        self.links: list[SideLink] = []
+        self.crossing_alert: CrossingAlert | None = None
+        self.config: SensorConfig = {"threshold": None, "val": None}
+        self.units: list[UnitPosition] = []
+        self.sensor_status: dict[str, SensorStatusEntry] = {}
         self.map_policy: MapPolicy = dict(DEFAULT_MAP_POLICY)
 
     def add_log(self, message: str):
-        entry = {"time": datetime.now().strftime("%H:%M:%S"), "msg": message}
+        entry: LogEntry = {"time": datetime.now().strftime("%H:%M:%S"), "msg": message}
         self.logs.insert(0, entry)
         if len(self.logs) > self.max_logs:
             self.logs.pop()
