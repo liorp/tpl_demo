@@ -80,7 +80,8 @@ const setOfflineModeEnabled = vi.fn();
 const placeUnit = vi.fn();
 const setUnitPairing = vi.fn();
 const monitorMapMock = vi.fn();
-const playAlarmSound = vi.fn();
+const startAlarmSound = vi.fn();
+const stopAlarmSound = vi.fn();
 
 vi.mock('../domain/monitor/service/monitorSocket', () => ({
   useMonitorSocket: () => ({
@@ -132,7 +133,8 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
 }));
 
 vi.mock('../domain/monitor/service/alarmSound', () => ({
-  playAlarmSound: () => playAlarmSound(),
+  startAlarmSound: () => startAlarmSound(),
+  stopAlarmSound: () => stopAlarmSound(),
 }));
 
 describe('App', () => {
@@ -151,7 +153,8 @@ describe('App', () => {
     placeUnit.mockClear();
     setUnitPairing.mockClear();
     monitorMapMock.mockClear();
-    playAlarmSound.mockClear();
+    startAlarmSound.mockClear();
+    stopAlarmSound.mockClear();
     state.globalSettings = {
       alarmSoundEnabled: true,
       offlineModeEnabled: true,
@@ -261,35 +264,67 @@ describe('App', () => {
     );
   });
 
-  test('plays alarm sound when alarm state enters alarm and sound is enabled', () => {
-    state.globalSettings = {
-      alarmSoundEnabled: true,
-      offlineModeEnabled: true,
-    };
-    state.alarm = 'clear';
+  test('starts alarm sound when crossing alerts are present and sound is enabled', () => {
+    state.crossingAlerts = [];
     const { rerender } = render(<App />);
 
-    expect(playAlarmSound).toHaveBeenCalledTimes(0);
+    expect(startAlarmSound).toHaveBeenCalledTimes(0);
 
-    state.alarm = 'alarm';
+    state.crossingAlerts = [
+      {
+        sensorA: 1,
+        sensorB: 2,
+        at: 1_700_100,
+        lat: 33.3,
+        lng: 35.7,
+        acknowledged: false,
+      },
+    ];
     rerender(<App />);
 
-    expect(playAlarmSound).toHaveBeenCalledTimes(1);
-
-    rerender(<App />);
-    expect(playAlarmSound).toHaveBeenCalledTimes(1);
+    expect(startAlarmSound).toHaveBeenCalledTimes(1);
   });
 
-  test('does not play alarm sound when global setting is disabled', () => {
+  test('stops alarm sound when all alerts are acknowledged', () => {
+    state.crossingAlerts = [
+      {
+        sensorA: 1,
+        sensorB: 2,
+        at: 1_700_100,
+        lat: 33.3,
+        lng: 35.7,
+        acknowledged: false,
+      },
+    ];
+    const { rerender } = render(<App />);
+
+    expect(startAlarmSound).toHaveBeenCalledTimes(1);
+
+    state.crossingAlerts = [];
+    rerender(<App />);
+
+    expect(stopAlarmSound).toHaveBeenCalled();
+  });
+
+  test('does not start alarm sound when global setting is disabled', () => {
     state.globalSettings = {
       alarmSoundEnabled: false,
       offlineModeEnabled: true,
     };
-    state.alarm = 'alarm';
+    state.crossingAlerts = [
+      {
+        sensorA: 1,
+        sensorB: 2,
+        at: 1_700_100,
+        lat: 33.3,
+        lng: 35.7,
+        acknowledged: false,
+      },
+    ];
 
     render(<App />);
 
-    expect(playAlarmSound).toHaveBeenCalledTimes(0);
+    expect(startAlarmSound).toHaveBeenCalledTimes(0);
   });
 
   test('hides stale sensors and sensors without lastSeenAt', () => {

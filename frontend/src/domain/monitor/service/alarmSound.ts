@@ -1,6 +1,13 @@
 let audioContext: AudioContext | null = null;
+let oscillator: OscillatorNode | null = null;
+let gainNode: GainNode | null = null;
+let sweepInterval: ReturnType<typeof setInterval> | null = null;
 
-export function playAlarmSound(): void {
+export function startAlarmSound(): void {
+  if (oscillator) {
+    return;
+  }
+
   const ContextCtor =
     window.AudioContext ??
     (window as unknown as { webkitAudioContext?: typeof AudioContext })
@@ -11,17 +18,37 @@ export function playAlarmSound(): void {
 
   audioContext ??= new ContextCtor();
 
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
-  oscillator.type = 'sine';
+  oscillator = audioContext.createOscillator();
+  gainNode = audioContext.createGain();
+  oscillator.type = 'square';
   oscillator.frequency.value = 880;
-  gainNode.gain.value = 0.0001;
+  gainNode.gain.value = 0.35;
   oscillator.connect(gainNode);
   gainNode.connect(audioContext.destination);
+  oscillator.start();
 
-  const now = audioContext.currentTime;
-  gainNode.gain.exponentialRampToValueAtTime(0.07, now + 0.01);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
-  oscillator.start(now);
-  oscillator.stop(now + 0.22);
+  let high = true;
+  sweepInterval = setInterval(() => {
+    if (!oscillator) {
+      return;
+    }
+    oscillator.frequency.value = high ? 660 : 880;
+    high = !high;
+  }, 500);
+}
+
+export function stopAlarmSound(): void {
+  if (sweepInterval !== null) {
+    clearInterval(sweepInterval);
+    sweepInterval = null;
+  }
+  if (oscillator) {
+    oscillator.stop();
+    oscillator.disconnect();
+    oscillator = null;
+  }
+  if (gainNode) {
+    gainNode.disconnect();
+    gainNode = null;
+  }
 }

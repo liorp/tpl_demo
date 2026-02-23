@@ -10,7 +10,10 @@ import {
 } from '../domain/monitor/model/mapViewport';
 import { getSelectedSensorLinks } from '../domain/monitor/model/monitorState';
 import type { CrossingAlert, MapPolicy } from '../domain/monitor/model/types';
-import { playAlarmSound } from '../domain/monitor/service/alarmSound';
+import {
+  startAlarmSound,
+  stopAlarmSound,
+} from '../domain/monitor/service/alarmSound';
 import { useMonitorSocket } from '../domain/monitor/service/monitorSocket';
 import { CommandStatusPanel } from '../domain/monitor/ui/CommandStatusPanel';
 import { ConfigMenu } from '../domain/monitor/ui/ConfigMenu';
@@ -107,14 +110,15 @@ export function App() {
   }, [activeUnits, selectedUnitId]);
 
   useEffect(() => {
-    if (!state.globalSettings.alarmSoundEnabled) {
-      return;
+    if (
+      state.globalSettings.alarmSoundEnabled &&
+      state.crossingAlerts.length > 0
+    ) {
+      startAlarmSound();
+      return () => stopAlarmSound();
     }
-    if (state.alarm !== 'alarm') {
-      return;
-    }
-    playAlarmSound();
-  }, [state.alarm, state.globalSettings.alarmSoundEnabled]);
+    stopAlarmSound();
+  }, [state.crossingAlerts.length, state.globalSettings.alarmSoundEnabled]);
 
   const handleMoveUnit = useCallback(
     (unitId: number, lat: number, lng: number) => {
