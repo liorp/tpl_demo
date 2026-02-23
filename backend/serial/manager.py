@@ -16,10 +16,10 @@ from backend.core.events import (
     SerialEvent,
     SerialIdle,
 )
-from backend.parsing.parser import parse_line
+from backend.parsing.parser import ANSI_RE, TIMESTAMP_RE, parse_line
 
 logger = logging.getLogger("tpl-signum")
-PROTOCOL_VALIDATION_TIMEOUT_SEC = 2.0
+PROTOCOL_VALIDATION_TIMEOUT_SEC = 5.0
 
 
 def list_serial_ports(forced_port: str) -> list[str]:
@@ -108,6 +108,8 @@ class SerialManager:
                     self.send_serial("cmd")
                     time.sleep(0.2)
                     self.send_serial("re 3 4")
+                    time.sleep(0.2)
+                    self.send_serial("map")
 
                     buffer = ""
                     validated_protocol = False
@@ -130,11 +132,13 @@ class SerialManager:
                         buffer += data.decode("utf-8", errors="replace")
                         while "\n" in buffer:
                             line, buffer = buffer.split("\n", 1)
+                            if not validated_protocol and TIMESTAMP_RE.match(
+                                ANSI_RE.sub("", line).strip()
+                            ):
+                                validated_protocol = True
+                                sink.put_nowait(SerialConnected(port))
                             event = parse_line(line)
                             if event:
-                                if not validated_protocol:
-                                    validated_protocol = True
-                                    sink.put_nowait(SerialConnected(port))
                                 sink.put_nowait(SerialEvent(event))
                 except serial.SerialException:
                     continue
