@@ -13,9 +13,11 @@
     "lint:backend": "uv run --project backend ruff check backend/ dummy_device.py",
     "test:frontend": "cd frontend && bun run test",
     "test:backend": "uv run --project backend pytest",
-    "test": "bun run test:frontend && bun run test:backend"
+    "test": "bun run test:frontend && bun run test:backend",
+    "depcheck": "cd frontend && bunx knip"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "lefthook": "^2.1.1"
   }
 }

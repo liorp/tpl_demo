@@ -78,14 +78,24 @@ function toTileUrl(tileRoot: string | null, useOfflineTiles: boolean): string {
 const PIN_STYLE =
   'display:flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;white-space:nowrap;color:#fff;line-height:1.4;box-shadow:0 0 0 2px rgba(15,23,42,0.35);';
 
-export function unitPinIcon(label: string) {
+function unitPinIcon(label: string) {
   const html = `<span style="${PIN_STYLE}border:2px solid #67e8f9;background:#06b6d4;">${label}</span>`;
-  return divIcon({ className: '', html, iconSize: [0, 0], iconAnchor: [0, 12] });
+  return divIcon({
+    className: '',
+    html,
+    iconSize: [0, 0],
+    iconAnchor: [0, 12],
+  });
 }
 
-export function alertPinIcon(label: string) {
+function alertPinIcon(label: string) {
   const html = `<span style="${PIN_STYLE}border:2px solid #fca5a5;background:#ef4444;">${label}</span>`;
-  return divIcon({ className: '', html, iconSize: [0, 0], iconAnchor: [0, 12] });
+  return divIcon({
+    className: '',
+    html,
+    iconSize: [0, 0],
+    iconAnchor: [0, 12],
+  });
 }
 
 export function MonitorMap({
@@ -208,7 +218,11 @@ export function MonitorMap({
             key={unit.id}
             position={[unit.lat, unit.lng]}
             draggable={true}
-            icon={alertingSensorIds.has(unit.id) ? alertPinIcon(unit.label) : unitPinIcon(unit.label)}
+            icon={
+              alertingSensorIds.has(unit.id)
+                ? alertPinIcon(unit.label)
+                : unitPinIcon(unit.label)
+            }
             eventHandlers={{
               click: () => onSelectUnit(unit.id),
               dragend: (event) => {

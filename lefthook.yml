@@ -1,0 +1,9 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: bun run lint
+    test:
+      run: bun run test
+    depcheck:
+      run: cd frontend && bunx knip
