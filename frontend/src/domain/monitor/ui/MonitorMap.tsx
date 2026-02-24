@@ -130,16 +130,6 @@ function stalePinIcon(label: string) {
   });
 }
 
-function alertPinIcon(label: string) {
-  const html = `<span style="${PIN_STYLE}border:2px solid #fca5a5;background:#ef4444;">${label}</span>`;
-  return divIcon({
-    className: '',
-    html,
-    iconSize: [0, 0],
-    iconAnchor: [0, PIN_ANCHOR_Y],
-  });
-}
-
 function toLastHeartbeat(lastSeenAt: number | undefined): string {
   if (typeof lastSeenAt !== 'number') {
     return '--';
@@ -181,6 +171,41 @@ function getSensorLinks(
   return peers.sort((a, b) => a.peerId - b.peerId);
 }
 
+function toPairKey(side1: number, side2: number): string {
+  const [a, b] = side1 <= side2 ? [side1, side2] : [side2, side1];
+  return `${a}-${b}`;
+}
+
+function toPairingEllipsePositions(
+  side1: UnitPlacement,
+  side2: UnitPlacement,
+): [number, number][] {
+  const midpointLat = (side1.lat + side2.lat) / 2;
+  const midpointLng = (side1.lng + side2.lng) / 2;
+  const cosLat = Math.max(Math.cos((midpointLat * Math.PI) / 180), 0.00001);
+
+  const dx = (side2.lng - side1.lng) * cosLat;
+  const dy = side2.lat - side1.lat;
+  const baseDistance = Math.max(Math.hypot(dx, dy), 0.001);
+  const angle = Math.atan2(dy, dx);
+
+  const semiMajorAxis = baseDistance * 0.65;
+  const semiMinorAxis = Math.max(baseDistance * 0.28, 0.0015);
+  const segments = 36;
+
+  const ellipse: [number, number][] = [];
+  for (let index = 0; index <= segments; index += 1) {
+    const theta = (2 * Math.PI * index) / segments;
+    const localX = semiMajorAxis * Math.cos(theta);
+    const localY = semiMinorAxis * Math.sin(theta);
+    const rotatedX = localX * Math.cos(angle) - localY * Math.sin(angle);
+    const rotatedY = localX * Math.sin(angle) + localY * Math.cos(angle);
+
+    ellipse.push([midpointLat + rotatedY, midpointLng + rotatedX / cosLat]);
+  }
+  return ellipse;
+}
+
 export function MonitorMap({
   units,
   pairings = [],
@@ -204,26 +229,21 @@ export function MonitorMap({
     typeof navigator !== 'undefined' &&
     navigator.onLine === false;
   const useOfflineTiles = offlineModeEnabled || policyForcesOffline;
-  const alertingSensorIds = new Set(
+  const alertingPairKeys = new Set(
     crossingAlerts
       .filter((alert) => !alert.acknowledged)
-      .flatMap((alert) => [alert.sensorA, alert.sensorB]),
+      .map((alert) => toPairKey(alert.sensorA, alert.sensorB)),
   );
 
   // Cache divIcon instances so Leaflet doesn't replace the DOM element on
   // every re-render (which would interrupt an in-progress drag).
   const iconCacheRef = useRef(new Map<string, ReturnType<typeof divIcon>>());
   const getCachedIcon = useCallback(
-    (label: string, type: 'normal' | 'stale' | 'alert') => {
+    (label: string, type: 'normal' | 'stale') => {
       const key = `${label}\0${type}`;
       let icon = iconCacheRef.current.get(key);
       if (!icon) {
-        icon =
-          type === 'alert'
-            ? alertPinIcon(label)
-            : type === 'stale'
-              ? stalePinIcon(label)
-              : unitPinIcon(label);
+        icon = type === 'stale' ? stalePinIcon(label) : unitPinIcon(label);
         iconCacheRef.current.set(key, icon);
       }
       return icon;
@@ -233,7 +253,7 @@ export function MonitorMap({
 
   const tileUrl = toTileUrl(tileRoot, useOfflineTiles);
   const unitsById = new Map(units.map((unit) => [unit.id, unit] as const));
-  const pairingLines = pairings.flatMap((pair) => {
+  const pairingEllipses = pairings.flatMap((pair) => {
     if (!pair.enabled) {
       return [];
     }
@@ -242,13 +262,12 @@ export function MonitorMap({
     if (!side1 || !side2) {
       return [];
     }
+    const key = toPairKey(pair.side1Id, pair.side2Id);
     return [
       {
-        key: `${pair.side1Id}-${pair.side2Id}`,
-        positions: [
-          [side1.lat, side1.lng] as [number, number],
-          [side2.lat, side2.lng] as [number, number],
-        ],
+        key,
+        positions: toPairingEllipsePositions(side1, side2),
+        alerting: alertingPairKeys.has(key),
       },
     ];
   });
@@ -340,14 +359,13 @@ export function MonitorMap({
         ) : null}
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
-        {pairingLines.map((line) => (
+        {pairingEllipses.map((ellipse) => (
           <Polyline
-            key={line.key}
-            positions={line.positions}
+            key={ellipse.key}
+            positions={ellipse.positions}
             pathOptions={{
-              color: '#67e8f9',
-              dashArray: '6 6',
-              weight: 2,
+              color: ellipse.alerting ? '#ef4444' : '#67e8f9',
+              weight: 3,
               opacity: 0.85,
             }}
           />
@@ -361,11 +379,7 @@ export function MonitorMap({
               draggable={true}
               icon={getCachedIcon(
                 unit.label,
-                alertingSensorIds.has(unit.id)
-                  ? 'alert'
-                  : unit.status === 'stale'
-                    ? 'stale'
-                    : 'normal',
+                unit.status === 'stale' ? 'stale' : 'normal',
               )}
               eventHandlers={{
                 click: () => onSelectUnit(unit.id),

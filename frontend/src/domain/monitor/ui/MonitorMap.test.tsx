@@ -491,7 +491,7 @@ describe('MonitorMap', () => {
     });
   });
 
-  test('uses red icon for sensors involved in unacknowledged crossing alerts', () => {
+  test('colors pairing ellipse red for unacknowledged crossing alerts', () => {
     render(
       <MonitorMap
         units={[
@@ -514,6 +514,7 @@ describe('MonitorMap', () => {
             acknowledged: false,
           },
         ]}
+        pairings={[{ side1Id: 1, side2Id: 2, enabled: true }]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -522,15 +523,17 @@ describe('MonitorMap', () => {
     const icon1 = markerIcons.get(33.2) as { options: { html: string } };
     const icon2 = markerIcons.get(33.3) as { options: { html: string } };
     const icon3 = markerIcons.get(33.4) as { options: { html: string } };
-    expect(icon1.options.html).toContain('background:#ef4444');
+    expect(icon1.options.html).toContain('background:#06b6d4');
     expect(icon1.options.html).toContain('Sensor 1');
-    expect(icon2.options.html).toContain('background:#ef4444');
+    expect(icon2.options.html).toContain('background:#06b6d4');
     expect(icon2.options.html).toContain('Sensor 2');
     expect(icon3.options.html).toContain('background:#06b6d4');
     expect(icon3.options.html).toContain('Sensor 3');
+    expect(polylineSegments).toHaveLength(1);
+    expect(polylineSegments[0]?.pathOptions?.color).toBe('#ef4444');
   });
 
-  test('uses default icon for sensors in acknowledged crossing alerts', () => {
+  test('uses neutral ellipse color for acknowledged crossing alerts', () => {
     render(
       <MonitorMap
         units={[
@@ -552,6 +555,7 @@ describe('MonitorMap', () => {
             acknowledged: true,
           },
         ]}
+        pairings={[{ side1Id: 1, side2Id: 2, enabled: true }]}
         onMoveUnit={vi.fn()}
         onSelectUnit={vi.fn()}
       />,
@@ -563,6 +567,8 @@ describe('MonitorMap', () => {
     expect(icon1.options.html).toContain('Sensor 1');
     expect(icon2.options.html).toContain('background:#06b6d4');
     expect(icon2.options.html).toContain('Sensor 2');
+    expect(polylineSegments).toHaveLength(1);
+    expect(polylineSegments[0]?.pathOptions?.color).toBe('#67e8f9');
   });
 
   test('uses yellow icon for stale sensors', () => {
@@ -612,7 +618,7 @@ describe('MonitorMap', () => {
     expect(icon1.options.html).toContain('font-size:14px');
   });
 
-  test('draws dotted lines for enabled sensor pairings', () => {
+  test('draws an ellipse for enabled sensor pairings', () => {
     render(
       <MonitorMap
         units={[
@@ -637,11 +643,8 @@ describe('MonitorMap', () => {
     );
 
     expect(polylineSegments).toHaveLength(1);
-    expect(polylineSegments[0]?.positions).toEqual([
-      [33.2, 35.7],
-      [33.3, 35.8],
-    ]);
-    expect(polylineSegments[0]?.pathOptions?.dashArray).toBe('6 6');
+    expect(polylineSegments[0]?.positions.length).toBeGreaterThan(10);
+    expect(polylineSegments[0]?.pathOptions?.dashArray).toBeUndefined();
   });
 
   test('shows status header, heartbeat, and full raw details for each sensor link in popup', () => {
