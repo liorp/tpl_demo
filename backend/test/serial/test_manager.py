@@ -136,7 +136,7 @@ def test_rejects_port_without_valid_protocol_event(monkeypatch):
     stop = threading.Event()
     sink = _StoppingSink(stop)
 
-    monotonic_values = iter([0.0, 5.0])
+    monotonic_values = iter([0.0, 8.0])
     monkeypatch.setattr("backend.serial.manager.serial.Serial", FakeSerial)
     monkeypatch.setattr("backend.serial.manager.list_serial_ports", lambda _forced: [port])
     monkeypatch.setattr("backend.serial.manager.time.sleep", lambda *_: None)

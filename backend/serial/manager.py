@@ -19,7 +19,7 @@ from backend.core.events import (
 from backend.parsing.parser import ANSI_RE, TIMESTAMP_RE, parse_line
 
 logger = logging.getLogger("tpl-signum")
-PROTOCOL_VALIDATION_TIMEOUT_SEC = 5.0
+PROTOCOL_VALIDATION_TIMEOUT_SEC = 8.0
 
 
 def list_serial_ports(forced_port: str) -> list[str]:
@@ -101,14 +101,14 @@ class SerialManager:
                     ser = self._connect(port)
                     connected_any = True
 
-                    time.sleep(0.5)
+                    time.sleep(1.0)
                     ser.reset_input_buffer()
                     self.send_serial("/")
-                    time.sleep(0.2)
+                    time.sleep(0.5)
                     self.send_serial("cmd")
-                    time.sleep(0.2)
+                    time.sleep(0.5)
                     self.send_serial("re 3 4")
-                    time.sleep(0.2)
+                    time.sleep(0.5)
                     self.send_serial("map")
 
                     buffer = ""
