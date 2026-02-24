@@ -39,8 +39,11 @@ def parse_line(raw_line: str) -> Event | None:
             "unit_a": int(m.group(2)),
             "id_b": m.group(3),
             "unit_b": int(m.group(4)),
+            "th": int(m.group(5)),
             "threshold": int(m.group(5)),
+            "val": int(m.group(6)),
             "value": int(m.group(6)),
+            "c": int(m.group(7)),
             "count": int(m.group(7)),
             "device_ts": device_ts,
         }
@@ -53,6 +56,7 @@ def parse_line(raw_line: str) -> Event | None:
             "unit_a": int(m.group(2)),
             "id_b": m.group(3),
             "unit_b": int(m.group(4)),
+            "val": int(m.group(5)),
             "value": int(m.group(5)),
             "device_ts": device_ts,
         }
@@ -78,6 +82,7 @@ def parse_line(raw_line: str) -> Event | None:
                 {
                     "side1": unit_id,
                     "side2": int(link_match.group(1)),
+                    "th3": int(link_match.group(2)),
                     "threshold": int(link_match.group(2)),
                     "rssi": int(link_match.group(3)),
                     "dt": int(link_match.group(4)),
@@ -86,9 +91,12 @@ def parse_line(raw_line: str) -> Event | None:
         return {
             "type": "map",
             "unit_id": unit_id,
+            "ver": m.group(2),
             "version": m.group(2),
             "gain": int(m.group(3)),
             "voltage": int(m.group(4)),
+            "scan": int(m.group(5)),
+            "adv": int(m.group(6)),
             "links": links,
             "device_ts": device_ts,
         }
@@ -98,6 +106,7 @@ def parse_line(raw_line: str) -> Event | None:
         return {
             "type": "config",
             "threshold": int(m.group(1)),
+            "val": int(m.group(2)),
             "value": int(m.group(2)),
             "device_ts": device_ts,
         }

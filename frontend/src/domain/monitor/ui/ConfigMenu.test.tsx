@@ -16,8 +16,8 @@ describe('ConfigMenu', () => {
         config={{ gain: 64 }}
         alarmSoundEnabled
         offlineModeEnabled
-        onSendThreshold={vi.fn()}
-        onSendGain={vi.fn()}
+        onSendThreshold={vi.fn().mockReturnValue(true)}
+        onSendGain={vi.fn().mockReturnValue(true)}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
@@ -34,7 +34,7 @@ describe('ConfigMenu', () => {
   });
 
   test('falls back to default values and sends threshold', () => {
-    const onSendThreshold = vi.fn();
+    const onSendThreshold = vi.fn().mockReturnValue(true);
 
     render(
       <ConfigMenu
@@ -42,7 +42,7 @@ describe('ConfigMenu', () => {
         alarmSoundEnabled
         offlineModeEnabled
         onSendThreshold={onSendThreshold}
-        onSendGain={vi.fn()}
+        onSendGain={vi.fn().mockReturnValue(true)}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
@@ -65,14 +65,14 @@ describe('ConfigMenu', () => {
   });
 
   test('sends gain with separate button', () => {
-    const onSendGain = vi.fn();
+    const onSendGain = vi.fn().mockReturnValue(true);
 
     render(
       <ConfigMenu
         config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onSendThreshold={vi.fn()}
+        onSendThreshold={vi.fn().mockReturnValue(true)}
         onSendGain={onSendGain}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={vi.fn()}
@@ -97,8 +97,8 @@ describe('ConfigMenu', () => {
         config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onSendThreshold={vi.fn()}
-        onSendGain={vi.fn()}
+        onSendThreshold={vi.fn().mockReturnValue(true)}
+        onSendGain={vi.fn().mockReturnValue(true)}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
@@ -122,8 +122,8 @@ describe('ConfigMenu', () => {
         config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onSendThreshold={vi.fn()}
-        onSendGain={vi.fn()}
+        onSendThreshold={vi.fn().mockReturnValue(true)}
+        onSendGain={vi.fn().mockReturnValue(true)}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={onResetAll}
@@ -144,8 +144,8 @@ describe('ConfigMenu', () => {
         config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onSendThreshold={vi.fn()}
-        onSendGain={vi.fn()}
+        onSendThreshold={vi.fn().mockReturnValue(true)}
+        onSendGain={vi.fn().mockReturnValue(true)}
         onAlarmSoundEnabledChange={onAlarmSoundEnabledChange}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
@@ -166,8 +166,8 @@ describe('ConfigMenu', () => {
         config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onSendThreshold={vi.fn()}
-        onSendGain={vi.fn()}
+        onSendThreshold={vi.fn().mockReturnValue(true)}
+        onSendGain={vi.fn().mockReturnValue(true)}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={onOfflineModeEnabledChange}
         onResetAll={vi.fn()}

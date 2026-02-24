@@ -96,8 +96,8 @@ const state: MonitorState = {
 
 const acknowledgeCrossing = vi.fn();
 const requestMap = vi.fn();
-const sendThreshold = vi.fn();
-const sendGain = vi.fn();
+const sendThreshold = vi.fn().mockReturnValue(true);
+const sendGain = vi.fn().mockReturnValue(true);
 const resetAll = vi.fn();
 const setAlarmSoundEnabled = vi.fn();
 const setOfflineModeEnabled = vi.fn();

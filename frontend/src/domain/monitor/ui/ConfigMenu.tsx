@@ -21,8 +21,8 @@ type Props = {
   config: MonitorConfig;
   alarmSoundEnabled: boolean;
   offlineModeEnabled: boolean;
-  onSendThreshold: (value: number) => void;
-  onSendGain: (value: number) => void;
+  onSendThreshold: (value: number) => boolean;
+  onSendGain: (value: number) => boolean;
   onAlarmSoundEnabledChange: (enabled: boolean) => void;
   onOfflineModeEnabledChange: (enabled: boolean) => void;
   onResetAll: () => void;
@@ -118,8 +118,11 @@ export function ConfigMenu({
                   if (thresholdNum === null) {
                     return;
                   }
-                  onSendThreshold(thresholdNum);
-                  toast.success(`Threshold set to ${thresholdNum}`);
+                  if (onSendThreshold(thresholdNum)) {
+                    toast.success(`Threshold set to ${thresholdNum}`);
+                  } else {
+                    toast.error('Not connected — threshold not sent');
+                  }
                 }}
                 disabled={!thresholdValid}
                 className="font-display tracking-wide"
@@ -148,8 +151,11 @@ export function ConfigMenu({
                   if (gainNum === null) {
                     return;
                   }
-                  onSendGain(gainNum);
-                  toast.success(`Gain set to ${gainNum}`);
+                  if (onSendGain(gainNum)) {
+                    toast.success(`Gain set to ${gainNum}`);
+                  } else {
+                    toast.error('Not connected — gain not sent');
+                  }
                 }}
                 disabled={!gainValid}
                 className="font-display tracking-wide"

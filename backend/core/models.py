@@ -77,7 +77,7 @@ class ConfigEvent(TypedDict):
 Event = DetectionEvent | CommLossEvent | ConnectedEvent | MapEvent | ConfigEvent
 
 
-class LogEntry(TypedDict):
+class LogEntry(TypedDict, total=False):
     time: str
     msg: str
 
@@ -130,8 +130,13 @@ class SensorState:
         self.sensor_status: dict[str, SensorStatusEntry] = {}
         self.map_policy: MapPolicy = dict(DEFAULT_MAP_POLICY)
 
-    def add_log(self, message: str):
+    def add_log(self, message: str, fields: dict[str, object] | None = None):
         entry: LogEntry = {"time": datetime.now().strftime("%H:%M:%S"), "msg": message}
+        if fields:
+            for key, value in fields.items():
+                if key in ("time", "msg"):
+                    continue
+                entry[key] = value
         self.logs.insert(0, entry)
         if len(self.logs) > self.max_logs:
             self.logs.pop()

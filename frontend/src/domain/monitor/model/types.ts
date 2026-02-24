@@ -3,7 +3,7 @@ export type AlarmState = 'clear' | 'alarm' | 'comm_loss' | 'disconnected';
 export type MonitorEvent = {
   time: string;
   msg: string;
-};
+} & Record<string, unknown>;
 
 export type UnitPlacement = {
   id: number;

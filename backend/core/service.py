@@ -168,7 +168,8 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         state.add_log(
             f"DETECTION {event['id_a']}({event['unit_a']})-{event['id_b']}({event['unit_b']}) "
-            f"th={event['threshold']} val={event['value']}"
+            f"th={event['threshold']} val={event['value']}",
+            fields=event,
         )
         return True
     if etype == "comm_loss":
@@ -189,7 +190,8 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         set_connection_state(state, True, state.current_port, "comm_loss")
         state.add_log(
-            f"COMM LOSS {event['id_a']}({event['unit_a']})-{event['id_b']}({event['unit_b']})"
+            f"COMM LOSS {event['id_a']}({event['unit_a']})-{event['id_b']}({event['unit_b']})",
+            fields=event,
         )
         return True
     if etype == "connected":
@@ -210,7 +212,8 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         state.add_log(
             f"LINK {event['id_unit']}({event['unit']}) -> {event['id_peer']}({event['peer']}): "
-            f"{'UP' if event['connected'] else 'DOWN'}"
+            f"{'UP' if event['connected'] else 'DOWN'}",
+            fields=event,
         )
         return True
     if etype == "map":
@@ -227,12 +230,16 @@ def handle_event(state: SensorState, event: Event) -> bool:
         state.config["gain"] = event["gain"]
         state.add_log(
             f"MAP from {event['unit_id']} ver={event['version']}"
-            f" gain={event['gain']} v={event['voltage']}"
+            f" gain={event['gain']} v={event['voltage']}",
+            fields=event,
         )
         return True
     if etype == "config":
         state.config["gain"] = event["value"]
-        state.add_log(f"CONFIG threshold={event['threshold']} gain={event['value']}")
+        state.add_log(
+            f"CONFIG threshold={event['threshold']} gain={event['value']}",
+            fields=event,
+        )
         return True
     return False
 

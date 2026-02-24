@@ -129,6 +129,41 @@ def test_handle_map_event_updates_links():
     assert state.links == [{"side1": 2, "side2": 7, "threshold": 0, "rssi": -57, "dt": 180}]
 
 
+def test_handle_event_log_keeps_raw_sensor_field_names():
+    state = SensorState()
+
+    changed = handle_event(
+        state,
+        {
+            "type": "map",
+            "unit_id": 7,
+            "version": "v1",
+            "ver": "v1",
+            "gain": 30,
+            "voltage": 2600,
+            "scan": 3,
+            "adv": 4,
+            "links": [
+                {
+                    "side1": 7,
+                    "side2": 2,
+                    "th3": 500,
+                    "threshold": 500,
+                    "rssi": -57,
+                    "dt": 180,
+                }
+            ],
+            "device_ts": 444,
+        },
+    )
+
+    assert changed is True
+    assert state.logs[0]["type"] == "map"
+    assert state.logs[0]["scan"] == 3
+    assert state.logs[0]["adv"] == 4
+    assert state.logs[0]["links"][0]["th3"] == 500
+
+
 def test_handle_map_event_deduplicates_bidirectional_links():
     state = SensorState()
 

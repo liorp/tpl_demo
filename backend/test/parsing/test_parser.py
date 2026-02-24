@@ -12,6 +12,9 @@ def test_parse_detection_event():
     assert event["unit_b"] == 2
     assert event["threshold"] == 99
     assert event["value"] == 101
+    assert event["th"] == 99
+    assert event["val"] == 101
+    assert event["c"] == 5
 
 
 def test_parse_map_response_with_signal_links():
@@ -25,9 +28,19 @@ def test_parse_map_response_with_signal_links():
     assert event is not None
     assert event["type"] == "map"
     assert event["unit_id"] == 7
+    assert event["ver"] == "v1"
+    assert event["scan"] == 3
+    assert event["adv"] == 4
     assert event["links"] == [
-        {"side1": 7, "side2": 2, "threshold": 0, "rssi": -57, "dt": 180},
-        {"side1": 7, "side2": 12, "threshold": 500, "rssi": -31, "dt": 721},
+        {"side1": 7, "side2": 2, "th3": 0, "threshold": 0, "rssi": -57, "dt": 180},
+        {
+            "side1": 7,
+            "side2": 12,
+            "th3": 500,
+            "threshold": 500,
+            "rssi": -31,
+            "dt": 721,
+        },
     ]
 
 
@@ -40,3 +53,4 @@ def test_parse_config_response():
     assert event["type"] == "config"
     assert event["threshold"] == 500
     assert event["value"] == 549
+    assert event["val"] == 549

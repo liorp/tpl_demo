@@ -10,6 +10,20 @@ type Props = {
   events: MonitorEvent[];
 };
 
+function formatEventValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value === null
+  ) {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? 'undefined';
+}
+
 export function EventLog({ events }: Props) {
   const [collapsed, setCollapsed] = useState(true);
 
@@ -79,6 +93,9 @@ export function EventLog({ events }: Props) {
         >
           {events.map((event) => {
             const isAlarm = isDetectionEvent(event.msg);
+            const detailEntries = Object.entries(event)
+              .filter(([key]) => key !== 'time' && key !== 'msg')
+              .sort(([left], [right]) => left.localeCompare(right));
             return (
               <div
                 key={`${event.time}-${event.msg}`}
@@ -106,6 +123,15 @@ export function EventLog({ events }: Props) {
                 >
                   {event.msg}
                 </span>
+                {detailEntries.length > 0 ? (
+                  <div className="ml-auto flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground/70">
+                    {detailEntries.map(([key, value]) => (
+                      <span key={key} className="font-mono">
+                        {key}: {formatEventValue(value)}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             );
           })}
