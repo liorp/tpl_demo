@@ -149,6 +149,13 @@ class SerialManager:
                             event = parse_line(line)
                             if event:
                                 sink.put_nowait(SerialEvent(event))
+                        if (
+                            validated_protocol
+                            and time.monotonic() - last_map_time
+                            >= MAP_HEARTBEAT_INTERVAL_SEC
+                        ):
+                            self.send_serial("map")
+                            last_map_time = time.monotonic()
                 except serial.SerialException:
                     continue
                 except Exception as exc:

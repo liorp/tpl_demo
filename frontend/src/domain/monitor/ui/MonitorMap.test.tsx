@@ -537,6 +537,31 @@ describe('MonitorMap', () => {
     expect(icon2.options.html).toContain('Sensor 2');
   });
 
+  test('uses yellow icon for stale sensors', () => {
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'stale' },
+        ]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    const icon1 = markerIcons.get(33.2) as { options: { html: string } };
+    const icon2 = markerIcons.get(33.3) as { options: { html: string } };
+    expect(icon1.options.html).toContain('background:#06b6d4');
+    expect(icon2.options.html).toContain('background:#eab308');
+    expect(icon2.options.html).toContain('Sensor 2');
+  });
+
   test('uses conservative offline zoom defaults before manifest resolves', () => {
     vi.stubGlobal(
       'fetch',

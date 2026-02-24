@@ -187,3 +187,67 @@ def test_marks_connected_after_first_valid_protocol_event(monkeypatch):
     connected_ports = [m.port for m in sink.messages if isinstance(m, SerialConnected)]
     assert connected_ports == [port]
     assert any(isinstance(m, SerialEvent) for m in sink.messages)
+
+
+def test_sends_map_heartbeat_even_when_data_flows_continuously(monkeypatch):
+    """MAP heartbeat must fire during continuous data, not only during idle."""
+    port = "/dev/cu.usbmodem1101"
+    written_commands: list[str] = []
+
+    class FakeSerial:
+        read_calls = 0
+
+        def __init__(self, *args, **kwargs):
+            self.in_waiting = 0
+            self.is_open = True
+
+        def read(self, _):
+            FakeSerial.read_calls += 1
+            # First read: valid protocol event (triggers validation)
+            if FakeSerial.read_calls == 1:
+                return b"[100] I CMD:CONFIG threshold:10 val:20\n"
+            # Reads 2-4: continuous non-MAP data (no idle gap)
+            if FakeSerial.read_calls <= 4:
+                return b"[101] I CMD:CONNECTED ABC(7) connected:DEF(8) 1\n"
+            # Stop after enough reads
+            raise serial.SerialException("done")
+
+        def reset_input_buffer(self):
+            return None
+
+        def write(self, data):
+            written_commands.append(data.decode())
+
+        def close(self):
+            self.is_open = False
+
+    # Time progression: start at 0, then jump past heartbeat interval
+    time_values = iter([
+        0.0,   # validation_started_at / last_map_time
+        0.0,   # first read timestamp check (protocol validation)
+        4.0,   # second read - past 3s heartbeat interval
+        4.0,   # third read
+        4.0,   # fourth read
+        4.0,   # fifth read (raises)
+    ])
+
+    manager = SerialManager(forced_port="")
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
+
+    monkeypatch.setattr("backend.serial.manager.serial.Serial", FakeSerial)
+    monkeypatch.setattr("backend.serial.manager.list_serial_ports", lambda _forced: [port])
+    monkeypatch.setattr("backend.serial.manager.time.sleep", lambda *_: None)
+    monkeypatch.setattr(
+        "backend.serial.manager.time.monotonic", lambda: next(time_values, 10.0)
+    )
+
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
+
+    # The initial setup sends: /, cmd, re 3 4, map
+    # After heartbeat interval elapses during data flow, another "map" should be sent
+    map_commands = [cmd for cmd in written_commands if cmd.strip() == "map\r" or cmd == "map\r"]
+    assert len(map_commands) >= 2, (
+        f"Expected at least 2 map commands (initial + heartbeat), "
+        f"got {len(map_commands)}. All commands: {written_commands}"
+    )

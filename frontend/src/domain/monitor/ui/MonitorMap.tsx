@@ -88,6 +88,16 @@ function unitPinIcon(label: string) {
   });
 }
 
+function stalePinIcon(label: string) {
+  const html = `<span style="${PIN_STYLE}border:2px solid #fde047;background:#eab308;">${label}</span>`;
+  return divIcon({
+    className: '',
+    html,
+    iconSize: [0, 0],
+    iconAnchor: [0, 12],
+  });
+}
+
 function alertPinIcon(label: string) {
   const html = `<span style="${PIN_STYLE}border:2px solid #fca5a5;background:#ef4444;">${label}</span>`;
   return divIcon({
@@ -221,7 +231,9 @@ export function MonitorMap({
             icon={
               alertingSensorIds.has(unit.id)
                 ? alertPinIcon(unit.label)
-                : unitPinIcon(unit.label)
+                : unit.status === 'stale'
+                  ? stalePinIcon(unit.label)
+                  : unitPinIcon(unit.label)
             }
             eventHandlers={{
               click: () => onSelectUnit(unit.id),

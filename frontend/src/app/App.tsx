@@ -61,18 +61,26 @@ export function App() {
 
   const activeUnits = useMemo(
     () =>
-      state.units.filter((unit) => {
-        if (unit.status === 'inactive') {
-          return false;
-        }
-        if (typeof unit.lastSeenAt !== 'number') {
-          return false;
-        }
-        return (
-          nowSeconds - toUnixSeconds(unit.lastSeenAt) <=
-          SENSOR_STALE_AFTER_SECONDS
-        );
-      }),
+      state.units
+        .filter((unit) => {
+          if (unit.status === 'inactive') {
+            return false;
+          }
+          if (typeof unit.lastSeenAt !== 'number') {
+            return false;
+          }
+          return true;
+        })
+        .map((unit) => {
+          const lastSeen = unit.lastSeenAt as number;
+          return {
+            ...unit,
+            status:
+              nowSeconds - toUnixSeconds(lastSeen) > SENSOR_STALE_AFTER_SECONDS
+                ? ('stale' as const)
+                : unit.status,
+          };
+        }),
     [nowSeconds, state.units],
   );
   const mapBounds = useMemo(

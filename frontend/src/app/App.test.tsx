@@ -344,7 +344,7 @@ describe('App', () => {
     expect(startAlarmSound).toHaveBeenCalledTimes(0);
   });
 
-  test('hides stale sensors and sensors without lastSeenAt', () => {
+  test('shows stale sensors and hides sensors without lastSeenAt or inactive', () => {
     const nowMs = 1_700_000_000_000;
     vi.spyOn(Date, 'now').mockReturnValue(nowMs);
     const nowSec = Math.floor(nowMs / 1000);
@@ -355,7 +355,7 @@ describe('App', () => {
         lat: 33.3,
         lng: 35.7,
         status: 'active',
-        lastSeenAt: nowSec - 5,
+        lastSeenAt: nowSec - 30,
       },
       {
         id: 2,
@@ -363,7 +363,7 @@ describe('App', () => {
         lat: 33.31,
         lng: 35.71,
         status: 'active',
-        lastSeenAt: nowSec - 11,
+        lastSeenAt: nowSec - 61,
       },
       {
         id: 3,
@@ -371,6 +371,14 @@ describe('App', () => {
         lat: 33.32,
         lng: 35.72,
         status: 'active',
+      },
+      {
+        id: 4,
+        label: 'Sensor 4',
+        lat: 33.33,
+        lng: 35.73,
+        status: 'inactive',
+        lastSeenAt: nowSec - 5,
       },
     ];
 
@@ -380,10 +388,13 @@ describe('App', () => {
       screen.getByRole('button', { name: 'Select Sensor 1' }),
     ).not.toBeNull();
     expect(
-      screen.queryByRole('button', { name: 'Select Sensor 2' }),
-    ).toBeNull();
+      screen.getByRole('button', { name: 'Select Sensor 2' }),
+    ).not.toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Select Sensor 3' }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Select Sensor 4' }),
     ).toBeNull();
   });
 });

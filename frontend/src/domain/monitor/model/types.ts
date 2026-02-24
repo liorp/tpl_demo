@@ -10,7 +10,7 @@ export type UnitPlacement = {
   label: string;
   lat: number;
   lng: number;
-  status?: 'active' | 'inactive';
+  status?: 'active' | 'inactive' | 'stale';
   lastSeenAt?: number;
 };
 
