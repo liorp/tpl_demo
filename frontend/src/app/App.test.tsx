@@ -113,7 +113,7 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
     onMoveUnit,
     focusPoint,
   }: {
-    units: { id: number; label: string }[];
+    units: { id: number; label: string; status?: string }[];
     onSelectUnit: (unitId: number) => void;
     onMoveUnit: (unitId: number, lat: number, lng: number) => void;
     focusPoint: { lat: number; lng: number } | null;
@@ -123,7 +123,7 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
       data-focus-lat={focusPoint ? focusPoint.lat : ''}
       data-focus-lng={focusPoint ? focusPoint.lng : ''}
     >
-      {monitorMapMock({ focusPoint })}
+      {monitorMapMock({ focusPoint, units })}
       {units.map((unit) => (
         <div key={unit.id}>
           <button type="button" onClick={() => onSelectUnit(unit.id)}>
@@ -344,7 +344,7 @@ describe('App', () => {
     expect(startAlarmSound).toHaveBeenCalledTimes(0);
   });
 
-  test('shows stale sensors and hides sensors without lastSeenAt or inactive', () => {
+  test('shows sensors with lastSeenAt regardless of active flag and marks stale by timestamp', () => {
     const nowMs = 1_700_000_000_000;
     vi.spyOn(Date, 'now').mockReturnValue(nowMs);
     const nowSec = Math.floor(nowMs / 1000);
@@ -394,7 +394,15 @@ describe('App', () => {
       screen.queryByRole('button', { name: 'Select Sensor 3' }),
     ).toBeNull();
     expect(
-      screen.queryByRole('button', { name: 'Select Sensor 4' }),
-    ).toBeNull();
+      screen.getByRole('button', { name: 'Select Sensor 4' }),
+    ).not.toBeNull();
+    expect(monitorMapMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        units: expect.arrayContaining([
+          expect.objectContaining({ id: 2, status: 'stale' }),
+          expect.objectContaining({ id: 4, status: 'inactive' }),
+        ]),
+      }),
+    );
   });
 });

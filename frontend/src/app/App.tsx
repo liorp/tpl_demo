@@ -59,13 +59,10 @@ export function App() {
     };
   }, []);
 
-  const activeUnits = useMemo(
+  const visibleUnits = useMemo(
     () =>
       state.units
         .filter((unit) => {
-          if (unit.status === 'inactive') {
-            return false;
-          }
           if (typeof unit.lastSeenAt !== 'number') {
             return false;
           }
@@ -73,13 +70,14 @@ export function App() {
         })
         .map((unit) => {
           const lastSeen = unit.lastSeenAt as number;
-          return {
-            ...unit,
-            status:
-              nowSeconds - toUnixSeconds(lastSeen) > SENSOR_STALE_AFTER_SECONDS
-                ? ('stale' as const)
-                : unit.status,
-          };
+          const elapsedSeconds = nowSeconds - toUnixSeconds(lastSeen);
+          if (elapsedSeconds > SENSOR_STALE_AFTER_SECONDS) {
+            return {
+              ...unit,
+              status: 'stale' as const,
+            };
+          }
+          return unit;
         }),
     [nowSeconds, state.units],
   );
@@ -106,14 +104,14 @@ export function App() {
     if (selectedUnitId === null) {
       return;
     }
-    const selectedUnitExists = activeUnits.some(
+    const selectedUnitExists = visibleUnits.some(
       (unit) => unit.id === selectedUnitId,
     );
     if (selectedUnitExists) {
       return;
     }
-    setSelectedUnitId(activeUnits[0]?.id ?? null);
-  }, [activeUnits, selectedUnitId]);
+    setSelectedUnitId(visibleUnits[0]?.id ?? null);
+  }, [visibleUnits, selectedUnitId]);
 
   useEffect(() => {
     if (
@@ -128,7 +126,7 @@ export function App() {
 
   const handleMoveUnit = useCallback(
     (unitId: number, lat: number, lng: number) => {
-      const unit = activeUnits.find((candidate) => candidate.id === unitId);
+      const unit = visibleUnits.find((candidate) => candidate.id === unitId);
       if (!unit) {
         return;
       }
@@ -139,7 +137,7 @@ export function App() {
       });
       setSelectedUnitId(unitId);
     },
-    [activeUnits, placeUnit],
+    [visibleUnits, placeUnit],
   );
 
   const handleFocusAlert = useCallback((alert: CrossingAlert) => {
@@ -201,7 +199,7 @@ export function App() {
             </div>
           ) : null}
           <MonitorMap
-            units={activeUnits}
+            units={visibleUnits}
             crossingAlerts={state.crossingAlerts}
             focusPoint={focusedAlertPoint}
             tileRoot={mapPolicy.tileRoot}
@@ -215,7 +213,7 @@ export function App() {
       </ErrorBoundary>
       <ErrorBoundary section="Pairing">
         <PairingPanel
-          units={activeUnits}
+          units={visibleUnits}
           pairings={state.pairings}
           onTogglePairing={setUnitPairing}
         />
