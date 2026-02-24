@@ -207,3 +207,17 @@
 @utility noise-bg {
   position: relative;
 }
+
+@layer components {
+  .leaflet-popup.sensor-popup .leaflet-popup-content-wrapper {
+    @apply rounded-md border border-border-bright bg-card text-foreground shadow-lg;
+  }
+
+  .leaflet-popup.sensor-popup .leaflet-popup-content {
+    @apply m-0;
+  }
+
+  .leaflet-popup.sensor-popup .leaflet-popup-tip {
+    @apply border border-border-bright bg-card shadow-none;
+  }
+}

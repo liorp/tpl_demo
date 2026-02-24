@@ -375,8 +375,8 @@ export function MonitorMap({
                 },
               }}
             >
-              <Popup>
-                <div className="w-80 max-w-[90vw] rounded-md border border-border-bright bg-card/90 p-3 font-body text-xs backdrop-blur-sm">
+              <Popup className="sensor-popup">
+                <div className="w-[22rem] max-w-[90vw] rounded-md border border-border-bright bg-card p-4 font-body text-xs">
                   <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
                     STATUS
                   </p>
@@ -395,7 +395,7 @@ export function MonitorMap({
                       sensorLinks.map((link) => (
                         <div
                           key={`${link.direction}-${link.peerId}`}
-                          className="rounded border border-border bg-card-elevated/60 px-2 py-1"
+                          className="rounded border border-border bg-card-elevated p-3"
                         >
                           <p className="font-body text-xs text-foreground">
                             Link {link.side1} {'->'} {link.side2}

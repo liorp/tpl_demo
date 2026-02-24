@@ -685,8 +685,14 @@ describe('MonitorMap', () => {
     expect(screen.queryByText('active')).toBeNull();
     expect(screen.queryByText('inactive')).toBeNull();
     expect(screen.getByText('STATUS').getAttribute('title')).toBeNull();
+    expect(screen.getByText('STATUS').parentElement?.className).toContain(
+      'p-4',
+    );
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
     expect(screen.getByText('Link 1 -> 2')).not.toBeNull();
+    expect(screen.getByText('Link 1 -> 2').parentElement?.className).toContain(
+      'p-3',
+    );
     expect(screen.getByText('Direction: OUT')).not.toBeNull();
     expect(screen.getByText('RSSI: -57dBm')).not.toBeNull();
     expect(screen.getByText('Threshold: 500')).not.toBeNull();
