@@ -20,6 +20,7 @@ from backend.parsing.parser import ANSI_RE, TIMESTAMP_RE, parse_line
 
 logger = logging.getLogger("tpl-signum")
 PROTOCOL_VALIDATION_TIMEOUT_SEC = 8.0
+MAP_HEARTBEAT_INTERVAL_SEC = 3.0
 
 
 def list_serial_ports(forced_port: str) -> list[str]:
@@ -114,6 +115,7 @@ class SerialManager:
                     buffer = ""
                     validated_protocol = False
                     validation_started_at = time.monotonic()
+                    last_map_time = time.monotonic()
                     while not (stop_event and stop_event.is_set()):
                         data = ser.read(ser.in_waiting or 1)
                         if not data:
@@ -126,6 +128,13 @@ class SerialManager:
                             ):
                                 logger.info("Ignoring %s: no valid protocol events", port)
                                 break
+                            if (
+                                validated_protocol
+                                and time.monotonic() - last_map_time
+                                >= MAP_HEARTBEAT_INTERVAL_SEC
+                            ):
+                                self.send_serial("map")
+                                last_map_time = time.monotonic()
                             sink.put_nowait(SerialIdle())
                             continue
 

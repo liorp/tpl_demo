@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ErrorBoundary } from '@/component/ErrorBoundary';
 import { Button } from '@/component/ui/button';
-import { TooltipProvider } from '@/component/ui/tooltip';
+import { SENSOR_STALE_AFTER_SECONDS } from '@/config';
 import {
   ISRAEL_MAP_BOUNDS,
   toLeafletBounds,
@@ -23,8 +23,6 @@ import { EventLog } from '../domain/monitor/ui/EventLog';
 import { MonitorMap } from '../domain/monitor/ui/MonitorMap';
 import { PairingPanel } from '../domain/monitor/ui/PairingPanel';
 import { StatusStrip } from '../domain/monitor/ui/StatusStrip';
-
-const SENSOR_STALE_AFTER_SECONDS = 60;
 
 export function App() {
   const {
@@ -144,99 +142,97 @@ export function App() {
   }, []);
 
   return (
-    <TooltipProvider>
-      <main className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-        <StatusStrip alarm={state.alarm} serverOnline={state.serverOnline} />
-        <ErrorBoundary section="Alerts">
-          <CrossingAlertBanner
-            alerts={state.crossingAlerts}
-            onAcknowledge={acknowledgeCrossing}
-            onFocus={handleFocusAlert}
-          />
-        </ErrorBoundary>
-        <ErrorBoundary section="Map">
-          <div className="relative flex min-h-0 flex-1 flex-col">
-            <div className="pointer-events-none absolute bottom-4 left-4 z-[1200]">
-              <div className="pointer-events-auto flex flex-col gap-2 rounded-md border border-border-bright bg-card/90 p-2 backdrop-blur-sm">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-border-bright bg-card/90 font-display text-sm font-medium tracking-wide text-muted-foreground shadow-sm hover:border-primary/50 hover:text-primary"
-                  type="button"
-                  onClick={() => requestMap()}
+    <main className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <StatusStrip alarm={state.alarm} serverOnline={state.serverOnline} />
+      <ErrorBoundary section="Alerts">
+        <CrossingAlertBanner
+          alerts={state.crossingAlerts}
+          onAcknowledge={acknowledgeCrossing}
+          onFocus={handleFocusAlert}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary section="Map">
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div className="pointer-events-none absolute bottom-4 left-4 z-[1200]">
+            <div className="pointer-events-auto flex flex-col gap-2 rounded-md border border-border-bright bg-card/90 p-2 backdrop-blur-sm">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-border-bright bg-card/90 font-display text-sm font-medium tracking-wide text-muted-foreground shadow-sm hover:border-primary/50 hover:text-primary"
+                type="button"
+                onClick={() => requestMap()}
+              >
+                <svg
+                  aria-hidden="true"
+                  focusable="false"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <svg
-                    aria-hidden="true"
-                    focusable="false"
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
-                  </svg>
-                  REFRESH MAP
-                </Button>
+                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                </svg>
+                REFRESH MAP
+              </Button>
+            </div>
+          </div>
+          {selectedUnitId !== null && selectedSensorStatus ? (
+            <div className="pointer-events-none absolute right-4 top-4 z-[1200]">
+              <div className="pointer-events-auto">
+                <CommandStatusPanel
+                  sensorId={selectedUnitId}
+                  active={selectedSensorStatus.active}
+                  links={selectedSensorLinks}
+                />
               </div>
             </div>
-            {selectedUnitId !== null && selectedSensorStatus ? (
-              <div className="pointer-events-none absolute right-4 top-4 z-[1200]">
-                <div className="pointer-events-auto">
-                  <CommandStatusPanel
-                    sensorId={selectedUnitId}
-                    active={selectedSensorStatus.active}
-                    links={selectedSensorLinks}
-                  />
-                </div>
-              </div>
-            ) : null}
-            <MonitorMap
-              units={activeUnits}
-              crossingAlerts={state.crossingAlerts}
-              focusPoint={focusedAlertPoint}
-              tileRoot={mapPolicy.tileRoot}
-              offlineRequired={mapPolicy.offlineRequired}
-              offlineModeEnabled={state.globalSettings.offlineModeEnabled}
-              mapBounds={mapBounds}
-              onMoveUnit={handleMoveUnit}
-              onSelectUnit={setSelectedUnitId}
-            />
-          </div>
-        </ErrorBoundary>
-        <ErrorBoundary section="Pairing">
-          <PairingPanel
+          ) : null}
+          <MonitorMap
             units={activeUnits}
-            pairings={state.pairings}
-            onTogglePairing={setUnitPairing}
+            crossingAlerts={state.crossingAlerts}
+            focusPoint={focusedAlertPoint}
+            tileRoot={mapPolicy.tileRoot}
+            offlineRequired={mapPolicy.offlineRequired}
+            offlineModeEnabled={state.globalSettings.offlineModeEnabled}
+            mapBounds={mapBounds}
+            onMoveUnit={handleMoveUnit}
+            onSelectUnit={setSelectedUnitId}
           />
-        </ErrorBoundary>
-        <ErrorBoundary section="Event Log">
-          <EventLog events={state.events} />
-        </ErrorBoundary>
-        <ErrorBoundary section="Controls">
-          <footer className="flex h-12 items-center justify-between border-t border-border bg-card/80 px-4 backdrop-blur-sm">
-            <ConfigMenu
-              config={state.config}
-              alarmSoundEnabled={state.globalSettings.alarmSoundEnabled}
-              offlineModeEnabled={state.globalSettings.offlineModeEnabled}
-              onApply={applyConfig}
-              onAlarmSoundEnabledChange={setAlarmSoundEnabled}
-              onOfflineModeEnabledChange={setOfflineModeEnabled}
-              onResetAll={resetAll}
-            />
-            <ConnectionIndicator
-              connected={state.connected}
-              serverOnline={state.serverOnline}
-              port={state.port}
-            />
-          </footer>
-        </ErrorBoundary>
-      </main>
-    </TooltipProvider>
+        </div>
+      </ErrorBoundary>
+      <ErrorBoundary section="Pairing">
+        <PairingPanel
+          units={activeUnits}
+          pairings={state.pairings}
+          onTogglePairing={setUnitPairing}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary section="Event Log">
+        <EventLog events={state.events} />
+      </ErrorBoundary>
+      <ErrorBoundary section="Controls">
+        <footer className="flex h-12 items-center justify-between border-t border-border bg-card/80 px-4 backdrop-blur-sm">
+          <ConfigMenu
+            config={state.config}
+            alarmSoundEnabled={state.globalSettings.alarmSoundEnabled}
+            offlineModeEnabled={state.globalSettings.offlineModeEnabled}
+            onApply={applyConfig}
+            onAlarmSoundEnabledChange={setAlarmSoundEnabled}
+            onOfflineModeEnabledChange={setOfflineModeEnabled}
+            onResetAll={resetAll}
+          />
+          <ConnectionIndicator
+            connected={state.connected}
+            serverOnline={state.serverOnline}
+            port={state.port}
+          />
+        </footer>
+      </ErrorBoundary>
+    </main>
   );
 }

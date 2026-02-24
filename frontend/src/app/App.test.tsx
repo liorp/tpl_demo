@@ -9,8 +9,17 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { TooltipProvider } from '@/component/ui/tooltip';
 import type { MonitorState } from '../domain/monitor/model/types';
 import { App } from './App';
+
+function renderApp() {
+  return render(
+    <TooltipProvider>
+      <App />
+    </TooltipProvider>,
+  );
+}
 
 const state: MonitorState = {
   serverOnline: true,
@@ -190,7 +199,7 @@ describe('App', () => {
   });
 
   test('renders refresh map as map HUD and hides live feed indicator', () => {
-    render(<App />);
+    renderApp();
 
     expect(screen.queryByText('Place unit ID:')).toBeNull();
     expect(screen.queryByText('UNIT')).toBeNull();
@@ -200,7 +209,7 @@ describe('App', () => {
   });
 
   test('moves a unit when map drag callback is triggered', () => {
-    render(<App />);
+    renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Move Sensor 1' }));
     expect(placeUnit).toHaveBeenCalledWith(
@@ -213,7 +222,7 @@ describe('App', () => {
   });
 
   test('shows command status panel for selected sensor from map click', () => {
-    render(<App />);
+    renderApp();
 
     const map = screen.getByTestId('monitor-map');
     fireEvent.click(
@@ -228,7 +237,7 @@ describe('App', () => {
   });
 
   test('updates command status panel when selected sensor changes', () => {
-    render(<App />);
+    renderApp();
 
     const map = screen.getByTestId('monitor-map');
     fireEvent.click(
@@ -247,7 +256,7 @@ describe('App', () => {
   });
 
   test('focuses map from crossing alert and keeps acknowledge action', () => {
-    render(<App />);
+    renderApp();
 
     const map = screen.getByTestId('monitor-map');
     expect(map.getAttribute('data-focus-lat')).toBe('');
@@ -266,7 +275,7 @@ describe('App', () => {
 
   test('starts alarm sound when crossing alerts are present and sound is enabled', () => {
     state.crossingAlerts = [];
-    const { rerender } = render(<App />);
+    const { rerender } = renderApp();
 
     expect(startAlarmSound).toHaveBeenCalledTimes(0);
 
@@ -280,7 +289,11 @@ describe('App', () => {
         acknowledged: false,
       },
     ];
-    rerender(<App />);
+    rerender(
+      <TooltipProvider>
+        <App />
+      </TooltipProvider>,
+    );
 
     expect(startAlarmSound).toHaveBeenCalledTimes(1);
   });
@@ -296,12 +309,16 @@ describe('App', () => {
         acknowledged: false,
       },
     ];
-    const { rerender } = render(<App />);
+    const { rerender } = renderApp();
 
     expect(startAlarmSound).toHaveBeenCalledTimes(1);
 
     state.crossingAlerts = [];
-    rerender(<App />);
+    rerender(
+      <TooltipProvider>
+        <App />
+      </TooltipProvider>,
+    );
 
     expect(stopAlarmSound).toHaveBeenCalled();
   });
@@ -322,7 +339,7 @@ describe('App', () => {
       },
     ];
 
-    render(<App />);
+    renderApp();
 
     expect(startAlarmSound).toHaveBeenCalledTimes(0);
   });
@@ -338,7 +355,7 @@ describe('App', () => {
         lat: 33.3,
         lng: 35.7,
         status: 'active',
-        lastSeenAt: nowSec - 30,
+        lastSeenAt: nowSec - 5,
       },
       {
         id: 2,
@@ -346,7 +363,7 @@ describe('App', () => {
         lat: 33.31,
         lng: 35.71,
         status: 'active',
-        lastSeenAt: nowSec - 61,
+        lastSeenAt: nowSec - 11,
       },
       {
         id: 3,
@@ -357,7 +374,7 @@ describe('App', () => {
       },
     ];
 
-    render(<App />);
+    renderApp();
 
     expect(
       screen.getByRole('button', { name: 'Select Sensor 1' }),

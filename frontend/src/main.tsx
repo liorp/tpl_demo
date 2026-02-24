@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
 import { ErrorBoundary } from './component/ErrorBoundary';
+import { TooltipProvider } from './component/ui/tooltip';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,9 +23,11 @@ if (!root) {
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary section="Application">
-        <App />
-      </ErrorBoundary>
+      <TooltipProvider>
+        <ErrorBoundary section="Application">
+          <App />
+        </ErrorBoundary>
+      </TooltipProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

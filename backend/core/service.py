@@ -141,6 +141,21 @@ def acknowledge_alarm(state: SensorState) -> bool:
 def handle_event(state: SensorState, event: Event) -> bool:
     etype = event["type"]
     if etype == "detection":
+        last_seen = _event_last_seen()
+        _update_sensor_link_status(
+            state,
+            sensor_id=event["unit_a"],
+            peer_id=event["unit_b"],
+            connected=True,
+            last_seen=last_seen,
+        )
+        _update_sensor_link_status(
+            state,
+            sensor_id=event["unit_b"],
+            peer_id=event["unit_a"],
+            connected=True,
+            last_seen=last_seen,
+        )
         crossing_lat, crossing_lng = _crossing_coordinates(state, event["unit_a"], event["unit_b"])
         state.last_detection_time = now_ts()
         set_connection_state(state, True, state.current_port, "alarm")
@@ -160,6 +175,21 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         return True
     if etype == "comm_loss":
+        last_seen = _event_last_seen()
+        _update_sensor_link_status(
+            state,
+            sensor_id=event["unit_a"],
+            peer_id=event["unit_b"],
+            connected=True,
+            last_seen=last_seen,
+        )
+        _update_sensor_link_status(
+            state,
+            sensor_id=event["unit_b"],
+            peer_id=event["unit_a"],
+            connected=True,
+            last_seen=last_seen,
+        )
         set_connection_state(state, True, state.current_port, "comm_loss")
         state.add_log(
             f"COMM LOSS {event['id_a']}({event['unit_a']})-{event['id_b']}({event['unit_b']})"
