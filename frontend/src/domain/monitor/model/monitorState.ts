@@ -90,7 +90,11 @@ export function createInitialServerState(): ServerState {
     alarm: 'disconnected',
     events: [],
     links: [],
-    config: { gain: null },
+    config: {
+      noise_threshold: null,
+      detection_threshold: null,
+      gain: null,
+    },
     sensorStatus: {},
     mapPolicy: parseMapPolicy(undefined),
   };
@@ -108,6 +112,16 @@ export function createInitialMonitorState(): MonitorState {
 
 export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
   const sensorStatus = parseSensorStatusMap(payload.sensor_status);
+  const noiseThreshold =
+    typeof payload.config.noise_threshold === 'number' &&
+    Number.isFinite(payload.config.noise_threshold)
+      ? payload.config.noise_threshold
+      : null;
+  const detectionThreshold =
+    typeof payload.config.detection_threshold === 'number' &&
+    Number.isFinite(payload.config.detection_threshold)
+      ? payload.config.detection_threshold
+      : null;
   return {
     serverOnline: true,
     connected: payload.connected,
@@ -115,7 +129,20 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     alarm: payload.alarm,
     events: sortEventsByTimestampDesc(payload.events).slice(0, MAX_EVENTS),
     links: payload.links,
-    config: payload.config,
+    config: {
+      gain:
+        typeof payload.config.gain === 'number' &&
+        Number.isFinite(payload.config.gain)
+          ? payload.config.gain
+          : null,
+      noise_threshold: noiseThreshold,
+      detection_threshold:
+        detectionThreshold !== null &&
+        noiseThreshold !== null &&
+        detectionThreshold < noiseThreshold
+          ? noiseThreshold
+          : detectionThreshold,
+    },
     sensorStatus,
     mapPolicy: parseMapPolicy(payload.map_policy),
   };

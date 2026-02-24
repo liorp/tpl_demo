@@ -50,7 +50,11 @@ def test_snapshot_includes_command_map_defaults():
     assert isinstance(current["events"], list)
     assert current["links"] == []
     assert current["crossing_alert"] is None
-    assert current["config"] == {"gain": None}
+    assert current["config"] == {
+        "noise_threshold": None,
+        "detection_threshold": None,
+        "gain": None,
+    }
     assert current["units"] == []
     assert current["sensor_status"] == {}
     assert current["map_policy"] == {
@@ -203,7 +207,48 @@ def test_handle_config_event_updates_config_values():
     )
 
     assert changed is True
-    assert state.config == {"gain": 799}
+    assert state.config == {
+        "noise_threshold": 777,
+        "detection_threshold": None,
+        "gain": 799,
+    }
+
+
+def test_handle_detection_between_noise_and_detection_logs_without_alert():
+    state = SensorState()
+    state.config["detection_threshold"] = 700
+    event = {
+        "type": "detection",
+        "id_a": "AA",
+        "unit_a": 1,
+        "id_b": "BB",
+        "unit_b": 2,
+        "threshold": 500,
+        "value": 650,
+        "count": 1,
+        "device_ts": 321,
+    }
+
+    changed = handle_event(state, event)
+
+    assert changed is True
+    assert state.alarm_state == "disconnected"
+    assert state.crossing_alert is None
+    assert state.logs[0]["msg"].startswith("DETECTION")
+
+
+def test_handle_config_event_raises_detection_threshold_to_noise_threshold():
+    state = SensorState()
+    state.config["detection_threshold"] = 600
+
+    changed = handle_event(
+        state,
+        {"type": "config", "threshold": 777, "value": 799, "device_ts": 555},
+    )
+
+    assert changed is True
+    assert state.config["noise_threshold"] == 777
+    assert state.config["detection_threshold"] == 777
 
 
 def test_handle_connected_and_map_update_sensor_status_graph(monkeypatch):

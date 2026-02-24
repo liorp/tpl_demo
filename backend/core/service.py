@@ -161,15 +161,21 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         crossing_lat, crossing_lng = _crossing_coordinates(state, event["unit_a"], event["unit_b"])
         state.last_detection_time = now_ts()
-        set_connection_state(state, True, state.current_port, "alarm")
-        state.crossing_alert = CrossingAlert(
-            sensor_a=event["unit_a"],
-            sensor_b=event["unit_b"],
-            timestamp=event.get("device_ts"),
-            lat=crossing_lat,
-            lng=crossing_lng,
-            acknowledged=False,
+        detection_threshold = state.config.get("detection_threshold")
+        should_trigger_alert = (
+            not isinstance(detection_threshold, int)
+            or event["value"] >= detection_threshold
         )
+        if should_trigger_alert:
+            set_connection_state(state, True, state.current_port, "alarm")
+            state.crossing_alert = CrossingAlert(
+                sensor_a=event["unit_a"],
+                sensor_b=event["unit_b"],
+                timestamp=event.get("device_ts"),
+                lat=crossing_lat,
+                lng=crossing_lng,
+                acknowledged=False,
+            )
         log_event(
             state,
             logger,
@@ -247,7 +253,12 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         return True
     if etype == "config":
+        noise_threshold = event["threshold"]
         state.config["gain"] = event["value"]
+        state.config["noise_threshold"] = noise_threshold
+        detection_threshold = state.config.get("detection_threshold")
+        if isinstance(detection_threshold, int) and detection_threshold < noise_threshold:
+            state.config["detection_threshold"] = noise_threshold
         log_event(
             state,
             logger,

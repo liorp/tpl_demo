@@ -571,6 +571,84 @@ describe('MonitorMap', () => {
     expect(polylineSegments[0]?.pathOptions?.color).toBe('#67e8f9');
   });
 
+  test('colors pairing ellipse yellow for between-threshold detections within 10 seconds', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(
+      new Date('2026-02-24T12:00:10').valueOf(),
+    );
+
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'active' },
+        ]}
+        pairings={[{ side1Id: 1, side2Id: 2, enabled: true }]}
+        crossingAlerts={[]}
+        events={[
+          {
+            time: '12:00:05',
+            msg: 'DETECTION',
+            type: 'detection',
+            unit_a: 1,
+            unit_b: 2,
+            threshold: 500,
+            value: 650,
+          },
+        ]}
+        config={{ gain: null, noise_threshold: 500, detection_threshold: 700 }}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(polylineSegments).toHaveLength(1);
+    expect(polylineSegments[0]?.pathOptions?.color).toBe('#eab308');
+  });
+
+  test('returns pairing ellipse to neutral after 10 seconds', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(
+      new Date('2026-02-24T12:00:20').valueOf(),
+    );
+
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'active' },
+        ]}
+        pairings={[{ side1Id: 1, side2Id: 2, enabled: true }]}
+        crossingAlerts={[]}
+        events={[
+          {
+            time: '12:00:05',
+            msg: 'DETECTION',
+            type: 'detection',
+            unit_a: 1,
+            unit_b: 2,
+            threshold: 500,
+            value: 650,
+          },
+        ]}
+        config={{ gain: null, noise_threshold: 500, detection_threshold: 700 }}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(polylineSegments).toHaveLength(1);
+    expect(polylineSegments[0]?.pathOptions?.color).toBe('#67e8f9');
+  });
+
   test('uses yellow icon for stale sensors', () => {
     render(
       <MonitorMap

@@ -22,6 +22,7 @@ type Props = {
   alarmSoundEnabled: boolean;
   offlineModeEnabled: boolean;
   onSendThreshold: (value: number) => boolean;
+  onSendDetectionThreshold: (value: number) => boolean;
   onSendGain: (value: number) => boolean;
   onAlarmSoundEnabledChange: (enabled: boolean) => void;
   onOfflineModeEnabledChange: (enabled: boolean) => void;
@@ -29,6 +30,7 @@ type Props = {
 };
 
 const DEFAULT_THRESHOLD = 500;
+const DEFAULT_DETECTION_THRESHOLD = 700;
 const DEFAULT_GAIN = 64;
 
 function toKnownValue(value: number | null, fallback: number): string {
@@ -40,25 +42,47 @@ export function ConfigMenu({
   alarmSoundEnabled,
   offlineModeEnabled,
   onSendThreshold,
+  onSendDetectionThreshold,
   onSendGain,
   onAlarmSoundEnabledChange,
   onOfflineModeEnabledChange,
   onResetAll,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [threshold, setThreshold] = useState(String(DEFAULT_THRESHOLD));
+  const [noiseThreshold, setNoiseThreshold] = useState(
+    toKnownValue(config.noise_threshold ?? null, DEFAULT_THRESHOLD),
+  );
+  const [detectionThreshold, setDetectionThreshold] = useState(
+    toKnownValue(
+      config.detection_threshold ?? null,
+      DEFAULT_DETECTION_THRESHOLD,
+    ),
+  );
   const [gain, setGain] = useState(toKnownValue(config.gain, DEFAULT_GAIN));
 
   useEffect(() => {
     if (open) {
       return;
     }
+    setNoiseThreshold(
+      toKnownValue(config.noise_threshold ?? null, DEFAULT_THRESHOLD),
+    );
+    setDetectionThreshold(
+      toKnownValue(
+        config.detection_threshold ?? null,
+        DEFAULT_DETECTION_THRESHOLD,
+      ),
+    );
     setGain(toKnownValue(config.gain, DEFAULT_GAIN));
-  }, [config.gain, open]);
+  }, [config.gain, config.noise_threshold, config.detection_threshold, open]);
 
-  const thresholdNum = parseInputNumber(threshold);
+  const noiseThresholdNum = parseInputNumber(noiseThreshold);
+  const detectionThresholdNum = parseInputNumber(detectionThreshold);
   const gainNum = parseInputNumber(gain);
-  const thresholdValid = thresholdNum !== null;
+  const noiseThresholdValid = noiseThresholdNum !== null;
+  const detectionThresholdValid =
+    detectionThresholdNum !== null &&
+    (noiseThresholdNum === null || detectionThresholdNum >= noiseThresholdNum);
   const gainValid = gainNum !== null;
 
   return (
@@ -94,37 +118,80 @@ export function ConfigMenu({
             Settings
           </DialogTitle>
           <DialogDescription>
-            Configure detection threshold and gain parameters.
+            Configure noise threshold, detection threshold, and gain parameters.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
             <Label
-              htmlFor="threshold"
+              htmlFor="noise-threshold"
               className="font-display text-xs tracking-wide text-muted-foreground"
             >
-              Threshold
+              Noise Threshold
             </Label>
             <div className="flex items-center gap-2">
               <Input
-                id="threshold"
-                value={threshold}
-                onChange={(event) => setThreshold(event.target.value)}
+                id="noise-threshold"
+                value={noiseThreshold}
+                onChange={(event) => setNoiseThreshold(event.target.value)}
                 className="bg-background font-mono tabular-nums"
               />
               <Button
                 size="sm"
                 onClick={() => {
-                  if (thresholdNum === null) {
+                  if (noiseThresholdNum === null) {
                     return;
                   }
-                  if (onSendThreshold(thresholdNum)) {
-                    toast.success(`Threshold set to ${thresholdNum}`);
+                  if (onSendThreshold(noiseThresholdNum)) {
+                    toast.success(
+                      `Noise threshold set to ${noiseThresholdNum}`,
+                    );
                   } else {
-                    toast.error('Not connected — threshold not sent');
+                    toast.error('Not connected — noise threshold not sent');
                   }
                 }}
-                disabled={!thresholdValid}
+                disabled={!noiseThresholdValid}
+                className="font-display tracking-wide"
+              >
+                Send
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <Label
+              htmlFor="detection-threshold"
+              className="font-display text-xs tracking-wide text-muted-foreground"
+            >
+              Detection Threshold
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="detection-threshold"
+                value={detectionThreshold}
+                onChange={(event) => setDetectionThreshold(event.target.value)}
+                className="bg-background font-mono tabular-nums"
+              />
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (detectionThresholdNum === null) {
+                    return;
+                  }
+                  if (
+                    noiseThresholdNum !== null &&
+                    detectionThresholdNum < noiseThresholdNum
+                  ) {
+                    return;
+                  }
+                  if (onSendDetectionThreshold(detectionThresholdNum)) {
+                    toast.success(
+                      `Detection threshold set to ${detectionThresholdNum}`,
+                    );
+                  } else {
+                    toast.error('Not connected — detection threshold not sent');
+                  }
+                }}
+                disabled={!detectionThresholdValid}
                 className="font-display tracking-wide"
               >
                 Send

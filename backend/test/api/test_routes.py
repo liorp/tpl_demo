@@ -28,6 +28,7 @@ def _build_app(
     tmp_path: Path,
     sent_cmds: list[str],
     persisted_layouts: list[dict] | None = None,
+    initial_config: dict | None = None,
 ) -> tuple[TestClient, Path, FakeBroadcaster]:
     static_dir = tmp_path / "dist"
     asset_dir = static_dir / "asset"
@@ -44,6 +45,8 @@ def _build_app(
 
     app = FastAPI()
     state = SensorState()
+    if initial_config is not None:
+        state.config.update(initial_config)
     state.map_policy = {
         "bounds": dict(ALLOWED_BOUNDS),
         "buffer_km": MAP_BUFFER_KM,
@@ -58,7 +61,7 @@ def _build_app(
             "events": [],
             "links": [],
             "crossing_alert": None,
-            "config": {"gain": None},
+            "config": dict(state.config),
             "units": [],
             "map_policy": dict(state.map_policy),
             "sensor_status": {},
@@ -84,11 +87,43 @@ def test_websocket_routes_command_messages(tmp_path: Path):
     with client.websocket_connect("/ws") as ws:
         _ = ws.receive_json()
         ws.send_text('{"cmd":"set_threshold","value":500}')
+        ws.send_text('{"cmd":"set_detection_threshold","value":700}')
         ws.send_text('{"cmd":"set_gain","value":64}')
         ws.send_text('{"cmd":"map"}')
         ws.send_text('{"cmd":"unsupported"}')
 
     assert sent_cmds == ["threshold 500", "gain 64", "map"]
+
+
+def test_set_detection_threshold_rejects_values_below_known_noise_threshold(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, broadcaster = _build_app(
+        tmp_path,
+        sent_cmds,
+        initial_config={"noise_threshold": 600, "detection_threshold": None},
+    )
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_detection_threshold","value":500}')
+
+    assert sent_cmds == []
+    assert broadcaster.payload["config"]["detection_threshold"] is None
+
+
+def test_set_threshold_rejects_values_above_known_detection_threshold(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, _ = _build_app(
+        tmp_path,
+        sent_cmds,
+        initial_config={"noise_threshold": 500, "detection_threshold": 700},
+    )
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_threshold","value":701}')
+
+    assert sent_cmds == []
 
 
 def test_serves_favicon_without_404(tmp_path: Path):

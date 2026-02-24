@@ -536,10 +536,15 @@ describe('monitor socket lifecycle', () => {
 
     const latestApi = onApi.mock.calls.at(-1)?.[0] as {
       sendThreshold: (value: number) => boolean;
+      sendDetectionThreshold: (value: number) => boolean;
     };
     expect(latestApi.sendThreshold(600)).toBe(true);
     expect(secondSocket?.send).toHaveBeenCalledWith(
       JSON.stringify({ cmd: 'set_threshold', value: 600 }),
+    );
+    expect(latestApi.sendDetectionThreshold(700)).toBe(true);
+    expect(secondSocket?.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'set_detection_threshold', value: 700 }),
     );
   });
 });

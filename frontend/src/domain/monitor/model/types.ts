@@ -45,6 +45,8 @@ export type CrossingAckWindow = {
 };
 
 export type MonitorConfig = {
+  noise_threshold?: number | null;
+  detection_threshold?: number | null;
   gain: number | null;
 };
 

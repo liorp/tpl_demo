@@ -28,6 +28,7 @@ export function App() {
     requestMap,
     acknowledgeCrossing,
     sendThreshold,
+    sendDetectionThreshold,
     sendGain,
     setAlarmSoundEnabled,
     setOfflineModeEnabled,
@@ -164,6 +165,8 @@ export function App() {
             pairings={state.pairings}
             links={state.links}
             crossingAlerts={state.crossingAlerts}
+            events={state.events}
+            config={state.config}
             focusPoint={focusedAlertPoint}
             tileRoot={mapPolicy.tileRoot}
             offlineRequired={mapPolicy.offlineRequired}
@@ -191,6 +194,7 @@ export function App() {
             alarmSoundEnabled={state.globalSettings.alarmSoundEnabled}
             offlineModeEnabled={state.globalSettings.offlineModeEnabled}
             onSendThreshold={sendThreshold}
+            onSendDetectionThreshold={sendDetectionThreshold}
             onSendGain={sendGain}
             onAlarmSoundEnabledChange={setAlarmSoundEnabled}
             onOfflineModeEnabledChange={setOfflineModeEnabled}

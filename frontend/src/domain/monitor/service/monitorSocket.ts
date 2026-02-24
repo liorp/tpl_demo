@@ -38,6 +38,7 @@ export function useMonitorSocket(): {
   acknowledgeCrossing: (alert: CrossingAlert) => void;
   requestMap: () => void;
   sendThreshold: (value: number) => boolean;
+  sendDetectionThreshold: (value: number) => boolean;
   sendGain: (value: number) => boolean;
   setAlarmSoundEnabled: (enabled: boolean) => void;
   setOfflineModeEnabled: (enabled: boolean) => void;
@@ -225,6 +226,15 @@ export function useMonitorSocket(): {
     return false;
   }, []);
 
+  const sendDetectionThreshold = useCallback((value: number): boolean => {
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ cmd: 'set_detection_threshold', value }));
+      return true;
+    }
+    return false;
+  }, []);
+
   const sendGain = useCallback((value: number): boolean => {
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -346,6 +356,7 @@ export function useMonitorSocket(): {
     acknowledgeCrossing,
     requestMap,
     sendThreshold,
+    sendDetectionThreshold,
     sendGain,
     setAlarmSoundEnabled,
     setOfflineModeEnabled,

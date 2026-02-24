@@ -14,6 +14,8 @@ import {
 import { getUnitBounds, ISRAEL_MAP_BOUNDS } from '../model/mapViewport';
 import type {
   CrossingAlert,
+  MonitorConfig,
+  MonitorEvent,
   PairLink,
   SignalLinkState,
   UnitPlacement,
@@ -27,6 +29,7 @@ const PIN_PADDING_Y_PX = 2 * PIN_SIZE_SCALE;
 const PIN_PADDING_X_PX = 8 * PIN_SIZE_SCALE;
 const PIN_FONT_SIZE_PX = 14;
 const PIN_ANCHOR_Y = 12 * PIN_SIZE_SCALE;
+const BETWEEN_THRESHOLD_WINDOW_MS = 10_000;
 dayjs.extend(relativeTime);
 
 type Props = {
@@ -34,6 +37,8 @@ type Props = {
   pairings?: PairLink[];
   links?: SignalLinkState[];
   crossingAlerts: CrossingAlert[];
+  events?: MonitorEvent[];
+  config?: MonitorConfig;
   focusPoint: { lat: number; lng: number } | null;
   tileRoot: string | null;
   offlineRequired: boolean;
@@ -176,6 +181,88 @@ function toPairKey(side1: number, side2: number): string {
   return `${a}-${b}`;
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function parseClockTimeMs(value: unknown): number | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const match = /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/.exec(
+    value.trim(),
+  );
+  if (!match) {
+    return null;
+  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  const millis = Number((match[4] ?? '0').padEnd(3, '0'));
+  if (
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59 ||
+    seconds < 0 ||
+    seconds > 59
+  ) {
+    return null;
+  }
+  return ((hours * 60 + minutes) * 60 + seconds) * 1000 + millis;
+}
+
+function toYellowPairKeys(
+  events: MonitorEvent[],
+  config: MonitorConfig | undefined,
+  nowMs: number,
+): Set<string> {
+  const yellowKeys = new Set<string>();
+  const seenPairs = new Set<string>();
+  const configuredNoise = toFiniteNumber(config?.noise_threshold);
+  const configuredDetection = toFiniteNumber(config?.detection_threshold);
+
+  for (const event of events) {
+    if (event.type !== 'detection') {
+      continue;
+    }
+    const unitA = toFiniteNumber(event.unit_a);
+    const unitB = toFiniteNumber(event.unit_b);
+    const value = toFiniteNumber(event.value);
+    if (unitA === null || unitB === null || value === null) {
+      continue;
+    }
+    const key = toPairKey(unitA, unitB);
+    if (seenPairs.has(key)) {
+      continue;
+    }
+    seenPairs.add(key);
+
+    const noiseThreshold = configuredNoise ?? toFiniteNumber(event.threshold);
+    const detectionThreshold = configuredDetection;
+    if (noiseThreshold === null || detectionThreshold === null) {
+      continue;
+    }
+    if (value < noiseThreshold || value >= detectionThreshold) {
+      continue;
+    }
+
+    const eventClockMs = parseClockTimeMs(event.time);
+    if (eventClockMs === null) {
+      continue;
+    }
+    const nowClockMs = nowMs - new Date(nowMs).setHours(0, 0, 0, 0);
+    const deltaMs =
+      nowClockMs >= eventClockMs
+        ? nowClockMs - eventClockMs
+        : nowClockMs + 86_400_000 - eventClockMs;
+    if (deltaMs <= BETWEEN_THRESHOLD_WINDOW_MS) {
+      yellowKeys.add(key);
+    }
+  }
+  return yellowKeys;
+}
+
 function toPairingEllipsePositions(
   side1: UnitPlacement,
   side2: UnitPlacement,
@@ -211,6 +298,8 @@ export function MonitorMap({
   pairings = [],
   links = [],
   crossingAlerts,
+  events = [],
+  config,
   focusPoint,
   tileRoot,
   offlineRequired,
@@ -234,6 +323,7 @@ export function MonitorMap({
       .filter((alert) => !alert.acknowledged)
       .map((alert) => toPairKey(alert.sensorA, alert.sensorB)),
   );
+  const yellowPairKeys = toYellowPairKeys(events, config, Date.now());
 
   // Cache divIcon instances so Leaflet doesn't replace the DOM element on
   // every re-render (which would interrupt an in-progress drag).
@@ -364,7 +454,11 @@ export function MonitorMap({
             key={ellipse.key}
             positions={ellipse.positions}
             pathOptions={{
-              color: ellipse.alerting ? '#ef4444' : '#67e8f9',
+              color: ellipse.alerting
+                ? '#ef4444'
+                : yellowPairKeys.has(ellipse.key)
+                  ? '#eab308'
+                  : '#67e8f9',
               weight: 3,
               opacity: 0.85,
             }}
