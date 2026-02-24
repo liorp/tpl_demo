@@ -22,6 +22,11 @@ import type {
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
 const ONLINE_TILE_NATIVE_MAX_ZOOM = 19;
 const OFFLINE_DEFAULT_NATIVE_MAX_ZOOM = 14;
+const PIN_SIZE_SCALE = 2;
+const PIN_PADDING_Y_PX = 2 * PIN_SIZE_SCALE;
+const PIN_PADDING_X_PX = 8 * PIN_SIZE_SCALE;
+const PIN_FONT_SIZE_PX = 14;
+const PIN_ANCHOR_Y = 12 * PIN_SIZE_SCALE;
 dayjs.extend(relativeTime);
 
 type Props = {
@@ -99,8 +104,7 @@ function toTileUrl(tileRoot: string | null, useOfflineTiles: boolean): string {
   const root = (tileRoot ?? '/tiles').replace(/\/+$/, '');
   return `${root}/{z}/{x}/{y}.png`;
 }
-const PIN_STYLE =
-  'display:flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;white-space:nowrap;color:#fff;line-height:1.4;box-shadow:0 0 0 2px rgba(15,23,42,0.35);transform:translateX(-50%);';
+const PIN_STYLE = `display:flex;align-items:center;justify-content:center;padding:${PIN_PADDING_Y_PX}px ${PIN_PADDING_X_PX}px;border-radius:9999px;font-size:${PIN_FONT_SIZE_PX}px;font-weight:600;white-space:nowrap;color:#fff;line-height:1.4;box-shadow:0 0 0 2px rgba(15,23,42,0.35);transform:translateX(-50%);`;
 
 function unitPinIcon(label: string) {
   const html = `<span style="${PIN_STYLE}border:2px solid #67e8f9;background:#06b6d4;">${label}</span>`;
@@ -108,7 +112,7 @@ function unitPinIcon(label: string) {
     className: '',
     html,
     iconSize: [0, 0],
-    iconAnchor: [0, 12],
+    iconAnchor: [0, PIN_ANCHOR_Y],
   });
 }
 
@@ -118,7 +122,7 @@ function stalePinIcon(label: string) {
     className: '',
     html,
     iconSize: [0, 0],
-    iconAnchor: [0, 12],
+    iconAnchor: [0, PIN_ANCHOR_Y],
   });
 }
 
@@ -128,7 +132,7 @@ function alertPinIcon(label: string) {
     className: '',
     html,
     iconSize: [0, 0],
-    iconAnchor: [0, 12],
+    iconAnchor: [0, PIN_ANCHOR_Y],
   });
 }
 

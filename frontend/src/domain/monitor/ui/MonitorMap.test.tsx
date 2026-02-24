@@ -590,6 +590,28 @@ describe('MonitorMap', () => {
     expect(icon2.options.html).toContain('Sensor 2');
   });
 
+  test('renders map pins at 2x radius/size', () => {
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+        ]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    const icon1 = markerIcons.get(33.2) as { options: { html: string } };
+    expect(icon1.options.html).toContain('padding:4px 16px');
+    expect(icon1.options.html).toContain('font-size:14px');
+  });
+
   test('draws dotted lines for enabled sensor pairings', () => {
     render(
       <MonitorMap
