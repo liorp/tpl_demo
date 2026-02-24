@@ -44,11 +44,14 @@ type Props = {
 };
 
 type CommandPeerLink = {
+  side1: number;
+  side2: number;
   peerId: number;
   direction: 'IN' | 'OUT';
   threshold: number;
   rssi: number;
   dt: number;
+  updatedAt: number;
 };
 
 function MapFocusController({
@@ -152,20 +155,26 @@ function getSensorLinks(
   for (const link of links) {
     if (link.side1 === sensorId) {
       peers.push({
+        side1: link.side1,
+        side2: link.side2,
         peerId: link.side2,
         direction: 'OUT',
         threshold: link.threshold,
         rssi: link.rssi,
         dt: link.dt,
+        updatedAt: link.updatedAt,
       });
     }
     if (link.side2 === sensorId) {
       peers.push({
+        side1: link.side1,
+        side2: link.side2,
         peerId: link.side1,
         direction: 'IN',
         threshold: link.threshold,
         rssi: link.rssi,
         dt: link.dt,
+        updatedAt: link.updatedAt,
       });
     }
   }
@@ -367,21 +376,12 @@ export function MonitorMap({
               }}
             >
               <Popup>
-                <div className="w-56 rounded-md border border-border-bright bg-card/90 p-3 font-body text-xs backdrop-blur-sm">
+                <div className="w-80 max-w-[90vw] rounded-md border border-border-bright bg-card/90 p-3 font-body text-xs backdrop-blur-sm">
                   <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
-                    CMD STATUS
+                    STATUS
                   </p>
                   <p className="mt-1 font-display text-sm text-foreground">
                     Sensor #{unit.id}
-                  </p>
-                  <p
-                    className={`text-xs ${
-                      unit.status === 'active'
-                        ? 'text-emerald-400'
-                        : 'text-rose-400'
-                    }`}
-                  >
-                    {unit.status === 'active' ? 'active' : 'inactive'}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     Last heartbeat: {toLastHeartbeat(unit.lastSeenAt)}
@@ -398,14 +398,25 @@ export function MonitorMap({
                           className="rounded border border-border bg-card-elevated/60 px-2 py-1"
                         >
                           <p className="font-body text-xs text-foreground">
-                            {link.direction}{' '}
-                            {link.direction === 'OUT'
-                              ? `${unit.id} -> ${link.peerId}`
-                              : `${link.peerId} -> ${unit.id}`}
+                            Link {link.side1} {'->'} {link.side2}
                           </p>
-                          <p className="font-body text-[11px] text-muted-foreground">
-                            {link.rssi}dBm • th:{link.threshold} • dt:{link.dt}
-                          </p>
+                          <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
+                            <p className="font-body text-[11px] text-muted-foreground">
+                              Direction: {link.direction}
+                            </p>
+                            <p className="font-body text-[11px] text-muted-foreground">
+                              RSSI: {link.rssi}dBm
+                            </p>
+                            <p className="font-body text-[11px] text-muted-foreground">
+                              Threshold: {link.threshold}
+                            </p>
+                            <p className="font-body text-[11px] text-muted-foreground">
+                              DT: {link.dt}
+                            </p>
+                            <p className="font-body text-[11px] text-muted-foreground">
+                              Updated at: {link.updatedAt}
+                            </p>
+                          </div>
                         </div>
                       ))
                     )}

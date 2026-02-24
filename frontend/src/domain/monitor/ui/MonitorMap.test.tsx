@@ -644,7 +644,7 @@ describe('MonitorMap', () => {
     expect(polylineSegments[0]?.pathOptions?.dashArray).toBe('6 6');
   });
 
-  test('shows cmd status and last heartbeat in sensor popup', () => {
+  test('shows status header, heartbeat, and full raw details for each sensor link in popup', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_012_000 * 1000);
 
     render(
@@ -680,13 +680,23 @@ describe('MonitorMap', () => {
       />,
     );
 
-    expect(screen.getByText('CMD STATUS')).not.toBeNull();
+    expect(screen.getByText('STATUS')).not.toBeNull();
     expect(screen.getByText('Sensor #1')).not.toBeNull();
-    expect(screen.getByText('active')).not.toBeNull();
-    expect(screen.getByText('CMD STATUS').getAttribute('title')).toBeNull();
+    expect(screen.queryByText('active')).toBeNull();
+    expect(screen.queryByText('inactive')).toBeNull();
+    expect(screen.getByText('STATUS').getAttribute('title')).toBeNull();
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
-    expect(screen.getByText('OUT 1 -> 2')).not.toBeNull();
-    expect(screen.getByText(/-57dBm • th:500 • dt:180/)).not.toBeNull();
+    expect(screen.getByText('Link 1 -> 2')).not.toBeNull();
+    expect(screen.getByText('Direction: OUT')).not.toBeNull();
+    expect(screen.getByText('RSSI: -57dBm')).not.toBeNull();
+    expect(screen.getByText('Threshold: 500')).not.toBeNull();
+    expect(screen.getByText('DT: 180')).not.toBeNull();
+    expect(screen.getByText('Updated at: 1')).not.toBeNull();
+    expect(
+      screen
+        .getByText('Direction: OUT')
+        .parentElement?.className.includes('grid grid-cols-2'),
+    ).toBe(true);
   });
 
   test('uses conservative offline zoom defaults before manifest resolves', () => {
