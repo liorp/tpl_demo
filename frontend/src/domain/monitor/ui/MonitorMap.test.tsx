@@ -725,6 +725,65 @@ describe('MonitorMap', () => {
     expect(polylineSegments[0]?.pathOptions?.dashArray).toBeUndefined();
   });
 
+  test('drawn pairing ellipse keeps paired units as focal points', () => {
+    const side1 = { lat: 33.2, lng: 35.7 };
+    const side2 = { lat: 33.28, lng: 35.86 };
+
+    render(
+      <MonitorMap
+        units={[
+          {
+            id: 1,
+            label: 'Sensor 1',
+            lat: side1.lat,
+            lng: side1.lng,
+            status: 'active',
+          },
+          {
+            id: 2,
+            label: 'Sensor 2',
+            lat: side2.lat,
+            lng: side2.lng,
+            status: 'active',
+          },
+        ]}
+        pairings={[{ side1Id: 1, side2Id: 2, enabled: true }]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    const ellipse = polylineSegments[0]?.positions ?? [];
+    expect(ellipse.length).toBeGreaterThan(10);
+
+    const midpointLat = (side1.lat + side2.lat) / 2;
+    const midpointLng = (side1.lng + side2.lng) / 2;
+    const cosLat = Math.max(Math.cos((midpointLat * Math.PI) / 180), 0.00001);
+
+    const toLocal = (lat: number, lng: number) => ({
+      x: (lng - midpointLng) * cosLat,
+      y: lat - midpointLat,
+    });
+    const focus1 = toLocal(side1.lat, side1.lng);
+    const focus2 = toLocal(side2.lat, side2.lng);
+    const focalSums = ellipse.map(([lat, lng]) => {
+      const point = toLocal(lat, lng);
+      const d1 = Math.hypot(point.x - focus1.x, point.y - focus1.y);
+      const d2 = Math.hypot(point.x - focus2.x, point.y - focus2.y);
+      return d1 + d2;
+    });
+
+    const minSum = Math.min(...focalSums);
+    const maxSum = Math.max(...focalSums);
+    expect(maxSum - minSum).toBeLessThan(0.0005);
+  });
+
   test('shows status header, heartbeat, and full raw details for each sensor link in popup', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_012_000 * 1000);
 
@@ -768,6 +827,12 @@ describe('MonitorMap', () => {
     expect(screen.getByText('STATUS').getAttribute('title')).toBeNull();
     expect(screen.getByText('STATUS').parentElement?.className).toContain(
       'p-4',
+    );
+    expect(screen.getByText('STATUS').parentElement?.className).toContain(
+      'w-full',
+    );
+    expect(screen.getByText('STATUS').parentElement?.className).not.toContain(
+      'w-[22rem]',
     );
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
     expect(screen.getByText('Link 1 -> 2')).not.toBeNull();

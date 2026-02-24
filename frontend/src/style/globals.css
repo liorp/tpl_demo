@@ -211,10 +211,14 @@
 @layer components {
   .leaflet-popup.sensor-popup .leaflet-popup-content-wrapper {
     @apply rounded-md border border-border-bright bg-card text-foreground shadow-lg;
+    padding: 0;
   }
 
   .leaflet-popup.sensor-popup .leaflet-popup-content {
-    @apply m-0;
+    /* biome-ignore lint/complexity/noImportantStyles: Leaflet injects inline popup width and default asymmetric margins. */
+    margin: 0 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Keep popup content width aligned with the custom card container. */
+    width: min(22rem, 90vw) !important;
   }
 
   .leaflet-popup.sensor-popup .leaflet-popup-tip {

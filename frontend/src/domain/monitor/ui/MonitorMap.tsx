@@ -276,8 +276,17 @@ function toPairingEllipsePositions(
   const baseDistance = Math.max(Math.hypot(dx, dy), 0.001);
   const angle = Math.atan2(dy, dx);
 
-  const semiMajorAxis = baseDistance * 0.65;
-  const semiMinorAxis = Math.max(baseDistance * 0.28, 0.0015);
+  const focalDistance = baseDistance / 2;
+  const semiMajorAxis = Math.max(baseDistance * 0.72, focalDistance + 0.0008);
+  const semiMinorAxis = Math.max(
+    Math.sqrt(
+      Math.max(
+        semiMajorAxis * semiMajorAxis - focalDistance * focalDistance,
+        0,
+      ),
+    ),
+    0.0015,
+  );
   const segments = 36;
 
   const ellipse: [number, number][] = [];
@@ -483,8 +492,8 @@ export function MonitorMap({
                 },
               }}
             >
-              <Popup className="sensor-popup">
-                <div className="w-[22rem] max-w-[90vw] rounded-md border border-border-bright bg-card p-4 font-body text-xs">
+              <Popup className="sensor-popup" maxWidth={360}>
+                <div className="w-full rounded-md border border-border-bright bg-card p-4 font-body text-xs">
                   <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
                     STATUS
                   </p>
