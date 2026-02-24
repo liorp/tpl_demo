@@ -116,6 +116,10 @@ class SerialManager:
                     time.sleep(0.5)
                     self.send_serial("re 3 4")
                     time.sleep(0.5)
+                    self.send_serial("/")
+                    time.sleep(0.5)
+                    self.send_serial("mpedT")
+                    time.sleep(0.5)
                     self.send_serial("map")
 
                     buffer = ""

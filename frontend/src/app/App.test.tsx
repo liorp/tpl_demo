@@ -41,7 +41,7 @@ const state: MonitorState = {
       acknowledged: false,
     },
   ],
-  config: { threshold: null, val: null },
+  config: { threshold: null, gain: null },
   globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
   units: [
     {

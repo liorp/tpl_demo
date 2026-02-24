@@ -43,7 +43,7 @@ def test_snapshot_includes_command_map_defaults():
     assert isinstance(current["events"], list)
     assert current["links"] == []
     assert current["crossing_alert"] is None
-    assert current["config"] == {"threshold": None, "val": None}
+    assert current["config"] == {"threshold": None, "gain": None}
     assert current["units"] == []
     assert current["sensor_status"] == {}
     assert current["map_policy"] == {
@@ -107,7 +107,7 @@ def test_handle_detection_updates_crossing_and_config():
     assert state.crossing_alert is not None
     assert state.crossing_alert["sensor_a"] == 1
     assert state.crossing_alert["sensor_b"] == 2
-    assert state.config == {"threshold": 500, "val": 549}
+    assert state.config["threshold"] == 500
 
 
 def test_handle_map_event_updates_links():
@@ -162,7 +162,7 @@ def test_handle_config_event_updates_config_values():
     )
 
     assert changed is True
-    assert state.config == {"threshold": 777, "val": 799}
+    assert state.config == {"threshold": 777, "gain": 799}
 
 
 def test_handle_connected_and_map_update_sensor_status_graph(monkeypatch):

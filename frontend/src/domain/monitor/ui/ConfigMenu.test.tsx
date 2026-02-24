@@ -13,7 +13,7 @@ describe('ConfigMenu', () => {
   test('opens settings modal and pre-populates known values', () => {
     render(
       <ConfigMenu
-        config={{ threshold: 640, val: 777 }}
+        config={{ threshold: 640, gain: 64 }}
         alarmSoundEnabled
         offlineModeEnabled
         onApply={vi.fn()}
@@ -26,10 +26,10 @@ describe('ConfigMenu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
 
     const threshold = screen.getByLabelText('Threshold') as HTMLInputElement;
-    const val = screen.getByLabelText('Val') as HTMLInputElement;
+    const gain = screen.getByLabelText('Gain') as HTMLInputElement;
 
     expect(threshold.value).toBe('640');
-    expect(val.value).toBe('777');
+    expect(gain.value).toBe('64');
   });
 
   test('falls back to default values and applies changes', () => {
@@ -37,7 +37,7 @@ describe('ConfigMenu', () => {
 
     render(
       <ConfigMenu
-        config={{ threshold: null, val: null }}
+        config={{ threshold: null, gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
         onApply={onApply}
@@ -50,16 +50,16 @@ describe('ConfigMenu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
 
     const threshold = screen.getByLabelText('Threshold') as HTMLInputElement;
-    const val = screen.getByLabelText('Val') as HTMLInputElement;
+    const gain = screen.getByLabelText('Gain') as HTMLInputElement;
 
     expect(threshold.value).toBe('500');
-    expect(val.value).toBe('549');
+    expect(gain.value).toBe('64');
 
     fireEvent.change(threshold, { target: { value: '600' } });
-    fireEvent.change(val, { target: { value: '650' } });
+    fireEvent.change(gain, { target: { value: '32' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
-    expect(onApply).toHaveBeenCalledWith({ threshold: 600, val: 650 });
+    expect(onApply).toHaveBeenCalledWith({ threshold: 600, gain: 32 });
   });
 
   test('resets all from settings', () => {
@@ -67,7 +67,7 @@ describe('ConfigMenu', () => {
 
     render(
       <ConfigMenu
-        config={{ threshold: null, val: null }}
+        config={{ threshold: null, gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
         onApply={vi.fn()}
@@ -88,7 +88,7 @@ describe('ConfigMenu', () => {
 
     render(
       <ConfigMenu
-        config={{ threshold: null, val: null }}
+        config={{ threshold: null, gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
         onApply={vi.fn()}
@@ -109,7 +109,7 @@ describe('ConfigMenu', () => {
 
     render(
       <ConfigMenu
-        config={{ threshold: null, val: null }}
+        config={{ threshold: null, gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
         onApply={vi.fn()}

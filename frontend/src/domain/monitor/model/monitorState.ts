@@ -207,7 +207,7 @@ export function createInitialServerState(): ServerState {
     alarm: 'disconnected',
     events: [],
     links: [],
-    config: { threshold: null, val: null },
+    config: { threshold: null, gain: null },
     sensorStatus: {},
     mapPolicy: toDefaultMapPolicy(),
   };

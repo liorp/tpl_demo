@@ -166,7 +166,6 @@ def handle_event(state: SensorState, event: Event) -> bool:
             acknowledged=False,
         )
         state.config["threshold"] = event["threshold"]
-        state.config["val"] = event["value"]
         state.add_log(
             f"DETECTION {event['id_a']}({event['unit_a']})-{event['id_b']}({event['unit_b']}) "
             f"th={event['threshold']} val={event['value']}"
@@ -219,6 +218,7 @@ def handle_event(state: SensorState, event: Event) -> bool:
         _refresh_sensor_status_from_map(
             state, unit_id=event["unit_id"], last_seen=_event_last_seen()
         )
+        state.config["gain"] = event["gain"]
         state.add_log(
             f"MAP from {event['unit_id']} ver={event['version']}"
             f" gain={event['gain']} v={event['voltage']}"
@@ -226,8 +226,8 @@ def handle_event(state: SensorState, event: Event) -> bool:
         return True
     if etype == "config":
         state.config["threshold"] = event["threshold"]
-        state.config["val"] = event["value"]
-        state.add_log(f"CONFIG threshold={event['threshold']} val={event['value']}")
+        state.config["gain"] = event["value"]
+        state.add_log(f"CONFIG threshold={event['threshold']} gain={event['value']}")
         return True
     return False
 

@@ -45,7 +45,7 @@ export type CrossingAckWindow = {
 
 export type MonitorConfig = {
   threshold: number | null;
-  val: number | null;
+  gain: number | null;
 };
 
 export type GlobalSettings = {

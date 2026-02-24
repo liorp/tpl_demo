@@ -19,14 +19,14 @@ type Props = {
   config: MonitorConfig;
   alarmSoundEnabled: boolean;
   offlineModeEnabled: boolean;
-  onApply: (next: { threshold: number; val: number }) => void;
+  onApply: (next: { threshold: number; gain: number }) => void;
   onAlarmSoundEnabledChange: (enabled: boolean) => void;
   onOfflineModeEnabledChange: (enabled: boolean) => void;
   onResetAll: () => void;
 };
 
 const DEFAULT_THRESHOLD = 500;
-const DEFAULT_VAL = 549;
+const DEFAULT_GAIN = 64;
 
 function toKnownValue(value: number | null, fallback: number): string {
   return value !== null ? String(value) : String(fallback);
@@ -45,23 +45,23 @@ export function ConfigMenu({
   const [threshold, setThreshold] = useState(
     toKnownValue(config.threshold, DEFAULT_THRESHOLD),
   );
-  const [val, setVal] = useState(toKnownValue(config.val, DEFAULT_VAL));
+  const [gain, setGain] = useState(toKnownValue(config.gain, DEFAULT_GAIN));
 
   useEffect(() => {
     if (open) {
       return;
     }
     setThreshold(toKnownValue(config.threshold, DEFAULT_THRESHOLD));
-    setVal(toKnownValue(config.val, DEFAULT_VAL));
-  }, [config.threshold, config.val, open]);
+    setGain(toKnownValue(config.gain, DEFAULT_GAIN));
+  }, [config.threshold, config.gain, open]);
 
   const thresholdNum = Number(threshold);
-  const valNum = Number(val);
+  const gainNum = Number(gain);
   const valid =
     Number.isFinite(thresholdNum) &&
-    Number.isFinite(valNum) &&
+    Number.isFinite(gainNum) &&
     threshold.trim() !== '' &&
-    val.trim() !== '';
+    gain.trim() !== '';
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -96,7 +96,7 @@ export function ConfigMenu({
             Settings
           </DialogTitle>
           <DialogDescription>
-            Configure detection threshold and validation parameters.
+            Configure detection threshold and gain parameters.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
@@ -116,15 +116,15 @@ export function ConfigMenu({
           </div>
           <div className="grid gap-2">
             <Label
-              htmlFor="val"
+              htmlFor="gain"
               className="font-display text-xs tracking-wide text-muted-foreground"
             >
-              Val
+              Gain
             </Label>
             <Input
-              id="val"
-              value={val}
-              onChange={(event) => setVal(event.target.value)}
+              id="gain"
+              value={gain}
+              onChange={(event) => setGain(event.target.value)}
               className="bg-background font-mono tabular-nums"
             />
           </div>
@@ -189,7 +189,7 @@ export function ConfigMenu({
             </Button>
             <Button
               onClick={() => {
-                onApply({ threshold: thresholdNum, val: valNum });
+                onApply({ threshold: thresholdNum, gain: gainNum });
                 setOpen(false);
               }}
               disabled={!valid}

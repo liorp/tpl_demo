@@ -100,7 +100,7 @@ class CrossingAlert(TypedDict):
 
 class SensorConfig(TypedDict):
     threshold: int | None
-    val: int | None
+    gain: int | None
 
 
 class UnitPosition(TypedDict):
@@ -125,7 +125,7 @@ class SensorState:
         self.max_logs = 50
         self.links: list[SideLink] = []
         self.crossing_alert: CrossingAlert | None = None
-        self.config: SensorConfig = {"threshold": None, "val": None}
+        self.config: SensorConfig = {"threshold": None, "gain": None}
         self.units: list[UnitPosition] = []
         self.sensor_status: dict[str, SensorStatusEntry] = {}
         self.map_policy: MapPolicy = dict(DEFAULT_MAP_POLICY)

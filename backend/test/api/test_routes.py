@@ -58,7 +58,7 @@ def _build_app(
             "events": [],
             "links": [],
             "crossing_alert": None,
-            "config": {"threshold": None, "val": None},
+            "config": {"threshold": None, "gain": None},
             "units": [],
             "map_policy": dict(state.map_policy),
             "sensor_status": {},
@@ -84,11 +84,11 @@ def test_websocket_routes_command_messages(tmp_path: Path):
     with client.websocket_connect("/ws") as ws:
         _ = ws.receive_json()
         ws.send_text('{"cmd":"set_threshold","value":500}')
-        ws.send_text('{"cmd":"set_val","value":549}')
+        ws.send_text('{"cmd":"set_gain","value":64}')
         ws.send_text('{"cmd":"map"}')
         ws.send_text('{"cmd":"unsupported"}')
 
-    assert sent_cmds == ["set th 500", "set val 549", "map"]
+    assert sent_cmds == ["threshold 500", "gain 64", "map"]
 
 
 def test_serves_favicon_without_404(tmp_path: Path):

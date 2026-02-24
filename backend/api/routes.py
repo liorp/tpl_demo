@@ -30,12 +30,12 @@ def _build_serial_command(payload: dict[str, Any]) -> str | None:
     if cmd == "set_threshold":
         value = payload.get("value")
         if isinstance(value, int):
-            return f"set th {value}"
+            return f"threshold {value}"
         return None
-    if cmd == "set_val":
+    if cmd == "set_gain":
         value = payload.get("value")
         if isinstance(value, int):
-            return f"set val {value}"
+            return f"gain {value}"
         return None
     if cmd == "map":
         return "map"

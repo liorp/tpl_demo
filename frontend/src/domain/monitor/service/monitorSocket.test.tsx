@@ -225,7 +225,7 @@ describe('monitor socket lifecycle', () => {
       ],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
       units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
       sensor_status: {
         '7': { last_seen: 100, connected_peers: [8] },
@@ -282,7 +282,7 @@ describe('monitor socket lifecycle', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
       units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
       sensor_status: {
         '7': { last_seen: 100, connected_peers: [8] },
@@ -330,7 +330,7 @@ describe('monitor socket lifecycle', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
       units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
       sensor_status: {
         '7': { last_seen: 101, connected_peers: [8] },
@@ -381,7 +381,7 @@ describe('monitor socket lifecycle', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
       units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
       sensor_status: {
         '7': { last_seen: 100, connected_peers: [8] },
@@ -420,7 +420,7 @@ describe('monitor socket lifecycle', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
       units: [{ id: 7, label: 'S7', lat: 33.4, lng: 35.85 }],
       sensor_status: {
         '7': { last_seen: 102, connected_peers: [8] },
@@ -457,7 +457,7 @@ describe('monitor socket lifecycle', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
       units: [{ id: 7, label: 'S7', lat: 33.4, lng: 35.85 }],
       sensor_status: {
         '7': { last_seen: 103, connected_peers: [8] },

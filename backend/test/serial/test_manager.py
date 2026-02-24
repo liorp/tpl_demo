@@ -70,13 +70,13 @@ def test_queues_commands_until_connection_is_open(monkeypatch):
             writes.append(data.decode())
 
     manager = SerialManager(forced_port="")
-    manager.send_serial("set th 500")
-    manager.send_serial("set val 549")
+    manager.send_serial("threshold 500")
+    manager.send_serial("gain 64")
 
     monkeypatch.setattr("backend.serial.manager.serial.Serial", FakeSerial)
     manager._connect("/dev/cu.usbmodem1101")
 
-    assert writes == ["set th 500\r", "set val 549\r"]
+    assert writes == ["threshold 500\r", "gain 64\r"]
 
 
 def test_disconnects_immediately_when_port_disappears_during_idle(monkeypatch):
@@ -264,7 +264,7 @@ def test_sends_map_heartbeat_even_when_data_flows_continuously(monkeypatch):
 
     manager.serial_reader_loop(sink=sink, stop_event=stop)
 
-    # The initial setup sends: /, cmd, re 3 4, map
+    # The initial setup sends: /, cmd, re 3 4, /, mpedT, map
     # After heartbeat interval elapses during data flow, another "map" should be sent
     map_commands = [cmd for cmd in written_commands if cmd.strip() == "map\r" or cmd == "map\r"]
     assert len(map_commands) >= 2, (

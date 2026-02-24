@@ -32,7 +32,7 @@ describe('monitor state model', () => {
       events: [{ time: '20:00:00', msg: 'DETECTION x' }],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
     });
 
     expect(state.connected).toBe(true);
@@ -49,7 +49,7 @@ describe('monitor state model', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
       units: [
         { id: 7, label: 'S7', lat: 33.31, lng: 35.78 },
         { id: 8, label: 'S8', lat: 33.32, lng: 35.79 },
@@ -112,7 +112,7 @@ describe('monitor state model', () => {
         lng: null,
         acknowledged: false,
       } as unknown as never,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
     });
 
     expect(state.crossingAlerts).toEqual([
@@ -142,7 +142,7 @@ describe('monitor state model', () => {
         lng: null,
         acknowledged: false,
       } as unknown as never,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
     });
 
     expect(state.crossingAlerts).toEqual([
@@ -165,7 +165,7 @@ describe('monitor state model', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
     });
 
     expect(state.units).toEqual([]);
@@ -357,7 +357,7 @@ describe('monitor state model', () => {
         { side1: 11, side2: 12, quality: 95, intensity: 23, updatedAt: 1 },
       ],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
     };
 
     const nextUnits = mergeTelemetryUnits([], payload);
@@ -376,7 +376,7 @@ describe('monitor state model', () => {
       ],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
     };
 
     const [unit] = mergeTelemetryUnits([], payload);
@@ -410,7 +410,7 @@ describe('monitor state model', () => {
       ],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
     };
 
     const next = mergeTelemetryUnits(previous, payload);
@@ -437,7 +437,7 @@ describe('monitor state model', () => {
       ],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, val: null },
+      config: { threshold: null, gain: null },
     };
 
     const next = mergeTelemetryUnits([], payload, 1_700_000_120);
