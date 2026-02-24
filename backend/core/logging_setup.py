@@ -1,6 +1,23 @@
+import json
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict[str, object] = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        raw_event = getattr(record, "raw_event", None)
+        if raw_event is not None:
+            payload["raw_event"] = raw_event
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
 
 
 def configure_logging(
@@ -15,7 +32,7 @@ def configure_logging(
     logger.setLevel(level)
     logger.propagate = False
 
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s %(message)s")
+    formatter = JsonFormatter()
 
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)

@@ -14,5 +14,8 @@ def log_event(
     log_method = getattr(logger, level, None)
     if not callable(log_method):
         log_method = logger.info
-    cast_method: Callable[[str], None] = log_method
-    cast_method(message)
+    cast_method: Callable[..., None] = log_method
+    kwargs: dict[str, object] = {}
+    if fields:
+        kwargs["extra"] = {"raw_event": fields}
+    cast_method(message, **kwargs)

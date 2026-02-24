@@ -1,3 +1,5 @@
+import json
+
 from backend.core.logging_setup import configure_logging
 
 
@@ -40,3 +42,26 @@ def test_configure_logging_is_idempotent(tmp_path):
 
     assert logger1 is logger2
     assert second_handler_count == first_handler_count
+
+
+def test_configure_logging_formats_records_as_json_with_raw_event(tmp_path):
+    log_file = tmp_path / 'app.log'
+
+    logger = configure_logging(
+        name='tpl-signum-test-json',
+        level='INFO',
+        log_file=str(log_file),
+        max_bytes=1024,
+        backup_count=2,
+    )
+
+    raw_event = {'type': 'config', 'threshold': 123, 'value': 9}
+    logger.info('CONFIG threshold=123 gain=9', extra={'raw_event': raw_event})
+
+    lines = log_file.read_text(encoding='utf-8').splitlines()
+    payload = json.loads(lines[-1])
+
+    assert payload['message'] == 'CONFIG threshold=123 gain=9'
+    assert payload['logger'] == 'tpl-signum-test-json'
+    assert payload['level'] == 'INFO'
+    assert payload['raw_event'] == raw_event
