@@ -59,6 +59,26 @@ def test_ignores_non_usb_ports_when_no_usb_candidates_exist(monkeypatch):
     assert list_serial_ports("") == []
 
 
+def test_queues_commands_until_connection_is_open(monkeypatch):
+    writes: list[str] = []
+
+    class FakeSerial:
+        def __init__(self, *args, **kwargs):
+            self.is_open = True
+
+        def write(self, data):
+            writes.append(data.decode())
+
+    manager = SerialManager(forced_port="")
+    manager.send_serial("set th 500")
+    manager.send_serial("set val 549")
+
+    monkeypatch.setattr("backend.serial.manager.serial.Serial", FakeSerial)
+    manager._connect("/dev/cu.usbmodem1101")
+
+    assert writes == ["set th 500\r", "set val 549\r"]
+
+
 def test_disconnects_immediately_when_port_disappears_during_idle(monkeypatch):
     port = "/dev/cu.usbmodem1101"
 

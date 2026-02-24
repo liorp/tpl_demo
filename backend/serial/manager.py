@@ -50,11 +50,14 @@ class SerialManager:
         self.forced_port = forced_port
         self._serial_lock = threading.Lock()
         self._serial_conn: serial.Serial | None = None
+        self._pending_commands: list[str] = []
 
     def send_serial(self, cmd: str):
         with self._serial_lock:
             if self._serial_conn and self._serial_conn.is_open:
                 self._serial_conn.write((cmd + "\r").encode())
+            else:
+                self._pending_commands.append(cmd)
 
     def close_connection(self):
         with self._serial_lock:
@@ -76,6 +79,9 @@ class SerialManager:
         )
         with self._serial_lock:
             self._serial_conn = ser
+            while self._pending_commands:
+                pending_cmd = self._pending_commands.pop(0)
+                ser.write((pending_cmd + "\r").encode())
         return ser
 
     def _is_port_available(self, port: str) -> bool:
