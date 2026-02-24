@@ -109,11 +109,19 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
 vi.mock('../domain/monitor/ui/MonitorMap', () => ({
   MonitorMap: ({
     units,
+    links,
     onSelectUnit,
     onMoveUnit,
     focusPoint,
   }: {
     units: { id: number; label: string; status?: string }[];
+    links: Array<{
+      side1: number;
+      side2: number;
+      quality: number;
+      intensity: number;
+      updatedAt: number;
+    }>;
     onSelectUnit: (unitId: number) => void;
     onMoveUnit: (unitId: number, lat: number, lng: number) => void;
     focusPoint: { lat: number; lng: number } | null;
@@ -123,7 +131,7 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
       data-focus-lat={focusPoint ? focusPoint.lat : ''}
       data-focus-lng={focusPoint ? focusPoint.lng : ''}
     >
-      {monitorMapMock({ focusPoint, units })}
+      {monitorMapMock({ focusPoint, units, links })}
       {units.map((unit) => (
         <div key={unit.id}>
           <button type="button" onClick={() => onSelectUnit(unit.id)}>
@@ -221,38 +229,25 @@ describe('App', () => {
     );
   });
 
-  test('shows command status panel for selected sensor from map click', () => {
+  test('passes signal links to map for sensor tooltip cmd status', () => {
     renderApp();
 
-    const map = screen.getByTestId('monitor-map');
-    fireEvent.click(
-      within(map).getByRole('button', { name: 'Select Sensor 1' }),
+    expect(monitorMapMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        links: state.links,
+      }),
     );
-
-    expect(screen.getByText('CMD STATUS')).not.toBeNull();
-    expect(screen.getByText('Sensor #1')).not.toBeNull();
-    expect(screen.getByText('active')).not.toBeNull();
-    expect(screen.getByText('OUT 1 -> 2')).not.toBeNull();
-    expect(screen.getByText('Q90 • I70')).not.toBeNull();
   });
 
-  test('updates command status panel when selected sensor changes', () => {
+  test('does not render floating cmd status panel after sensor selection', () => {
     renderApp();
 
     const map = screen.getByTestId('monitor-map');
     fireEvent.click(
       within(map).getByRole('button', { name: 'Select Sensor 1' }),
     );
-    expect(screen.getByText('Sensor #1')).not.toBeNull();
-    expect(screen.getByText('active')).not.toBeNull();
 
-    fireEvent.click(
-      within(map).getByRole('button', { name: 'Select Sensor 2' }),
-    );
-    expect(screen.getByText('Sensor #2')).not.toBeNull();
-    expect(screen.getByText('inactive')).not.toBeNull();
-    expect(screen.getByText('IN 1 -> 2')).not.toBeNull();
-    expect(screen.queryByText('OUT 1 -> 2')).toBeNull();
+    expect(screen.queryByText('CMD STATUS')).toBeNull();
   });
 
   test('focuses map from crossing alert and keeps acknowledge action', () => {

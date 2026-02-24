@@ -8,14 +8,12 @@ import {
   toLeafletBounds,
   toUnixSeconds,
 } from '../domain/monitor/model/mapViewport';
-import { getSelectedSensorLinks } from '../domain/monitor/model/monitorState';
 import type { CrossingAlert, MapPolicy } from '../domain/monitor/model/types';
 import {
   startAlarmSound,
   stopAlarmSound,
 } from '../domain/monitor/service/alarmSound';
 import { useMonitorSocket } from '../domain/monitor/service/monitorSocket';
-import { CommandStatusPanel } from '../domain/monitor/ui/CommandStatusPanel';
 import { ConfigMenu } from '../domain/monitor/ui/ConfigMenu';
 import { ConnectionIndicator } from '../domain/monitor/ui/ConnectionIndicator';
 import { CrossingAlertBanner } from '../domain/monitor/ui/CrossingAlertBanner';
@@ -36,7 +34,6 @@ export function App() {
     placeUnit,
     setUnitPairing,
   } = useMonitorSocket();
-  const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const [focusedAlertPoint, setFocusedAlertPoint] = useState<{
     lat: number;
     lng: number;
@@ -87,31 +84,6 @@ export function App() {
       ISRAEL_MAP_BOUNDS,
     [mapPolicy.bounds, mapPolicy.bufferKm],
   );
-  const selectedSensorStatus = useMemo(
-    () =>
-      selectedUnitId === null
-        ? null
-        : (state.sensorStatus[String(selectedUnitId)] ?? null),
-    [selectedUnitId, state.sensorStatus],
-  );
-  const selectedSensorLinks = useMemo(
-    () =>
-      getSelectedSensorLinks(selectedUnitId, state.sensorStatus, state.links),
-    [selectedUnitId, state.sensorStatus, state.links],
-  );
-
-  useEffect(() => {
-    if (selectedUnitId === null) {
-      return;
-    }
-    const selectedUnitExists = visibleUnits.some(
-      (unit) => unit.id === selectedUnitId,
-    );
-    if (selectedUnitExists) {
-      return;
-    }
-    setSelectedUnitId(visibleUnits[0]?.id ?? null);
-  }, [visibleUnits, selectedUnitId]);
 
   useEffect(() => {
     if (
@@ -135,7 +107,6 @@ export function App() {
         lat,
         lng,
       });
-      setSelectedUnitId(unitId);
     },
     [visibleUnits, placeUnit],
   );
@@ -187,19 +158,10 @@ export function App() {
               </Button>
             </div>
           </div>
-          {selectedUnitId !== null && selectedSensorStatus ? (
-            <div className="pointer-events-none absolute right-4 top-4 z-[1200]">
-              <div className="pointer-events-auto">
-                <CommandStatusPanel
-                  sensorId={selectedUnitId}
-                  active={selectedSensorStatus.active}
-                  links={selectedSensorLinks}
-                />
-              </div>
-            </div>
-          ) : null}
           <MonitorMap
             units={visibleUnits}
+            pairings={state.pairings}
+            links={state.links}
             crossingAlerts={state.crossingAlerts}
             focusPoint={focusedAlertPoint}
             tileRoot={mapPolicy.tileRoot}
@@ -207,7 +169,7 @@ export function App() {
             offlineModeEnabled={state.globalSettings.offlineModeEnabled}
             mapBounds={mapBounds}
             onMoveUnit={handleMoveUnit}
-            onSelectUnit={setSelectedUnitId}
+            onSelectUnit={() => {}}
           />
         </div>
       </ErrorBoundary>

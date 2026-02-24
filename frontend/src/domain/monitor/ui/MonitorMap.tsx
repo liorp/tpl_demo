@@ -1,16 +1,33 @@
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { divIcon } from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import {
+  MapContainer,
+  Marker,
+  Polyline,
+  Popup,
+  TileLayer,
+  useMap,
+} from 'react-leaflet';
 
 import { getUnitBounds, ISRAEL_MAP_BOUNDS } from '../model/mapViewport';
-import type { CrossingAlert, UnitPlacement } from '../model/types';
+import type {
+  CrossingAlert,
+  PairLink,
+  SignalLinkState,
+  UnitPlacement,
+} from '../model/types';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
 const ONLINE_TILE_NATIVE_MAX_ZOOM = 19;
 const OFFLINE_DEFAULT_NATIVE_MAX_ZOOM = 14;
+dayjs.extend(relativeTime);
 
 type Props = {
   units: UnitPlacement[];
+  pairings?: PairLink[];
+  links?: SignalLinkState[];
   crossingAlerts: CrossingAlert[];
   focusPoint: { lat: number; lng: number } | null;
   tileRoot: string | null;
@@ -19,6 +36,13 @@ type Props = {
   mapBounds: [[number, number], [number, number]] | null;
   onMoveUnit: (unitId: number, lat: number, lng: number) => void;
   onSelectUnit: (unitId: number) => void;
+};
+
+type CommandPeerLink = {
+  peerId: number;
+  direction: 'IN' | 'OUT';
+  quality: number | null;
+  intensity: number | null;
 };
 
 function MapFocusController({
@@ -108,8 +132,47 @@ function alertPinIcon(label: string) {
   });
 }
 
+function toMetric(value: number | null): string {
+  return value === null ? '--' : String(Math.round(value));
+}
+
+function toLastHeartbeat(lastSeenAt: number | undefined): string {
+  if (typeof lastSeenAt !== 'number') {
+    return '--';
+  }
+  return dayjs.unix(lastSeenAt).fromNow();
+}
+
+function getSensorLinks(
+  sensorId: number,
+  links: SignalLinkState[],
+): CommandPeerLink[] {
+  const peers: CommandPeerLink[] = [];
+  for (const link of links) {
+    if (link.side1 === sensorId) {
+      peers.push({
+        peerId: link.side2,
+        direction: 'OUT',
+        quality: link.quality,
+        intensity: link.intensity,
+      });
+    }
+    if (link.side2 === sensorId) {
+      peers.push({
+        peerId: link.side1,
+        direction: 'IN',
+        quality: link.quality,
+        intensity: link.intensity,
+      });
+    }
+  }
+  return peers.sort((a, b) => a.peerId - b.peerId);
+}
+
 export function MonitorMap({
   units,
+  pairings = [],
+  links = [],
   crossingAlerts,
   focusPoint,
   tileRoot,
@@ -135,6 +198,26 @@ export function MonitorMap({
       .flatMap((alert) => [alert.sensorA, alert.sensorB]),
   );
   const tileUrl = toTileUrl(tileRoot, useOfflineTiles);
+  const unitsById = new Map(units.map((unit) => [unit.id, unit] as const));
+  const pairingLines = pairings.flatMap((pair) => {
+    if (!pair.enabled) {
+      return [];
+    }
+    const side1 = unitsById.get(pair.side1Id);
+    const side2 = unitsById.get(pair.side2Id);
+    if (!side1 || !side2) {
+      return [];
+    }
+    return [
+      {
+        key: `${pair.side1Id}-${pair.side2Id}`,
+        positions: [
+          [side1.lat, side1.lng] as [number, number],
+          [side2.lat, side2.lng] as [number, number],
+        ],
+      },
+    ];
+  });
   const minZoom = offlineZoomRange ? offlineZoomRange.minZoom : 7;
   const maxNativeZoom = offlineZoomRange
     ? offlineZoomRange.maxZoom
@@ -223,35 +306,90 @@ export function MonitorMap({
         ) : null}
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
-        {units.map((unit) => (
-          <Marker
-            key={unit.id}
-            position={[unit.lat, unit.lng]}
-            draggable={true}
-            icon={
-              alertingSensorIds.has(unit.id)
-                ? alertPinIcon(unit.label)
-                : unit.status === 'stale'
-                  ? stalePinIcon(unit.label)
-                  : unitPinIcon(unit.label)
-            }
-            eventHandlers={{
-              click: () => onSelectUnit(unit.id),
-              dragend: (event) => {
-                const next = event.target.getLatLng();
-                onMoveUnit(unit.id, next.lat, next.lng);
-              },
+        {pairingLines.map((line) => (
+          <Polyline
+            key={line.key}
+            positions={line.positions}
+            pathOptions={{
+              color: '#67e8f9',
+              dashArray: '6 6',
+              weight: 2,
+              opacity: 0.85,
             }}
-          >
-            <Popup>
-              <div className="font-body text-xs">
-                <strong className="font-display">{unit.label}</strong>
-                <br />
-                <span className="text-muted-foreground">Sensor #{unit.id}</span>
-              </div>
-            </Popup>
-          </Marker>
+          />
         ))}
+        {units.map((unit) => {
+          const sensorLinks = getSensorLinks(unit.id, links);
+          return (
+            <Marker
+              key={unit.id}
+              position={[unit.lat, unit.lng]}
+              draggable={true}
+              icon={
+                alertingSensorIds.has(unit.id)
+                  ? alertPinIcon(unit.label)
+                  : unit.status === 'stale'
+                    ? stalePinIcon(unit.label)
+                    : unitPinIcon(unit.label)
+              }
+              eventHandlers={{
+                click: () => onSelectUnit(unit.id),
+                dragend: (event) => {
+                  const next = event.target.getLatLng();
+                  onMoveUnit(unit.id, next.lat, next.lng);
+                },
+              }}
+            >
+              <Popup>
+                <div className="w-56 rounded-md border border-border-bright bg-card/90 p-3 font-body text-xs backdrop-blur-sm">
+                  <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
+                    CMD STATUS
+                  </p>
+                  <p className="mt-1 font-display text-sm text-foreground">
+                    Sensor #{unit.id}
+                  </p>
+                  <p
+                    className={`text-xs ${
+                      unit.status === 'active'
+                        ? 'text-emerald-400'
+                        : 'text-rose-400'
+                    }`}
+                  >
+                    {unit.status === 'active' ? 'active' : 'inactive'}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Last heartbeat: {toLastHeartbeat(unit.lastSeenAt)}
+                  </p>
+                  <div className="mt-3 space-y-1.5">
+                    {sensorLinks.length === 0 ? (
+                      <p className="font-body text-xs text-muted-foreground">
+                        No peer links
+                      </p>
+                    ) : (
+                      sensorLinks.map((link) => (
+                        <div
+                          key={`${link.direction}-${link.peerId}`}
+                          className="rounded border border-border bg-card-elevated/60 px-2 py-1"
+                        >
+                          <p className="font-body text-xs text-foreground">
+                            {link.direction}{' '}
+                            {link.direction === 'OUT'
+                              ? `${unit.id} -> ${link.peerId}`
+                              : `${link.peerId} -> ${unit.id}`}
+                          </p>
+                          <p className="font-body text-[11px] text-muted-foreground">
+                            Q{toMetric(link.quality)} • I
+                            {toMetric(link.intensity)}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
       {offlineModeEnabled && offlineTilePackMissing ? (
         <div className="pointer-events-none absolute inset-x-3 top-3 z-[1300] rounded border border-red-500/50 bg-red-950/90 px-3 py-2 text-xs text-red-100">

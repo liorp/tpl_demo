@@ -20,6 +20,15 @@ const markerEvents = new Map<
   }>
 >();
 const markerIcons = new Map<number, unknown>();
+const polylineSegments: Array<{
+  positions: [number, number][];
+  pathOptions?: {
+    color?: string;
+    dashArray?: string;
+    weight?: number;
+    opacity?: number;
+  };
+}> = [];
 const mapFlyTo = vi.fn();
 const mapSetView = vi.fn();
 const mapFitBounds = vi.fn();
@@ -74,6 +83,7 @@ vi.mock('react-leaflet', () => ({
     position,
     icon,
     eventHandlers,
+    children,
   }: {
     position: [number, number];
     icon?: unknown;
@@ -83,13 +93,30 @@ vi.mock('react-leaflet', () => ({
         target: { getLatLng: () => { lat: number; lng: number } };
       }) => void;
     }>;
+    children?: React.ReactNode;
   }) => {
     markerEvents.set(position[0], eventHandlers ?? {});
     markerIcons.set(position[0], icon);
+    return <div data-testid={`marker-${position[0]}`}>{children}</div>;
+  },
+  Polyline: ({
+    positions,
+    pathOptions,
+  }: {
+    positions: [number, number][];
+    pathOptions?: {
+      color?: string;
+      dashArray?: string;
+      weight?: number;
+      opacity?: number;
+    };
+  }) => {
+    polylineSegments.push({ positions, pathOptions });
     return null;
   },
-  Polyline: () => null,
-  Popup: () => null,
+  Popup: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="popup">{children}</div>
+  ),
   useMapEvents: (
     handlers: Partial<{
       click: (event: { latlng: { lat: number; lng: number } }) => void;
@@ -111,6 +138,7 @@ describe('MonitorMap', () => {
     mapEvents.click = undefined;
     markerEvents.clear();
     markerIcons.clear();
+    polylineSegments.length = 0;
     vi.restoreAllMocks();
     mapFlyTo.mockClear();
     mapSetView.mockClear();
@@ -560,6 +588,75 @@ describe('MonitorMap', () => {
     expect(icon1.options.html).toContain('background:#06b6d4');
     expect(icon2.options.html).toContain('background:#eab308');
     expect(icon2.options.html).toContain('Sensor 2');
+  });
+
+  test('draws dotted lines for enabled sensor pairings', () => {
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'active' },
+          { id: 3, label: 'Sensor 3', lat: 33.4, lng: 35.9, status: 'active' },
+        ]}
+        pairings={[
+          { side1Id: 1, side2Id: 2, enabled: true },
+          { side1Id: 2, side2Id: 3, enabled: false },
+          { side1Id: 1, side2Id: 99, enabled: true },
+        ]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(polylineSegments).toHaveLength(1);
+    expect(polylineSegments[0]?.positions).toEqual([
+      [33.2, 35.7],
+      [33.3, 35.8],
+    ]);
+    expect(polylineSegments[0]?.pathOptions?.dashArray).toBe('6 6');
+  });
+
+  test('shows cmd status and last heartbeat in sensor popup', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_012_000 * 1000);
+
+    render(
+      <MonitorMap
+        units={[
+          {
+            id: 1,
+            label: 'Sensor 1',
+            lat: 33.2,
+            lng: 35.7,
+            status: 'active',
+            lastSeenAt: 1_700_002,
+          },
+        ]}
+        links={[
+          { side1: 1, side2: 2, quality: 90, intensity: 70, updatedAt: 1 },
+        ]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('CMD STATUS')).not.toBeNull();
+    expect(screen.getByText('Sensor #1')).not.toBeNull();
+    expect(screen.getByText('active')).not.toBeNull();
+    expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
+    expect(screen.getByText('OUT 1 -> 2')).not.toBeNull();
+    expect(screen.getByText('Q90 • I70')).not.toBeNull();
   });
 
   test('uses conservative offline zoom defaults before manifest resolves', () => {
