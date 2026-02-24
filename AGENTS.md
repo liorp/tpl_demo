@@ -7,6 +7,9 @@ This repository is split into a Python backend and a React/TypeScript frontend.
 - `backend/test/`: Pytest suites grouped by domain (`core/`, `parsing/`, `realtime/`, `architecture/`).
 - `frontend/src/`: UI and client logic. Main app entry is `src/main.tsx`, with feature code under `src/domain/**` and app shell in `src/app/`.
 - `frontend/dist/`: Built frontend assets.
+- `scripts/`: Utility scripts:
+  - `scripts/demo-backend.sh`: waits for dummy device port file and launches backend with `SERIAL_PORT`.
+  - `scripts/probe_sensor.py`: probes a TPL USB sensor over serial for diagnostics.
 - `doc/plan/`: Design/planning documents.
 
 ## Build, Test, and Development Commands
