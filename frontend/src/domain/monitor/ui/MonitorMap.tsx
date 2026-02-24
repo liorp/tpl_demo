@@ -369,10 +369,7 @@ export function MonitorMap({
             >
               <Popup>
                 <div className="w-56 rounded-md border border-border-bright bg-card/90 p-3 font-body text-xs backdrop-blur-sm">
-                  <p
-                    className="font-display text-[11px] tracking-[0.2em] text-muted-foreground"
-                    title="Active = receiving telemetry. Inactive = telemetry not received."
-                  >
+                  <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
                     CMD STATUS
                   </p>
                   <p className="mt-1 font-display text-sm text-foreground">

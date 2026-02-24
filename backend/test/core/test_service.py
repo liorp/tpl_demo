@@ -58,7 +58,7 @@ def test_snapshot_includes_mutated_runtime_fields():
     state = SensorState()
     state.units = [{"id": 1, "label": "S1", "lat": 33.31, "lng": 35.78}]
     state.sensor_status = {
-        "1": {"active": True, "last_seen": 1700000000, "connected_peers": [2, 3]}
+        "1": {"last_seen": 1700000000, "connected_peers": [2, 3]}
     }
     state.map_policy = {
         "bounds": {"north": 1.0, "south": 0.0, "east": 1.0, "west": 0.0},
@@ -71,7 +71,7 @@ def test_snapshot_includes_mutated_runtime_fields():
 
     assert current["units"] == [{"id": 1, "label": "S1", "lat": 33.31, "lng": 35.78}]
     assert current["sensor_status"] == {
-        "1": {"active": True, "last_seen": 1700000000, "connected_peers": [2, 3]}
+        "1": {"last_seen": 1700000000, "connected_peers": [2, 3]}
     }
     assert current["map_policy"] == {
         "bounds": {"north": 1.0, "south": 0.0, "east": 1.0, "west": 0.0},
@@ -216,22 +216,18 @@ def test_handle_connected_and_map_update_sensor_status_graph(monkeypatch):
     assert disconnected_changed is True
     assert map_changed is True
     assert state.sensor_status["1"] == {
-        "active": False,
         "last_seen": 1002,
         "connected_peers": [],
     }
     assert state.sensor_status["2"] == {
-        "active": False,
         "last_seen": 1002,
         "connected_peers": [],
     }
     assert state.sensor_status["7"] == {
-        "active": True,
         "last_seen": 1003,
         "connected_peers": [8],
     }
     assert state.sensor_status["8"] == {
-        "active": True,
         "last_seen": 1003,
         "connected_peers": [7],
     }

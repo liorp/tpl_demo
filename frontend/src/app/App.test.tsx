@@ -68,9 +68,9 @@ const state: MonitorState = {
   ],
   pairings: [],
   sensorStatus: {
-    '1': { active: true, lastSeen: 1_700_002, connectedPeers: [2, 3] },
-    '2': { active: false, lastSeen: null, connectedPeers: [1] },
-    '3': { active: true, lastSeen: 1_700_003, connectedPeers: [1] },
+    '1': { lastSeen: 1_700_002, connectedPeers: [2, 3] },
+    '2': { lastSeen: null, connectedPeers: [] },
+    '3': { lastSeen: 1_700_003, connectedPeers: [1] },
   },
   mapPolicy: {
     bounds: null,

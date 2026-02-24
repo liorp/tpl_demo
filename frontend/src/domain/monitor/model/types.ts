@@ -54,7 +54,6 @@ export type GlobalSettings = {
 };
 
 export type SensorStatus = {
-  active: boolean;
   lastSeen: number | null;
   connectedPeers: number[];
 };
@@ -76,7 +75,6 @@ export type MapPolicy = {
 };
 
 export type BackendSensorStatus = {
-  active?: unknown;
   last_seen?: unknown;
   connected_peers?: unknown;
 };

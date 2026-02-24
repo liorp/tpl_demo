@@ -125,7 +125,6 @@ function toSensorStatusMap(
         )
       : [];
     next[sensorId] = {
-      active: value.active === true,
       lastSeen: typeof value.last_seen === 'number' ? value.last_seen : null,
       connectedPeers,
     };
@@ -168,7 +167,10 @@ export function toPayloadUnits(
       lng,
       ...(sensor
         ? {
-            status: sensor.active ? ('active' as const) : ('inactive' as const),
+            status:
+              sensor.connectedPeers.length > 0
+                ? ('active' as const)
+                : ('inactive' as const),
             lastSeenAt: sensor.lastSeen ?? undefined,
           }
         : {}),
@@ -186,7 +188,10 @@ export function toPayloadUnits(
       label: `S${sensorId}`,
       lat: fallback.lat,
       lng: fallback.lng,
-      status: sensor.active ? ('active' as const) : ('inactive' as const),
+      status:
+        sensor.connectedPeers.length > 0
+          ? ('active' as const)
+          : ('inactive' as const),
       lastSeenAt: sensor.lastSeen ?? undefined,
     });
   }

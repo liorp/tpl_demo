@@ -111,7 +111,6 @@ class UnitPosition(TypedDict):
 
 
 class SensorStatusEntry(TypedDict):
-    active: bool
     last_seen: int
     connected_peers: list[int]
 

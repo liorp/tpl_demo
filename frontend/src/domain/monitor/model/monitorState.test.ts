@@ -55,8 +55,8 @@ describe('monitor state model', () => {
         { id: 8, label: 'S8', lat: 33.32, lng: 35.79 },
       ],
       sensor_status: {
-        '7': { active: true, last_seen: 101, connected_peers: [8] },
-        '8': { active: false, last_seen: 99, connected_peers: [7] },
+        '7': { last_seen: 101, connected_peers: [8] },
+        '8': { last_seen: 99, connected_peers: [] },
       },
       map_policy: {
         bounds: { north: 34.0, south: 33.0, west: 35.0, east: 36.0 },
@@ -85,8 +85,8 @@ describe('monitor state model', () => {
       },
     ]);
     expect(state.sensorStatus).toEqual({
-      '7': { active: true, lastSeen: 101, connectedPeers: [8] },
-      '8': { active: false, lastSeen: 99, connectedPeers: [7] },
+      '7': { lastSeen: 101, connectedPeers: [8] },
+      '8': { lastSeen: 99, connectedPeers: [] },
     });
     expect(state.mapPolicy).toEqual({
       bounds: { north: 34.0, south: 33.0, west: 35.0, east: 36.0 },

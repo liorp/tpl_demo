@@ -228,7 +228,7 @@ describe('monitor socket lifecycle', () => {
       config: { threshold: null, val: null },
       units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
       sensor_status: {
-        '7': { active: true, last_seen: 100, connected_peers: [] },
+        '7': { last_seen: 100, connected_peers: [8] },
       },
       map_policy: {
         bounds: null,
@@ -256,7 +256,7 @@ describe('monitor socket lifecycle', () => {
         },
       ]);
       expect(latestState.sensorStatus).toEqual({
-        '7': { active: true, lastSeen: 100, connectedPeers: [] },
+        '7': { lastSeen: 100, connectedPeers: [8] },
       });
       expect(latestState.mapPolicy.tileRoot).toBe('/tiles');
     });
@@ -285,7 +285,7 @@ describe('monitor socket lifecycle', () => {
       config: { threshold: null, val: null },
       units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
       sensor_status: {
-        '7': { active: true, last_seen: 100, connected_peers: [] },
+        '7': { last_seen: 100, connected_peers: [8] },
       },
       map_policy: {
         bounds: null,
@@ -333,7 +333,7 @@ describe('monitor socket lifecycle', () => {
       config: { threshold: null, val: null },
       units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
       sensor_status: {
-        '7': { active: true, last_seen: 101, connected_peers: [] },
+        '7': { last_seen: 101, connected_peers: [8] },
       },
       map_policy: {
         bounds: null,
@@ -384,7 +384,7 @@ describe('monitor socket lifecycle', () => {
       config: { threshold: null, val: null },
       units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
       sensor_status: {
-        '7': { active: true, last_seen: 100, connected_peers: [] },
+        '7': { last_seen: 100, connected_peers: [8] },
       },
       map_policy: {
         bounds: null,
@@ -423,7 +423,7 @@ describe('monitor socket lifecycle', () => {
       config: { threshold: null, val: null },
       units: [{ id: 7, label: 'S7', lat: 33.4, lng: 35.85 }],
       sensor_status: {
-        '7': { active: true, last_seen: 102, connected_peers: [] },
+        '7': { last_seen: 102, connected_peers: [8] },
       },
       map_policy: {
         bounds: null,
@@ -460,7 +460,7 @@ describe('monitor socket lifecycle', () => {
       config: { threshold: null, val: null },
       units: [{ id: 7, label: 'S7', lat: 33.4, lng: 35.85 }],
       sensor_status: {
-        '7': { active: true, last_seen: 103, connected_peers: [] },
+        '7': { last_seen: 103, connected_peers: [8] },
       },
       map_policy: {
         bounds: null,

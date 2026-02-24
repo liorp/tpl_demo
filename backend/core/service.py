@@ -68,7 +68,6 @@ def _update_sensor_link_status(
     else:
         peers.discard(peer_id)
     state.sensor_status[sensor_key] = SensorStatusEntry(
-        active=len(peers) > 0,
         last_seen=last_seen,
         connected_peers=sorted(peers),
     )
@@ -92,7 +91,6 @@ def _refresh_sensor_status_from_map(
     for sensor_id in touched:
         peers = sorted(graph.get(sensor_id, set()))
         state.sensor_status[str(sensor_id)] = SensorStatusEntry(
-            active=len(peers) > 0,
             last_seen=last_seen,
             connected_peers=peers,
         )
