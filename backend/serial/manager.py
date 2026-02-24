@@ -115,7 +115,7 @@ class SerialManager:
                     buffer = ""
                     validated_protocol = False
                     validation_started_at = time.monotonic()
-                    last_map_time = time.monotonic()
+                    last_map_time = validation_started_at
                     while not (stop_event and stop_event.is_set()):
                         data = ser.read(ser.in_waiting or 1)
                         if not data:

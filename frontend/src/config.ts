@@ -1,5 +1,5 @@
 export const DEFAULT_BACKEND_PORT = 8080;
-export const SENSOR_STALE_AFTER_SECONDS = 60;
+export const SENSOR_STALE_AFTER_SECONDS = 10;
 declare const __TPL_BACKEND_PORT__: string | undefined;
 
 const ENV_BACKEND_PORT =
