@@ -5,6 +5,7 @@ import type {
   CrossingAlert,
   MapBounds,
   MapPolicy,
+  MonitorEvent,
   MonitorPayload,
   MonitorState,
   PairLink,
@@ -21,6 +22,7 @@ const MAX_CROSSING_ACK_WINDOWS = 40;
 const CROSSING_ALERT_DEDUP_WINDOW_MS = 10_000;
 const CROSSING_ACK_SUPPRESSION_WINDOW_MS = 2_000;
 const MAP_FROM_RE = /MAP from (\d+)/;
+const CLOCK_TIME_RE = /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/;
 
 export function toCrossingAlert(
   raw: MonitorPayload['crossing_alert'],
@@ -207,7 +209,7 @@ export function createInitialServerState(): ServerState {
     alarm: 'disconnected',
     events: [],
     links: [],
-    config: { threshold: null, gain: null },
+    config: { gain: null },
     sensorStatus: {},
     mapPolicy: toDefaultMapPolicy(),
   };
@@ -230,12 +232,66 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     connected: payload.connected,
     port: payload.port,
     alarm: payload.alarm,
-    events: payload.events.slice(0, MAX_EVENTS),
+    events: sortEventsByTimestampDesc(payload.events).slice(0, MAX_EVENTS),
     links: payload.links,
     config: payload.config,
     sensorStatus,
     mapPolicy: toMapPolicy(payload.map_policy),
   };
+}
+
+function parseEventTimestampMs(time: string): number {
+  const normalized = time.trim();
+  if (normalized.length === 0) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const numeric = Number(normalized);
+  if (Number.isFinite(numeric)) {
+    return normalized.length <= 10 ? numeric * 1000 : numeric;
+  }
+
+  const parsedDate = Date.parse(normalized);
+  if (Number.isFinite(parsedDate)) {
+    return parsedDate;
+  }
+
+  const clockMatch = CLOCK_TIME_RE.exec(normalized);
+  if (!clockMatch) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const hours = Number(clockMatch[1]);
+  const minutes = Number(clockMatch[2]);
+  const seconds = Number(clockMatch[3]);
+  const millis = Number((clockMatch[4] ?? '0').padEnd(3, '0'));
+  if (
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59 ||
+    seconds < 0 ||
+    seconds > 59
+  ) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return ((hours * 60 + minutes) * 60 + seconds) * 1000 + millis;
+}
+
+function sortEventsByTimestampDesc(events: MonitorEvent[]): MonitorEvent[] {
+  return events
+    .map((event, index) => ({
+      event,
+      index,
+      timestampMs: parseEventTimestampMs(event.time),
+    }))
+    .sort((a, b) => {
+      if (a.timestampMs !== b.timestampMs) {
+        return b.timestampMs - a.timestampMs;
+      }
+      return b.index - a.index;
+    })
+    .map((entry) => entry.event);
 }
 
 export function toMonitorStateFromPayload(

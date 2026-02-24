@@ -16,7 +16,7 @@ CONNECTED_RE = re.compile(
 MAP_RSP_RE = re.compile(
     r"CMD:MAP_RSP\s+from\s+(\d+)\s+ver:(\S+)\s+gain:(\d+)\s+voltage:(\d+)\s+scan:(\d+)\s+adv:(\d+):\s+(.*)"
 )
-MAP_LINK_RE = re.compile(r"\w+\((\d+)\)>\w+\((\d+)\)\s+q:(\d+)\s+i:(\d+)")
+MAP_LINK_RE = re.compile(r"\[(\d+)\s+th3:(\d+)\s+(-?\d+)dBm\s+dt:(\d+)\]")
 CONFIG_RE = re.compile(r"CMD:CONFIG\s+threshold:(\d+)\s+val:(\d+)")
 
 
@@ -71,22 +71,21 @@ def parse_line(raw_line: str) -> Event | None:
 
     m = MAP_RSP_RE.search(content)
     if m:
+        unit_id = int(m.group(1))
         links: list[dict[str, int]] = []
-        for token in m.group(7).split(","):
-            link_match = MAP_LINK_RE.search(token.strip())
-            if not link_match:
-                continue
+        for link_match in MAP_LINK_RE.finditer(m.group(7)):
             links.append(
                 {
-                    "side1": int(link_match.group(1)),
-                    "side2": int(link_match.group(2)),
-                    "quality": int(link_match.group(3)),
-                    "intensity": int(link_match.group(4)),
+                    "side1": unit_id,
+                    "side2": int(link_match.group(1)),
+                    "threshold": int(link_match.group(2)),
+                    "rssi": int(link_match.group(3)),
+                    "dt": int(link_match.group(4)),
                 }
             )
         return {
             "type": "map",
-            "unit_id": int(m.group(1)),
+            "unit_id": unit_id,
             "version": m.group(2),
             "gain": int(m.group(3)),
             "voltage": int(m.group(4)),

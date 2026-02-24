@@ -35,8 +35,9 @@ def _normalize_side_links(raw_links: list[dict]) -> list[SideLink]:
             {
                 "side1": side1,
                 "side2": side2,
-                "quality": int(link.get("quality", 0)),
-                "intensity": int(link.get("intensity", 0)),
+                "threshold": int(link.get("threshold", 0)),
+                "rssi": int(link.get("rssi", 0)),
+                "dt": int(link.get("dt", 0)),
             }
         )
     return normalized
@@ -165,7 +166,6 @@ def handle_event(state: SensorState, event: Event) -> bool:
             lng=crossing_lng,
             acknowledged=False,
         )
-        state.config["threshold"] = event["threshold"]
         state.add_log(
             f"DETECTION {event['id_a']}({event['unit_a']})-{event['id_b']}({event['unit_b']}) "
             f"th={event['threshold']} val={event['value']}"
@@ -214,9 +214,15 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         return True
     if etype == "map":
-        state.links = _normalize_side_links(list(event.get("links", [])))
+        reporting_unit = event["unit_id"]
+        remaining = [
+            link for link in state.links
+            if link["side1"] != reporting_unit and link["side2"] != reporting_unit
+        ]
+        new_links = _normalize_side_links(list(event.get("links", [])))
+        state.links = remaining + new_links
         _refresh_sensor_status_from_map(
-            state, unit_id=event["unit_id"], last_seen=_event_last_seen()
+            state, unit_id=reporting_unit, last_seen=_event_last_seen()
         )
         state.config["gain"] = event["gain"]
         state.add_log(
@@ -225,7 +231,6 @@ def handle_event(state: SensorState, event: Event) -> bool:
         )
         return True
     if etype == "config":
-        state.config["threshold"] = event["threshold"]
         state.config["gain"] = event["value"]
         state.add_log(f"CONFIG threshold={event['threshold']} gain={event['value']}")
         return True

@@ -27,7 +27,8 @@ export function App() {
     state,
     requestMap,
     acknowledgeCrossing,
-    applyConfig,
+    sendThreshold,
+    sendGain,
     setAlarmSoundEnabled,
     setOfflineModeEnabled,
     resetAll,
@@ -189,7 +190,8 @@ export function App() {
             config={state.config}
             alarmSoundEnabled={state.globalSettings.alarmSoundEnabled}
             offlineModeEnabled={state.globalSettings.offlineModeEnabled}
-            onApply={applyConfig}
+            onSendThreshold={sendThreshold}
+            onSendGain={sendGain}
             onAlarmSoundEnabledChange={setAlarmSoundEnabled}
             onOfflineModeEnabledChange={setOfflineModeEnabled}
             onResetAll={resetAll}

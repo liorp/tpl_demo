@@ -58,7 +58,7 @@ def _build_app(
             "events": [],
             "links": [],
             "crossing_alert": None,
-            "config": {"threshold": None, "gain": None},
+            "config": {"gain": None},
             "units": [],
             "map_policy": dict(state.map_policy),
             "sensor_status": {},

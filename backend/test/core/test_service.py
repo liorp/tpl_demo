@@ -43,7 +43,7 @@ def test_snapshot_includes_command_map_defaults():
     assert isinstance(current["events"], list)
     assert current["links"] == []
     assert current["crossing_alert"] is None
-    assert current["config"] == {"threshold": None, "gain": None}
+    assert current["config"] == {"gain": None}
     assert current["units"] == []
     assert current["sensor_status"] == {}
     assert current["map_policy"] == {
@@ -107,7 +107,6 @@ def test_handle_detection_updates_crossing_and_config():
     assert state.crossing_alert is not None
     assert state.crossing_alert["sensor_a"] == 1
     assert state.crossing_alert["sensor_b"] == 2
-    assert state.config["threshold"] == 500
 
 
 def test_handle_map_event_updates_links():
@@ -121,13 +120,13 @@ def test_handle_map_event_updates_links():
             "version": "v1",
             "gain": 30,
             "voltage": 2600,
-            "links": [{"side1": 2, "side2": 1, "quality": 88, "intensity": 73}],
+            "links": [{"side1": 7, "side2": 2, "threshold": 0, "rssi": -57, "dt": 180}],
             "device_ts": 444,
         },
     )
 
     assert changed is True
-    assert state.links == [{"side1": 1, "side2": 2, "quality": 88, "intensity": 73}]
+    assert state.links == [{"side1": 2, "side2": 7, "threshold": 0, "rssi": -57, "dt": 180}]
 
 
 def test_handle_map_event_deduplicates_bidirectional_links():
@@ -142,15 +141,15 @@ def test_handle_map_event_deduplicates_bidirectional_links():
             "gain": 30,
             "voltage": 2600,
             "links": [
-                {"side1": 1, "side2": 2, "quality": 88, "intensity": 73},
-                {"side1": 2, "side2": 1, "quality": 60, "intensity": 55},
+                {"side1": 7, "side2": 2, "threshold": 0, "rssi": -57, "dt": 180},
+                {"side1": 7, "side2": 2, "threshold": 0, "rssi": -50, "dt": 200},
             ],
             "device_ts": 445,
         },
     )
 
     assert changed is True
-    assert state.links == [{"side1": 1, "side2": 2, "quality": 88, "intensity": 73}]
+    assert state.links == [{"side1": 2, "side2": 7, "threshold": 0, "rssi": -57, "dt": 180}]
 
 
 def test_handle_config_event_updates_config_values():
@@ -162,7 +161,7 @@ def test_handle_config_event_updates_config_values():
     )
 
     assert changed is True
-    assert state.config == {"threshold": 777, "gain": 799}
+    assert state.config == {"gain": 799}
 
 
 def test_handle_connected_and_map_update_sensor_status_graph(monkeypatch):
@@ -206,7 +205,7 @@ def test_handle_connected_and_map_update_sensor_status_graph(monkeypatch):
             "gain": 30,
             "voltage": 2600,
             "links": [
-                {"side1": 7, "side2": 8, "quality": 88, "intensity": 73},
+                {"side1": 7, "side2": 8, "threshold": 0, "rssi": -30, "dt": 200},
             ],
             "device_ts": 7000,
         },

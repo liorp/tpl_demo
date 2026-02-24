@@ -32,13 +32,37 @@ describe('monitor state model', () => {
       events: [{ time: '20:00:00', msg: 'DETECTION x' }],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
     });
 
     expect(state.connected).toBe(true);
     expect(state.port).toBe('/dev/ttyUSB0');
     expect(state.alarm).toBe('alarm');
     expect(shouldShowAck(state)).toBe(true);
+  });
+
+  test('sorts events by timestamp descending so newest entries render on top', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [
+        { time: '21:55:44', msg: 'SYSTEM old' },
+        { time: '21:55:46', msg: 'DETECTION same-second older' },
+        { time: '21:55:46', msg: 'DETECTION same-second newer' },
+        { time: '21:55:45', msg: 'SYSTEM mid' },
+      ],
+      links: [],
+      crossing_alert: null,
+      config: { gain: null },
+    });
+
+    expect(state.events.map((event) => event.msg)).toEqual([
+      'DETECTION same-second newer',
+      'DETECTION same-second older',
+      'SYSTEM mid',
+      'SYSTEM old',
+    ]);
   });
 
   test('maps backend units, sensor_status, and map_policy payload fields', () => {
@@ -49,7 +73,7 @@ describe('monitor state model', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
       units: [
         { id: 7, label: 'S7', lat: 33.31, lng: 35.78 },
         { id: 8, label: 'S8', lat: 33.32, lng: 35.79 },
@@ -112,7 +136,7 @@ describe('monitor state model', () => {
         lng: null,
         acknowledged: false,
       } as unknown as never,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
     });
 
     expect(state.crossingAlerts).toEqual([
@@ -142,7 +166,7 @@ describe('monitor state model', () => {
         lng: null,
         acknowledged: false,
       } as unknown as never,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
     });
 
     expect(state.crossingAlerts).toEqual([
@@ -165,7 +189,7 @@ describe('monitor state model', () => {
       events: [],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
     });
 
     expect(state.units).toEqual([]);
@@ -354,10 +378,17 @@ describe('monitor state model', () => {
         { time: '21:55:46', msg: 'MAP from 2 ver=0.4c10 gain=32 v=2112' },
       ],
       links: [
-        { side1: 11, side2: 12, quality: 95, intensity: 23, updatedAt: 1 },
+        {
+          side1: 11,
+          side2: 12,
+          threshold: 500,
+          rssi: -57,
+          dt: 180,
+          updatedAt: 1,
+        },
       ],
       crossing_alert: null,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
     };
 
     const nextUnits = mergeTelemetryUnits([], payload);
@@ -376,7 +407,7 @@ describe('monitor state model', () => {
       ],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
     };
 
     const [unit] = mergeTelemetryUnits([], payload);
@@ -410,7 +441,7 @@ describe('monitor state model', () => {
       ],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
     };
 
     const next = mergeTelemetryUnits(previous, payload);
@@ -437,7 +468,7 @@ describe('monitor state model', () => {
       ],
       links: [],
       crossing_alert: null,
-      config: { threshold: null, gain: null },
+      config: { gain: null },
     };
 
     const next = mergeTelemetryUnits([], payload, 1_700_000_120);

@@ -17,7 +17,7 @@ def test_parse_detection_event():
 def test_parse_map_response_with_signal_links():
     line = (
         "[321] I CMD:MAP_RSP from 7 ver:v1 gain:30 voltage:2600 scan:3 adv:4:"
-        " AA(1)>BB(2) q:88 i:73, BB(2)>CC(3) q:61 i:55"
+        "  [2 th3:0 -57dBm dt:180] [12 th3:500 -31dBm dt:721]"
     )
 
     event = parse_line(line)
@@ -26,8 +26,8 @@ def test_parse_map_response_with_signal_links():
     assert event["type"] == "map"
     assert event["unit_id"] == 7
     assert event["links"] == [
-        {"side1": 1, "side2": 2, "quality": 88, "intensity": 73},
-        {"side1": 2, "side2": 3, "quality": 61, "intensity": 55},
+        {"side1": 7, "side2": 2, "threshold": 0, "rssi": -57, "dt": 180},
+        {"side1": 7, "side2": 12, "threshold": 500, "rssi": -31, "dt": 721},
     ]
 
 

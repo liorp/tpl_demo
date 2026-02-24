@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/component/ui/button';
 import {
@@ -19,7 +20,8 @@ type Props = {
   config: MonitorConfig;
   alarmSoundEnabled: boolean;
   offlineModeEnabled: boolean;
-  onApply: (next: { threshold: number; gain: number }) => void;
+  onSendThreshold: (value: number) => void;
+  onSendGain: (value: number) => void;
   onAlarmSoundEnabledChange: (enabled: boolean) => void;
   onOfflineModeEnabledChange: (enabled: boolean) => void;
   onResetAll: () => void;
@@ -36,32 +38,28 @@ export function ConfigMenu({
   config,
   alarmSoundEnabled,
   offlineModeEnabled,
-  onApply,
+  onSendThreshold,
+  onSendGain,
   onAlarmSoundEnabledChange,
   onOfflineModeEnabledChange,
   onResetAll,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [threshold, setThreshold] = useState(
-    toKnownValue(config.threshold, DEFAULT_THRESHOLD),
-  );
+  const [threshold, setThreshold] = useState(String(DEFAULT_THRESHOLD));
   const [gain, setGain] = useState(toKnownValue(config.gain, DEFAULT_GAIN));
 
   useEffect(() => {
     if (open) {
       return;
     }
-    setThreshold(toKnownValue(config.threshold, DEFAULT_THRESHOLD));
     setGain(toKnownValue(config.gain, DEFAULT_GAIN));
-  }, [config.threshold, config.gain, open]);
+  }, [config.gain, open]);
 
   const thresholdNum = Number(threshold);
   const gainNum = Number(gain);
-  const valid =
-    Number.isFinite(thresholdNum) &&
-    Number.isFinite(gainNum) &&
-    threshold.trim() !== '' &&
-    gain.trim() !== '';
+  const thresholdValid =
+    Number.isFinite(thresholdNum) && threshold.trim() !== '';
+  const gainValid = Number.isFinite(gainNum) && gain.trim() !== '';
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -107,12 +105,25 @@ export function ConfigMenu({
             >
               Threshold
             </Label>
-            <Input
-              id="threshold"
-              value={threshold}
-              onChange={(event) => setThreshold(event.target.value)}
-              className="bg-background font-mono tabular-nums"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="threshold"
+                value={threshold}
+                onChange={(event) => setThreshold(event.target.value)}
+                className="bg-background font-mono tabular-nums"
+              />
+              <Button
+                size="sm"
+                onClick={() => {
+                  onSendThreshold(thresholdNum);
+                  toast.success(`Threshold set to ${thresholdNum}`);
+                }}
+                disabled={!thresholdValid}
+                className="font-display tracking-wide"
+              >
+                Send
+              </Button>
+            </div>
           </div>
           <div className="grid gap-2">
             <Label
@@ -121,12 +132,25 @@ export function ConfigMenu({
             >
               Gain
             </Label>
-            <Input
-              id="gain"
-              value={gain}
-              onChange={(event) => setGain(event.target.value)}
-              className="bg-background font-mono tabular-nums"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="gain"
+                value={gain}
+                onChange={(event) => setGain(event.target.value)}
+                className="bg-background font-mono tabular-nums"
+              />
+              <Button
+                size="sm"
+                onClick={() => {
+                  onSendGain(gainNum);
+                  toast.success(`Gain set to ${gainNum}`);
+                }}
+                disabled={!gainValid}
+                className="font-display tracking-wide"
+              >
+                Send
+              </Button>
+            </div>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-md border border-border-bright bg-background/70 px-3 py-2">
             <div className="space-y-0.5">
@@ -179,25 +203,13 @@ export function ConfigMenu({
           >
             Reset all
           </Button>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              className="font-display tracking-wide"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                onApply({ threshold: thresholdNum, gain: gainNum });
-                setOpen(false);
-              }}
-              disabled={!valid}
-              className="font-display tracking-wide"
-            >
-              Apply
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            className="font-display tracking-wide"
+          >
+            Close
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

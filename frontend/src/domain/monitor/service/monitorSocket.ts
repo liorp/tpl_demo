@@ -52,7 +52,8 @@ export function useMonitorSocket(): {
   state: MonitorState;
   acknowledgeCrossing: (alert: CrossingAlert) => void;
   requestMap: () => void;
-  applyConfig: (value: { threshold: number; gain: number }) => void;
+  sendThreshold: (value: number) => void;
+  sendGain: (value: number) => void;
   setAlarmSoundEnabled: (enabled: boolean) => void;
   setOfflineModeEnabled: (enabled: boolean) => void;
   resetAll: () => void;
@@ -227,18 +228,19 @@ export function useMonitorSocket(): {
     }
   }, []);
 
-  const applyConfig = useCallback(
-    (value: { threshold: number; gain: number }) => {
-      const socket = socketRef.current;
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(
-          JSON.stringify({ cmd: 'set_threshold', value: value.threshold }),
-        );
-        socket.send(JSON.stringify({ cmd: 'set_gain', value: value.gain }));
-      }
-    },
-    [],
-  );
+  const sendThreshold = useCallback((value: number) => {
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ cmd: 'set_threshold', value }));
+    }
+  }, []);
+
+  const sendGain = useCallback((value: number) => {
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ cmd: 'set_gain', value }));
+    }
+  }, []);
 
   const placeUnit = useCallback((unit: UnitPlacement) => {
     const socket = socketRef.current;
@@ -351,7 +353,8 @@ export function useMonitorSocket(): {
     state,
     acknowledgeCrossing,
     requestMap,
-    applyConfig,
+    sendThreshold,
+    sendGain,
     setAlarmSoundEnabled,
     setOfflineModeEnabled,
     resetAll,

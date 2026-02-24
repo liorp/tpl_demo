@@ -10,13 +10,14 @@ afterEach(() => {
 });
 
 describe('ConfigMenu', () => {
-  test('opens settings modal and pre-populates known values', () => {
+  test('opens settings modal and pre-populates gain from config', () => {
     render(
       <ConfigMenu
-        config={{ threshold: 640, gain: 64 }}
+        config={{ gain: 64 }}
         alarmSoundEnabled
         offlineModeEnabled
-        onApply={vi.fn()}
+        onSendThreshold={vi.fn()}
+        onSendGain={vi.fn()}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
@@ -28,19 +29,20 @@ describe('ConfigMenu', () => {
     const threshold = screen.getByLabelText('Threshold') as HTMLInputElement;
     const gain = screen.getByLabelText('Gain') as HTMLInputElement;
 
-    expect(threshold.value).toBe('640');
+    expect(threshold.value).toBe('500');
     expect(gain.value).toBe('64');
   });
 
-  test('falls back to default values and applies changes', () => {
-    const onApply = vi.fn();
+  test('falls back to default values and sends threshold', () => {
+    const onSendThreshold = vi.fn();
 
     render(
       <ConfigMenu
-        config={{ threshold: null, gain: null }}
+        config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onApply={onApply}
+        onSendThreshold={onSendThreshold}
+        onSendGain={vi.fn()}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
@@ -56,10 +58,37 @@ describe('ConfigMenu', () => {
     expect(gain.value).toBe('64');
 
     fireEvent.change(threshold, { target: { value: '600' } });
-    fireEvent.change(gain, { target: { value: '32' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    const sendButtons = screen.getAllByRole('button', { name: 'Send' });
+    fireEvent.click(sendButtons[0]);
 
-    expect(onApply).toHaveBeenCalledWith({ threshold: 600, gain: 32 });
+    expect(onSendThreshold).toHaveBeenCalledWith(600);
+  });
+
+  test('sends gain with separate button', () => {
+    const onSendGain = vi.fn();
+
+    render(
+      <ConfigMenu
+        config={{ gain: null }}
+        alarmSoundEnabled
+        offlineModeEnabled
+        onSendThreshold={vi.fn()}
+        onSendGain={onSendGain}
+        onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={vi.fn()}
+        onResetAll={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+
+    fireEvent.change(screen.getByLabelText('Gain'), {
+      target: { value: '32' },
+    });
+    const sendButtons = screen.getAllByRole('button', { name: 'Send' });
+    fireEvent.click(sendButtons[1]);
+
+    expect(onSendGain).toHaveBeenCalledWith(32);
   });
 
   test('resets all from settings', () => {
@@ -67,10 +96,11 @@ describe('ConfigMenu', () => {
 
     render(
       <ConfigMenu
-        config={{ threshold: null, gain: null }}
+        config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onApply={vi.fn()}
+        onSendThreshold={vi.fn()}
+        onSendGain={vi.fn()}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={onResetAll}
@@ -88,10 +118,11 @@ describe('ConfigMenu', () => {
 
     render(
       <ConfigMenu
-        config={{ threshold: null, gain: null }}
+        config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onApply={vi.fn()}
+        onSendThreshold={vi.fn()}
+        onSendGain={vi.fn()}
         onAlarmSoundEnabledChange={onAlarmSoundEnabledChange}
         onOfflineModeEnabledChange={vi.fn()}
         onResetAll={vi.fn()}
@@ -109,10 +140,11 @@ describe('ConfigMenu', () => {
 
     render(
       <ConfigMenu
-        config={{ threshold: null, gain: null }}
+        config={{ gain: null }}
         alarmSoundEnabled
         offlineModeEnabled
-        onApply={vi.fn()}
+        onSendThreshold={vi.fn()}
+        onSendGain={vi.fn()}
         onAlarmSoundEnabledChange={vi.fn()}
         onOfflineModeEnabledChange={onOfflineModeEnabledChange}
         onResetAll={vi.fn()}

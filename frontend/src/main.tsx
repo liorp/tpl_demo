@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Toaster } from 'sonner';
 import { App } from './app/App';
 import { ErrorBoundary } from './component/ErrorBoundary';
 import { TooltipProvider } from './component/ui/tooltip';
@@ -26,6 +27,7 @@ createRoot(root).render(
       <TooltipProvider>
         <ErrorBoundary section="Application">
           <App />
+          <Toaster position="bottom-right" />
         </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>

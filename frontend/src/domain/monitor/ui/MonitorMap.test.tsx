@@ -660,7 +660,14 @@ describe('MonitorMap', () => {
           },
         ]}
         links={[
-          { side1: 1, side2: 2, quality: 90, intensity: 70, updatedAt: 1 },
+          {
+            side1: 1,
+            side2: 2,
+            threshold: 500,
+            rssi: -57,
+            dt: 180,
+            updatedAt: 1,
+          },
         ]}
         focusPoint={null}
         tileRoot={null}
@@ -679,7 +686,7 @@ describe('MonitorMap', () => {
     expect(screen.getByText('CMD STATUS').getAttribute('title')).toBeNull();
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
     expect(screen.getByText('OUT 1 -> 2')).not.toBeNull();
-    expect(screen.getByText('Q90 • I70')).not.toBeNull();
+    expect(screen.getByText(/-57dBm • th:500 • dt:180/)).not.toBeNull();
   });
 
   test('uses conservative offline zoom defaults before manifest resolves', () => {

@@ -85,8 +85,9 @@ class LogEntry(TypedDict):
 class SideLink(TypedDict):
     side1: int
     side2: int
-    quality: int
-    intensity: int
+    threshold: int
+    rssi: int
+    dt: int
 
 
 class CrossingAlert(TypedDict):
@@ -99,7 +100,6 @@ class CrossingAlert(TypedDict):
 
 
 class SensorConfig(TypedDict):
-    threshold: int | None
     gain: int | None
 
 
@@ -125,7 +125,7 @@ class SensorState:
         self.max_logs = 50
         self.links: list[SideLink] = []
         self.crossing_alert: CrossingAlert | None = None
-        self.config: SensorConfig = {"threshold": None, "gain": None}
+        self.config: SensorConfig = {"gain": None}
         self.units: list[UnitPosition] = []
         self.sensor_status: dict[str, SensorStatusEntry] = {}
         self.map_policy: MapPolicy = dict(DEFAULT_MAP_POLICY)

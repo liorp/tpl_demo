@@ -23,8 +23,9 @@ export type PairLink = {
 export type SignalLinkState = {
   side1: number;
   side2: number;
-  quality: number;
-  intensity: number;
+  threshold: number;
+  rssi: number;
+  dt: number;
   updatedAt: number;
 };
 
@@ -44,7 +45,6 @@ export type CrossingAckWindow = {
 };
 
 export type MonitorConfig = {
-  threshold: number | null;
   gain: number | null;
 };
 

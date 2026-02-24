@@ -28,8 +28,22 @@ const state: MonitorState = {
   alarm: 'clear',
   events: [],
   links: [
-    { side1: 1, side2: 2, quality: 90, intensity: 70, updatedAt: 1_700_000 },
-    { side1: 3, side2: 1, quality: 65, intensity: 44, updatedAt: 1_700_001 },
+    {
+      side1: 1,
+      side2: 2,
+      threshold: 500,
+      rssi: -57,
+      dt: 180,
+      updatedAt: 1_700_000,
+    },
+    {
+      side1: 3,
+      side2: 1,
+      threshold: 500,
+      rssi: -65,
+      dt: 200,
+      updatedAt: 1_700_001,
+    },
   ],
   crossingAlerts: [
     {
@@ -41,7 +55,7 @@ const state: MonitorState = {
       acknowledged: false,
     },
   ],
-  config: { threshold: null, gain: null },
+  config: { gain: null },
   globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
   units: [
     {
@@ -82,7 +96,8 @@ const state: MonitorState = {
 
 const acknowledgeCrossing = vi.fn();
 const requestMap = vi.fn();
-const applyConfig = vi.fn();
+const sendThreshold = vi.fn();
+const sendGain = vi.fn();
 const resetAll = vi.fn();
 const setAlarmSoundEnabled = vi.fn();
 const setOfflineModeEnabled = vi.fn();
@@ -97,7 +112,8 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
     state,
     acknowledgeCrossing,
     requestMap,
-    applyConfig,
+    sendThreshold,
+    sendGain,
     setAlarmSoundEnabled,
     setOfflineModeEnabled,
     resetAll,
@@ -118,8 +134,9 @@ vi.mock('../domain/monitor/ui/MonitorMap', () => ({
     links: Array<{
       side1: number;
       side2: number;
-      quality: number;
-      intensity: number;
+      threshold: number;
+      rssi: number;
+      dt: number;
       updatedAt: number;
     }>;
     onSelectUnit: (unitId: number) => void;
@@ -163,7 +180,8 @@ describe('App', () => {
     cleanup();
     acknowledgeCrossing.mockClear();
     requestMap.mockClear();
-    applyConfig.mockClear();
+    sendThreshold.mockClear();
+    sendGain.mockClear();
     resetAll.mockClear();
     setAlarmSoundEnabled.mockClear();
     setOfflineModeEnabled.mockClear();

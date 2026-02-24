@@ -46,8 +46,9 @@ type Props = {
 type CommandPeerLink = {
   peerId: number;
   direction: 'IN' | 'OUT';
-  quality: number | null;
-  intensity: number | null;
+  threshold: number;
+  rssi: number;
+  dt: number;
 };
 
 function MapFocusController({
@@ -136,10 +137,6 @@ function alertPinIcon(label: string) {
   });
 }
 
-function toMetric(value: number | null): string {
-  return value === null ? '--' : String(Math.round(value));
-}
-
 function toLastHeartbeat(lastSeenAt: number | undefined): string {
   if (typeof lastSeenAt !== 'number') {
     return '--';
@@ -157,16 +154,18 @@ function getSensorLinks(
       peers.push({
         peerId: link.side2,
         direction: 'OUT',
-        quality: link.quality,
-        intensity: link.intensity,
+        threshold: link.threshold,
+        rssi: link.rssi,
+        dt: link.dt,
       });
     }
     if (link.side2 === sensorId) {
       peers.push({
         peerId: link.side1,
         direction: 'IN',
-        quality: link.quality,
-        intensity: link.intensity,
+        threshold: link.threshold,
+        rssi: link.rssi,
+        dt: link.dt,
       });
     }
   }
@@ -405,8 +404,7 @@ export function MonitorMap({
                               : `${link.peerId} -> ${unit.id}`}
                           </p>
                           <p className="font-body text-[11px] text-muted-foreground">
-                            Q{toMetric(link.quality)} • I
-                            {toMetric(link.intensity)}
+                            {link.rssi}dBm • th:{link.threshold} • dt:{link.dt}
                           </p>
                         </div>
                       ))
