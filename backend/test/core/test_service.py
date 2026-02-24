@@ -32,6 +32,13 @@ def test_handle_detection_sets_alarm_and_log():
     assert state.logs[0]["msg"].startswith("DETECTION")
 
 
+def test_add_log_without_fields_keeps_time_and_message_shape():
+    state = SensorState()
+    state.add_log("hello")
+
+    assert set(state.logs[0].keys()) == {"time", "msg"}
+
+
 def test_snapshot_includes_command_map_defaults():
     state = SensorState()
 

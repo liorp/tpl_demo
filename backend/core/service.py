@@ -1,7 +1,9 @@
+import logging
 import math
 from collections.abc import Callable
 from pathlib import Path
 
+from backend.core.event_logging import log_event
 from backend.core.layout_store import ALLOWED_BOUNDS
 from backend.core.models import (
     CrossingAlert,
@@ -13,6 +15,8 @@ from backend.core.models import (
     UnitPosition,
     now_ts,
 )
+
+logger = logging.getLogger("tpl-signum")
 
 
 def _normalize_side_links(raw_links: list[dict]) -> list[SideLink]:
@@ -133,7 +137,7 @@ def acknowledge_alarm(state: SensorState) -> bool:
     if state.alarm_state in ("alarm", "comm_loss"):
         set_connection_state(state, True, state.current_port, "clear")
     state.crossing_alert = None
-    state.add_log("Alarm acknowledged")
+    log_event(state, logger, "Alarm acknowledged")
     return True
 
 
@@ -166,7 +170,9 @@ def handle_event(state: SensorState, event: Event) -> bool:
             lng=crossing_lng,
             acknowledged=False,
         )
-        state.add_log(
+        log_event(
+            state,
+            logger,
             f"DETECTION {event['id_a']}({event['unit_a']})-{event['id_b']}({event['unit_b']}) "
             f"th={event['threshold']} val={event['value']}",
             fields=event,
@@ -189,7 +195,9 @@ def handle_event(state: SensorState, event: Event) -> bool:
             last_seen=last_seen,
         )
         set_connection_state(state, True, state.current_port, "comm_loss")
-        state.add_log(
+        log_event(
+            state,
+            logger,
             f"COMM LOSS {event['id_a']}({event['unit_a']})-{event['id_b']}({event['unit_b']})",
             fields=event,
         )
@@ -210,7 +218,9 @@ def handle_event(state: SensorState, event: Event) -> bool:
             connected=event["connected"],
             last_seen=last_seen,
         )
-        state.add_log(
+        log_event(
+            state,
+            logger,
             f"LINK {event['id_unit']}({event['unit']}) -> {event['id_peer']}({event['peer']}): "
             f"{'UP' if event['connected'] else 'DOWN'}",
             fields=event,
@@ -228,7 +238,9 @@ def handle_event(state: SensorState, event: Event) -> bool:
             state, unit_id=reporting_unit, last_seen=_event_last_seen()
         )
         state.config["gain"] = event["gain"]
-        state.add_log(
+        log_event(
+            state,
+            logger,
             f"MAP from {event['unit_id']} ver={event['version']}"
             f" gain={event['gain']} v={event['voltage']}",
             fields=event,
@@ -236,7 +248,9 @@ def handle_event(state: SensorState, event: Event) -> bool:
         return True
     if etype == "config":
         state.config["gain"] = event["value"]
-        state.add_log(
+        log_event(
+            state,
+            logger,
             f"CONFIG threshold={event['threshold']} gain={event['value']}",
             fields=event,
         )
@@ -252,7 +266,7 @@ def check_auto_reset(state: SensorState, now_ts_value: float, timeout_sec: float
     if should_reset:
         set_connection_state(state, True, state.current_port, "clear")
         state.crossing_alert = None
-        state.add_log("Alarm cleared (auto-reset)")
+        log_event(state, logger, "Alarm cleared (auto-reset)")
         return True
     return False
 
@@ -260,7 +274,7 @@ def check_auto_reset(state: SensorState, now_ts_value: float, timeout_sec: float
 def mark_disconnected(state: SensorState, reason: str | None = None) -> bool:
     set_connection_state(state, False, "None", "disconnected")
     if reason:
-        state.add_log(reason)
+        log_event(state, logger, reason, level="warning")
     return True
 
 

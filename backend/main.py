@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -8,7 +7,16 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from backend.api.routes import AppDeps, register_routes
-from backend.config import AUTO_RESET_TIMEOUT, LAYOUT_STATE_PATH, SERIAL_PORT
+from backend.config import (
+    APP_LOG_BACKUP_COUNT,
+    APP_LOG_FILE,
+    APP_LOG_LEVEL,
+    APP_LOG_MAX_BYTES,
+    AUTO_RESET_TIMEOUT,
+    LAYOUT_STATE_PATH,
+    SERIAL_PORT,
+)
+from backend.core.event_logging import log_event
 from backend.core.events import (
     SerialConnected,
     SerialDisconnect,
@@ -17,6 +25,7 @@ from backend.core.events import (
     SerialMessage,
 )
 from backend.core.layout_store import load_layout_state, save_layout_state
+from backend.core.logging_setup import configure_logging
 from backend.core.models import SensorState, snapshot
 from backend.core.service import (
     check_auto_reset,
@@ -27,8 +36,13 @@ from backend.core.service import (
 from backend.realtime.broadcaster import Broadcaster
 from backend.serial.manager import SerialManager
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("tpl-signum")
+logger = configure_logging(
+    name="tpl-signum",
+    level=APP_LOG_LEVEL,
+    log_file=APP_LOG_FILE,
+    max_bytes=APP_LOG_MAX_BYTES,
+    backup_count=APP_LOG_BACKUP_COUNT,
+)
 
 state = SensorState()
 broadcaster = Broadcaster()
@@ -66,20 +80,24 @@ class _AsyncSink:
 async def _serial_consumer(queue: asyncio.Queue[SerialMessage]) -> None:
     while True:
         msg = await queue.get()
-        if isinstance(msg, SerialEvent):
-            if handle_event(state, msg.event):
-                broadcaster.enqueue(snapshot(state))
-        elif isinstance(msg, SerialConnected):
-            set_connection_state(state, True, msg.port, "clear")
-            state.add_log(f"Connected to {msg.port}")
+        _handle_serial_message(msg)
+
+
+def _handle_serial_message(msg: SerialMessage) -> None:
+    if isinstance(msg, SerialEvent):
+        if handle_event(state, msg.event):
             broadcaster.enqueue(snapshot(state))
-        elif isinstance(msg, SerialIdle):
-            if check_auto_reset(state, time.time(), AUTO_RESET_TIMEOUT):
-                broadcaster.enqueue(snapshot(state))
-        elif isinstance(msg, SerialDisconnect):
-            serial_manager.close_connection()
-            mark_disconnected(state, msg.reason)
+    elif isinstance(msg, SerialConnected):
+        set_connection_state(state, True, msg.port, "clear")
+        log_event(state, logger, f"Connected to {msg.port}")
+        broadcaster.enqueue(snapshot(state))
+    elif isinstance(msg, SerialIdle):
+        if check_auto_reset(state, time.time(), AUTO_RESET_TIMEOUT):
             broadcaster.enqueue(snapshot(state))
+    elif isinstance(msg, SerialDisconnect):
+        serial_manager.close_connection()
+        mark_disconnected(state, msg.reason)
+        broadcaster.enqueue(snapshot(state))
 
 
 @asynccontextmanager
