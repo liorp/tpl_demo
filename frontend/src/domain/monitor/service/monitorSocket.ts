@@ -6,6 +6,7 @@ import {
   addCrossingAckWindow,
   createInitialServerState,
   isCrossingAlertSuppressed,
+  isPairEnabled,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
   setPairingInList,
@@ -83,6 +84,8 @@ export function useMonitorSocket(): {
   const crossingAckWindowsRef = useRef<CrossingAckWindow[]>([]);
 
   const socketRef = useRef<WebSocket | null>(null);
+  const pairingsRef = useRef(clientState.pairings);
+  pairingsRef.current = clientState.pairings;
   const pendingPositionsRef = useRef(
     new Map<number, { lat: number; lng: number }>(),
   );
@@ -119,12 +122,21 @@ export function useMonitorSocket(): {
 
             // Handle crossing alerts (transient)
             const incomingAlert = toCrossingAlert(payload.crossing_alert);
+            const pairedAlert =
+              incomingAlert &&
+              isPairEnabled(
+                pairingsRef.current,
+                incomingAlert.sensorA,
+                incomingAlert.sensorB,
+              )
+                ? incomingAlert
+                : null;
             const allowedAlert = isCrossingAlertSuppressed(
-              incomingAlert,
+              pairedAlert,
               crossingAckWindowsRef.current,
             )
               ? null
-              : incomingAlert;
+              : pairedAlert;
             setCrossingAlerts((prev) =>
               mergeCrossingAlerts(prev, allowedAlert),
             );

@@ -4,6 +4,7 @@ import {
   addCrossingAckWindow,
   createInitialMonitorState,
   isCrossingAlertSuppressed,
+  isPairEnabled,
   isSignalFresh,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
@@ -448,5 +449,22 @@ describe('monitor state model', () => {
         lastSeenAt: 1_700_000_120,
       }),
     ]);
+  });
+
+  test('isPairEnabled returns true only for enabled pairings', () => {
+    const pairings = [
+      { side1Id: 2, side2Id: 12, enabled: true },
+      { side1Id: 3, side2Id: 8, enabled: true },
+    ];
+
+    expect(isPairEnabled(pairings, 2, 12)).toBe(true);
+    expect(isPairEnabled(pairings, 12, 2)).toBe(true);
+    expect(isPairEnabled(pairings, 3, 8)).toBe(true);
+    expect(isPairEnabled(pairings, 1, 12)).toBe(false);
+    expect(isPairEnabled(pairings, 2, 3)).toBe(false);
+  });
+
+  test('isPairEnabled returns false when pairings list is empty', () => {
+    expect(isPairEnabled([], 2, 12)).toBe(false);
   });
 });

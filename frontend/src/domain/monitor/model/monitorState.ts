@@ -142,6 +142,7 @@ export function toPayloadUnits(
   }
 
   const nextUnits: UnitPlacement[] = [];
+  const seenIds = new Set<number>();
   for (const unit of payloadUnits) {
     if (!unit || typeof unit !== 'object') {
       continue;
@@ -158,6 +159,7 @@ export function toPayloadUnits(
     ) {
       continue;
     }
+    seenIds.add(id);
     const sensor = sensorStatus[String(id)];
     nextUnits.push({
       id,
@@ -170,6 +172,22 @@ export function toPayloadUnits(
             lastSeenAt: sensor.lastSeen ?? undefined,
           }
         : {}),
+    });
+  }
+
+  for (const [sensorIdStr, sensor] of Object.entries(sensorStatus)) {
+    const sensorId = Number.parseInt(sensorIdStr, 10);
+    if (!Number.isInteger(sensorId) || sensorId <= 0 || seenIds.has(sensorId)) {
+      continue;
+    }
+    const fallback = toDefaultUnitPosition(sensorId);
+    nextUnits.push({
+      id: sensorId,
+      label: `S${sensorId}`,
+      lat: fallback.lat,
+      lng: fallback.lng,
+      status: sensor.active ? ('active' as const) : ('inactive' as const),
+      lastSeenAt: sensor.lastSeen ?? undefined,
     });
   }
 
@@ -283,6 +301,18 @@ export function addCrossingAckWindow(
   const sensorB = Math.max(alert.sensorA, alert.sensorB);
   const nextWindow: CrossingAckWindow = { sensorA, sensorB, at: alert.at };
   return [nextWindow, ...windows].slice(0, maxWindows);
+}
+
+export function isPairEnabled(
+  pairings: PairLink[],
+  sensorA: number,
+  sensorB: number,
+): boolean {
+  const side1 = Math.min(sensorA, sensorB);
+  const side2 = Math.max(sensorA, sensorB);
+  return pairings.some(
+    (pair) => pair.enabled && pair.side1Id === side1 && pair.side2Id === side2,
+  );
 }
 
 export function isCrossingAlertSuppressed(
