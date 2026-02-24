@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, StrictMode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { useMonitorSocket } from './monitorSocket';
@@ -39,6 +39,11 @@ class FakeWebSocket {
     this.onmessage?.(
       new MessageEvent('message', { data: JSON.stringify(payload) }),
     );
+  }
+
+  emitClose() {
+    this.readyState = FakeWebSocket.CLOSED;
+    this.onclose?.(new CloseEvent('close'));
   }
 }
 
@@ -505,5 +510,36 @@ describe('monitor socket lifecycle', () => {
       };
       expect(latest.units[0]?.lastSeenAt).toBe(103);
     });
+  });
+
+  test('keeps active socket usable when stale socket closes in Strict Mode', async () => {
+    const onApi = vi.fn();
+    render(
+      <StrictMode>
+        <TestWrapper>
+          <StateHarness onState={vi.fn()} onApi={onApi} />
+        </TestWrapper>
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(2);
+    });
+
+    const firstSocket = FakeWebSocket.instances[0];
+    const secondSocket = FakeWebSocket.instances[1];
+    expect(firstSocket).toBeDefined();
+    expect(secondSocket).toBeDefined();
+
+    secondSocket?.emitOpen();
+    firstSocket?.emitClose();
+
+    const latestApi = onApi.mock.calls.at(-1)?.[0] as {
+      sendThreshold: (value: number) => boolean;
+    };
+    expect(latestApi.sendThreshold(600)).toBe(true);
+    expect(secondSocket?.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'set_threshold', value: 600 }),
+    );
   });
 });

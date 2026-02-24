@@ -166,6 +166,9 @@ export function useMonitorSocket(): {
       };
 
       socket.onclose = () => {
+        if (socketRef.current !== socket) {
+          return;
+        }
         socketRef.current = null;
         queryClient.setQueryData<ServerState>(
           SERVER_QUERY_KEY,
