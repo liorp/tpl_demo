@@ -76,7 +76,7 @@ function toTileUrl(tileRoot: string | null, useOfflineTiles: boolean): string {
   return `${root}/{z}/{x}/{y}.png`;
 }
 const PIN_STYLE =
-  'display:flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;white-space:nowrap;color:#fff;line-height:1.4;box-shadow:0 0 0 2px rgba(15,23,42,0.35);';
+  'display:flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;white-space:nowrap;color:#fff;line-height:1.4;box-shadow:0 0 0 2px rgba(15,23,42,0.35);transform:translateX(-50%);';
 
 function unitPinIcon(label: string) {
   const html = `<span style="${PIN_STYLE}border:2px solid #67e8f9;background:#06b6d4;">${label}</span>`;
