@@ -262,6 +262,35 @@ describe('monitor socket lifecycle', () => {
     });
   });
 
+  test('ignores malformed websocket payloads that do not match monitor envelope', async () => {
+    const onState = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} />
+      </TestWrapper>,
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    socket.emitOpen();
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      config: 'not-an-object',
+    });
+
+    await waitFor(() => {
+      const latestState = onState.mock.calls.at(-1)?.[0] as {
+        connected: boolean;
+        port: string;
+      };
+      expect(latestState.connected).toBe(false);
+      expect(latestState.port).toBe('None');
+    });
+  });
+
   test('broadcast with old position does not overwrite optimistic placeUnit update', async () => {
     const onState = vi.fn();
     const onApi = vi.fn();

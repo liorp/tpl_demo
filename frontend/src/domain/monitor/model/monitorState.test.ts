@@ -120,6 +120,41 @@ describe('monitor state model', () => {
     });
   });
 
+  test('drops invalid numeric values in sensor_status and units payloads', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { gain: null },
+      units: [
+        { id: 7, label: 'S7', lat: Number.NaN, lng: 35.78 },
+        { id: 8, label: 'S8', lat: 33.32, lng: 35.79 },
+      ],
+      sensor_status: {
+        '8': {
+          last_seen: Number.POSITIVE_INFINITY,
+          connected_peers: [9, Number.NaN, Number.POSITIVE_INFINITY],
+        },
+      },
+    } as MonitorPayload);
+
+    expect(state.units).toEqual([
+      {
+        id: 8,
+        label: 'S8',
+        lat: 33.32,
+        lng: 35.79,
+        status: 'active',
+      },
+    ]);
+    expect(state.sensorStatus).toEqual({
+      '8': { lastSeen: null, connectedPeers: [9] },
+    });
+  });
+
   test('maps snake_case crossing alert fields from backend payload', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
@@ -149,6 +184,24 @@ describe('monitor state model', () => {
         acknowledged: false,
       },
     ]);
+  });
+
+  test('ignores camelCase crossing alert aliases to keep a single wire format', () => {
+    const state = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'alarm',
+      events: [],
+      links: [],
+      crossing_alert: {
+        sensorA: 11,
+        sensorB: 12,
+        at: 1_739_742_000,
+      } as unknown as never,
+      config: { gain: null },
+    });
+
+    expect(state.crossingAlerts).toEqual([]);
   });
 
   test('normalizes crossing pair order to ascending ids', () => {

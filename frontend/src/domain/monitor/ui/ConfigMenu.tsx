@@ -15,6 +15,7 @@ import { Label } from '@/component/ui/label';
 import { Switch } from '@/component/ui/switch';
 
 import type { MonitorConfig } from '../model/types';
+import { parseInputNumber } from '../model/validation';
 
 type Props = {
   config: MonitorConfig;
@@ -55,11 +56,10 @@ export function ConfigMenu({
     setGain(toKnownValue(config.gain, DEFAULT_GAIN));
   }, [config.gain, open]);
 
-  const thresholdNum = Number(threshold);
-  const gainNum = Number(gain);
-  const thresholdValid =
-    Number.isFinite(thresholdNum) && threshold.trim() !== '';
-  const gainValid = Number.isFinite(gainNum) && gain.trim() !== '';
+  const thresholdNum = parseInputNumber(threshold);
+  const gainNum = parseInputNumber(gain);
+  const thresholdValid = thresholdNum !== null;
+  const gainValid = gainNum !== null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -115,6 +115,9 @@ export function ConfigMenu({
               <Button
                 size="sm"
                 onClick={() => {
+                  if (thresholdNum === null) {
+                    return;
+                  }
                   onSendThreshold(thresholdNum);
                   toast.success(`Threshold set to ${thresholdNum}`);
                 }}
@@ -142,6 +145,9 @@ export function ConfigMenu({
               <Button
                 size="sm"
                 onClick={() => {
+                  if (gainNum === null) {
+                    return;
+                  }
                   onSendGain(gainNum);
                   toast.success(`Gain set to ${gainNum}`);
                 }}

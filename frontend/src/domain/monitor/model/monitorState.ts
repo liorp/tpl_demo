@@ -1,10 +1,6 @@
 import type {
-  BackendMapPolicy,
-  BackendSensorStatus,
   CrossingAckWindow,
   CrossingAlert,
-  MapBounds,
-  MapPolicy,
   MonitorEvent,
   MonitorPayload,
   MonitorState,
@@ -14,6 +10,12 @@ import type {
   SignalLinkState,
   UnitPlacement,
 } from './types';
+import {
+  parseCrossingAlert,
+  parseMapPolicy,
+  parsePayloadUnits,
+  parseSensorStatusMap,
+} from './validation';
 
 const MAX_EVENTS = 50;
 const MAX_UNITS = 32;
@@ -27,144 +29,23 @@ const CLOCK_TIME_RE = /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/;
 export function toCrossingAlert(
   raw: MonitorPayload['crossing_alert'],
 ): CrossingAlert | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-
-  const value = raw as Record<string, unknown>;
-  const sensorA =
-    typeof value.sensorA === 'number'
-      ? value.sensorA
-      : typeof value.sensor_a === 'number'
-        ? value.sensor_a
-        : null;
-  const sensorB =
-    typeof value.sensorB === 'number'
-      ? value.sensorB
-      : typeof value.sensor_b === 'number'
-        ? value.sensor_b
-        : null;
-  const at =
-    typeof value.at === 'number'
-      ? value.at
-      : typeof value.timestamp === 'number'
-        ? value.timestamp
-        : null;
-
-  if (sensorA === null || sensorB === null || at === null) {
-    return null;
-  }
-  const side1 = Math.min(sensorA, sensorB);
-  const side2 = Math.max(sensorA, sensorB);
-
-  return {
-    sensorA: side1,
-    sensorB: side2,
-    at,
-    lat: typeof value.lat === 'number' ? value.lat : null,
-    lng: typeof value.lng === 'number' ? value.lng : null,
-    acknowledged: value.acknowledged === true,
-  };
-}
-
-function toDefaultMapPolicy(): MapPolicy {
-  return {
-    bounds: null,
-    bufferKm: null,
-    tileRoot: '/tiles',
-    offlineRequired: true,
-  };
-}
-
-function toMapBounds(raw: unknown): MapBounds | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-  const value = raw as Record<string, unknown>;
-  const north = value.north;
-  const south = value.south;
-  const west = value.west;
-  const east = value.east;
-  if (
-    typeof north !== 'number' ||
-    typeof south !== 'number' ||
-    typeof west !== 'number' ||
-    typeof east !== 'number'
-  ) {
-    return null;
-  }
-  return { north, south, west, east };
-}
-
-function toMapPolicy(raw: BackendMapPolicy | undefined): MapPolicy {
-  if (!raw || typeof raw !== 'object') {
-    return toDefaultMapPolicy();
-  }
-  return {
-    bounds: toMapBounds(raw.bounds),
-    bufferKm: typeof raw.buffer_km === 'number' ? raw.buffer_km : null,
-    tileRoot: typeof raw.tile_root === 'string' ? raw.tile_root : null,
-    offlineRequired: raw.offline_required === true,
-  };
-}
-
-function toSensorStatusMap(
-  raw: MonitorPayload['sensor_status'],
-): SensorStatusMap {
-  if (!raw || typeof raw !== 'object') {
-    return {};
-  }
-
-  const next: SensorStatusMap = {};
-  for (const [sensorId, status] of Object.entries(raw)) {
-    if (!status || typeof status !== 'object') {
-      continue;
-    }
-    const value = status as BackendSensorStatus;
-    const connectedPeers = Array.isArray(value.connected_peers)
-      ? value.connected_peers.filter(
-          (peer): peer is number => typeof peer === 'number',
-        )
-      : [];
-    next[sensorId] = {
-      lastSeen: typeof value.last_seen === 'number' ? value.last_seen : null,
-      connectedPeers,
-    };
-  }
-  return next;
+  return parseCrossingAlert(raw);
 }
 
 export function toPayloadUnits(
   payloadUnits: MonitorPayload['units'],
   sensorStatus: SensorStatusMap,
 ): UnitPlacement[] {
-  if (!Array.isArray(payloadUnits)) {
-    return [];
-  }
-
+  const parsedUnits = parsePayloadUnits(payloadUnits);
   const nextUnits: UnitPlacement[] = [];
   const seenIds = new Set<number>();
-  for (const unit of payloadUnits) {
-    if (!unit || typeof unit !== 'object') {
-      continue;
-    }
-    const value = unit as Record<string, unknown>;
-    const id = value.id;
-    const lat = value.lat;
-    const lng = value.lng;
-    if (
-      typeof id !== 'number' ||
-      !Number.isInteger(id) ||
-      typeof lat !== 'number' ||
-      typeof lng !== 'number'
-    ) {
-      continue;
-    }
+  for (const unit of parsedUnits) {
+    const { id, lat, lng, label } = unit;
     seenIds.add(id);
     const sensor = sensorStatus[String(id)];
     nextUnits.push({
       id,
-      label: typeof value.label === 'string' ? value.label : `S${id}`,
+      label,
       lat,
       lng,
       ...(sensor
@@ -211,7 +92,7 @@ export function createInitialServerState(): ServerState {
     links: [],
     config: { gain: null },
     sensorStatus: {},
-    mapPolicy: toDefaultMapPolicy(),
+    mapPolicy: parseMapPolicy(undefined),
   };
 }
 
@@ -226,7 +107,7 @@ export function createInitialMonitorState(): MonitorState {
 }
 
 export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
-  const sensorStatus = toSensorStatusMap(payload.sensor_status);
+  const sensorStatus = parseSensorStatusMap(payload.sensor_status);
   return {
     serverOnline: true,
     connected: payload.connected,
@@ -236,7 +117,7 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     links: payload.links,
     config: payload.config,
     sensorStatus,
-    mapPolicy: toMapPolicy(payload.map_policy),
+    mapPolicy: parseMapPolicy(payload.map_policy),
   };
 }
 

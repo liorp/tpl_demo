@@ -24,29 +24,14 @@ import type {
   CrossingAckWindow,
   CrossingAlert,
   GlobalSettings,
-  MonitorPayload,
   MonitorState,
   PairLink,
   ServerState,
   UnitPlacement,
 } from '../model/types';
+import { isMonitorPayload } from '../model/validation';
 
 const SERVER_QUERY_KEY = ['monitor', 'server'] as const;
-
-function isPayload(data: unknown): data is MonitorPayload {
-  if (!data || typeof data !== 'object') {
-    return false;
-  }
-
-  const value = data as Record<string, unknown>;
-  return (
-    typeof value.connected === 'boolean' &&
-    typeof value.port === 'string' &&
-    typeof value.alarm === 'string' &&
-    Array.isArray(value.events) &&
-    Array.isArray(value.links)
-  );
-}
 
 export function useMonitorSocket(): {
   state: MonitorState;
@@ -116,7 +101,7 @@ export function useMonitorSocket(): {
       socket.onmessage = (event: MessageEvent<string>) => {
         try {
           const payload: unknown = JSON.parse(event.data);
-          if (isPayload(payload)) {
+          if (isMonitorPayload(payload)) {
             // Update server state in React Query cache
             const nextServer = toServerStateFromPayload(payload);
             queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, nextServer);
@@ -230,8 +215,17 @@ export function useMonitorSocket(): {
 
   const sendThreshold = useCallback((value: number) => {
     const socket = socketRef.current;
+    console.log('[DEBUG sendThreshold]', {
+      value,
+      socketExists: !!socket,
+      readyState: socket?.readyState,
+      OPEN: WebSocket.OPEN,
+    });
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ cmd: 'set_threshold', value }));
+      console.log('[DEBUG sendThreshold] SENT');
+    } else {
+      console.log('[DEBUG sendThreshold] SKIPPED - socket not open');
     }
   }, []);
 

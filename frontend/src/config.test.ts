@@ -22,6 +22,9 @@ describe('frontend runtime config', () => {
     expect(resolveBackendPort('abc')).toBe(DEFAULT_BACKEND_PORT);
     expect(resolveBackendPort(0)).toBe(DEFAULT_BACKEND_PORT);
     expect(resolveBackendPort(70000)).toBe(DEFAULT_BACKEND_PORT);
+    expect(resolveBackendPort('8098.1')).toBe(DEFAULT_BACKEND_PORT);
+    expect(resolveBackendPort('8098abc')).toBe(DEFAULT_BACKEND_PORT);
+    expect(resolveBackendPort('')).toBe(DEFAULT_BACKEND_PORT);
   });
 
   test('builds websocket URL from protocol, host, and configured port', () => {

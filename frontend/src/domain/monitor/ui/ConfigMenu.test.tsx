@@ -91,6 +91,29 @@ describe('ConfigMenu', () => {
     expect(onSendGain).toHaveBeenCalledWith(32);
   });
 
+  test('disables send for non-decimal numeric syntax', () => {
+    render(
+      <ConfigMenu
+        config={{ gain: null }}
+        alarmSoundEnabled
+        offlineModeEnabled
+        onSendThreshold={vi.fn()}
+        onSendGain={vi.fn()}
+        onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={vi.fn()}
+        onResetAll={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.change(screen.getByLabelText('Threshold'), {
+      target: { value: '0x10' },
+    });
+
+    const sendButtons = screen.getAllByRole('button', { name: 'Send' });
+    expect(sendButtons[0]?.hasAttribute('disabled')).toBe(true);
+  });
+
   test('resets all from settings', () => {
     const onResetAll = vi.fn();
 

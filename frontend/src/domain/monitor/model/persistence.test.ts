@@ -70,6 +70,32 @@ describe('monitor persistence', () => {
     expect(loaded.pairings).toEqual([]);
   });
 
+  test('drops non-finite persisted unit and pairing values', () => {
+    store.clear();
+    localStorage.setItem(
+      'monitor:persisted:v1',
+      JSON.stringify({
+        units: [
+          { id: 1, label: 'U1', lat: 33.1, lng: 35.1 },
+          { id: 2, label: 'U2', lat: Number.NaN, lng: 35.2 },
+        ],
+        pairings: [
+          { side1Id: 1, side2Id: 2, enabled: true },
+          { side1Id: Number.NaN, side2Id: 3, enabled: true },
+        ],
+      }),
+    );
+
+    const loaded = loadPersistedMonitorConfig();
+
+    expect(loaded.units).toEqual([
+      { id: 1, label: 'U1', lat: 33.1, lng: 35.1 },
+    ]);
+    expect(loaded.pairings).toEqual([
+      { side1Id: 1, side2Id: 2, enabled: true },
+    ]);
+  });
+
   test('clears persisted monitor config', () => {
     store.clear();
     savePersistedMonitorConfig({
