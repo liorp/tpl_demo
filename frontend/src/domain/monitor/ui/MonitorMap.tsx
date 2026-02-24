@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { divIcon } from 'leaflet';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   MapContainer,
   Marker,
@@ -201,6 +201,28 @@ export function MonitorMap({
       .filter((alert) => !alert.acknowledged)
       .flatMap((alert) => [alert.sensorA, alert.sensorB]),
   );
+
+  // Cache divIcon instances so Leaflet doesn't replace the DOM element on
+  // every re-render (which would interrupt an in-progress drag).
+  const iconCacheRef = useRef(new Map<string, ReturnType<typeof divIcon>>());
+  const getCachedIcon = useCallback(
+    (label: string, type: 'normal' | 'stale' | 'alert') => {
+      const key = `${label}\0${type}`;
+      let icon = iconCacheRef.current.get(key);
+      if (!icon) {
+        icon =
+          type === 'alert'
+            ? alertPinIcon(label)
+            : type === 'stale'
+              ? stalePinIcon(label)
+              : unitPinIcon(label);
+        iconCacheRef.current.set(key, icon);
+      }
+      return icon;
+    },
+    [],
+  );
+
   const tileUrl = toTileUrl(tileRoot, useOfflineTiles);
   const unitsById = new Map(units.map((unit) => [unit.id, unit] as const));
   const pairingLines = pairings.flatMap((pair) => {
@@ -329,13 +351,14 @@ export function MonitorMap({
               key={unit.id}
               position={[unit.lat, unit.lng]}
               draggable={true}
-              icon={
+              icon={getCachedIcon(
+                unit.label,
                 alertingSensorIds.has(unit.id)
-                  ? alertPinIcon(unit.label)
+                  ? 'alert'
                   : unit.status === 'stale'
-                    ? stalePinIcon(unit.label)
-                    : unitPinIcon(unit.label)
-              }
+                    ? 'stale'
+                    : 'normal',
+              )}
               eventHandlers={{
                 click: () => onSelectUnit(unit.id),
                 dragend: (event) => {
@@ -346,7 +369,10 @@ export function MonitorMap({
             >
               <Popup>
                 <div className="w-56 rounded-md border border-border-bright bg-card/90 p-3 font-body text-xs backdrop-blur-sm">
-                  <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
+                  <p
+                    className="font-display text-[11px] tracking-[0.2em] text-muted-foreground"
+                    title="Active = receiving telemetry. Inactive = telemetry not received."
+                  >
                     CMD STATUS
                   </p>
                   <p className="mt-1 font-display text-sm text-foreground">

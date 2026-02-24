@@ -676,6 +676,9 @@ describe('MonitorMap', () => {
     expect(screen.getByText('CMD STATUS')).not.toBeNull();
     expect(screen.getByText('Sensor #1')).not.toBeNull();
     expect(screen.getByText('active')).not.toBeNull();
+    expect(screen.getByText('CMD STATUS').getAttribute('title')).toBe(
+      'Active = receiving telemetry. Inactive = telemetry not received.',
+    );
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
     expect(screen.getByText('OUT 1 -> 2')).not.toBeNull();
     expect(screen.getByText('Q90 • I70')).not.toBeNull();
