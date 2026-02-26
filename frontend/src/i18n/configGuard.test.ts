@@ -12,4 +12,9 @@ describe('i18n config runtime guard', () => {
     const source = readFileSync(resolve(__dirname, 'config.ts'), 'utf8');
     expect(source.includes('import.meta as')).toBe(false);
   });
+
+  test('guards VITEST access when import.meta.env is undefined', () => {
+    const source = readFileSync(resolve(__dirname, 'config.ts'), 'utf8');
+    expect(source.includes('import.meta.env?.VITEST')).toBe(true);
+  });
 });

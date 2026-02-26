@@ -9,7 +9,7 @@ export const supportedLanguages = ['en', 'he'] as const;
 export type SupportedLanguage = (typeof supportedLanguages)[number];
 
 if (!i18n.isInitialized) {
-  const isTestEnv = Boolean(import.meta.env.VITEST);
+  const isTestEnv = Boolean(import.meta.env?.VITEST);
   void i18n
     .use(LanguageDetector)
     .use(initReactI18next)
