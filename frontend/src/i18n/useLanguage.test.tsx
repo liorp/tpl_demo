@@ -8,6 +8,8 @@ import { useLanguage } from './useLanguage';
 
 afterEach(async () => {
   await i18n.changeLanguage('en');
+  document.documentElement.lang = 'en';
+  document.documentElement.dir = 'ltr';
 });
 
 describe('useLanguage', () => {
@@ -34,5 +36,23 @@ describe('useLanguage', () => {
 
     const { result } = renderHook(() => useLanguage());
     expect(result.current.language).toBe('he');
+  });
+
+  test('sets page direction to rtl for hebrew and ltr for english', async () => {
+    const { result } = renderHook(() => useLanguage());
+
+    await act(async () => {
+      await result.current.setLanguage('he');
+    });
+
+    expect(document.documentElement.lang).toBe('he');
+    expect(document.documentElement.dir).toBe('rtl');
+
+    await act(async () => {
+      await result.current.setLanguage('en');
+    });
+
+    expect(document.documentElement.lang).toBe('en');
+    expect(document.documentElement.dir).toBe('ltr');
   });
 });

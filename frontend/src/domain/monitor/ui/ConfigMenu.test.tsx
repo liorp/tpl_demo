@@ -269,8 +269,11 @@ describe('ConfigMenu', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    const select = screen.getByLabelText('Language');
-    fireEvent.change(select, { target: { value: 'he' } });
+    const languageSelect = screen.getByRole('combobox', { name: 'Language' });
+    expect(languageSelect.getAttribute('data-slot')).toBe('select-trigger');
+
+    fireEvent.keyDown(languageSelect, { key: 'ArrowDown' });
+    fireEvent.click(screen.getByRole('option', { name: 'Hebrew' }));
 
     expect(screen.getByRole('heading', { name: 'הגדרות' })).not.toBeNull();
   });

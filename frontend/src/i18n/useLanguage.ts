@@ -8,6 +8,18 @@ function normalizeLanguage(language: string): SupportedLanguage {
   return language.startsWith('he') ? 'he' : 'en';
 }
 
+function applyDocumentLanguage(
+  language: SupportedLanguage,
+  i18nDir: (language: string) => string,
+) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  document.documentElement.lang = language;
+  document.documentElement.dir = i18nDir(language);
+}
+
 export function useLanguage() {
   const { i18n } = useTranslation();
 
@@ -17,6 +29,7 @@ export function useLanguage() {
       supportedLanguages,
       setLanguage: async (language: SupportedLanguage) => {
         await i18n.changeLanguage(language);
+        applyDocumentLanguage(language, i18n.dir.bind(i18n));
       },
     }),
     [i18n],

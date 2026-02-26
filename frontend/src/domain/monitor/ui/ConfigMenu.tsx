@@ -13,6 +13,13 @@ import {
 } from '@/component/ui/dialog';
 import { Input } from '@/component/ui/input';
 import { Label } from '@/component/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/component/ui/select';
 import { Switch } from '@/component/ui/switch';
 import { useLanguage } from '@/i18n/useLanguage';
 import type { MonitorConfig } from '../model/types';
@@ -245,17 +252,28 @@ export function ConfigMenu({
             >
               {t('settings.language')}
             </Label>
-            <select
-              id="language"
+            <Select
               value={language}
-              onChange={(event) => {
-                void setLanguage(event.target.value as 'en' | 'he');
+              onValueChange={(value) => {
+                void setLanguage(value as 'en' | 'he');
               }}
-              className="h-9 rounded-md border border-input bg-background px-3 font-body text-sm text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
             >
-              <option value="en">{t('settings.languageEnglish')}</option>
-              <option value="he">{t('settings.languageHebrew')}</option>
-            </select>
+              <SelectTrigger
+                id="language"
+                aria-label={t('settings.language')}
+                className="font-body text-sm text-foreground"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">
+                  {t('settings.languageEnglish')}
+                </SelectItem>
+                <SelectItem value="he">
+                  {t('settings.languageHebrew')}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-md border border-border-bright bg-background/70 px-3 py-2">
             <div className="space-y-0.5">
