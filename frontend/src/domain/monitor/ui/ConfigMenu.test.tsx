@@ -252,4 +252,26 @@ describe('ConfigMenu', () => {
 
     expect(onOfflineModeEnabledChange).toHaveBeenCalledWith(false);
   });
+
+  test('allows selecting language from settings', () => {
+    render(
+      <ConfigMenu
+        config={{ gain: null }}
+        alarmSoundEnabled
+        offlineModeEnabled
+        onSendThreshold={vi.fn().mockReturnValue(true)}
+        onSendDetectionThreshold={vi.fn().mockReturnValue(true)}
+        onSendGain={vi.fn().mockReturnValue(true)}
+        onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={vi.fn()}
+        onResetAll={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    const select = screen.getByLabelText('Language');
+    fireEvent.change(select, { target: { value: 'he' } });
+
+    expect(screen.getByRole('heading', { name: 'הגדרות' })).not.toBeNull();
+  });
 });

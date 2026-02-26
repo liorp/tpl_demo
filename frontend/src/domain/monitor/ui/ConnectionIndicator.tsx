@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   Tooltip,
@@ -18,6 +19,7 @@ export const ConnectionIndicator = React.memo(function ConnectionIndicator({
   serverOnline,
   port,
 }: Props) {
+  const { t } = useTranslation();
   const dotColor = connected
     ? 'bg-emerald-400 shadow-[0_0_6px_oklch(0.65_0.19_155/0.5)]'
     : serverOnline
@@ -25,10 +27,10 @@ export const ConnectionIndicator = React.memo(function ConnectionIndicator({
       : 'bg-red-500/80';
 
   const tooltip = connected
-    ? `Connected to sensor on port ${port}`
+    ? t('connection.tooltipConnected', { port })
     : serverOnline
-      ? 'Server online — waiting for sensor'
-      : 'Server offline — retrying...';
+      ? t('connection.tooltipWaiting')
+      : t('connection.tooltipOffline');
 
   return (
     <Tooltip>
@@ -48,16 +50,22 @@ export const ConnectionIndicator = React.memo(function ConnectionIndicator({
           <span className="font-display text-sm font-medium tracking-wide text-muted-foreground">
             {connected ? (
               <>
-                <span className="text-emerald-400/90">Online</span>
+                <span className="text-emerald-400/90">
+                  {t('connection.online')}
+                </span>
                 <span className="mx-1 text-muted-foreground/30">|</span>
                 <span className="font-mono tabular-nums text-foreground/50">
                   {port}
                 </span>
               </>
             ) : serverOnline ? (
-              <span className="text-amber-400/80">No sensor</span>
+              <span className="text-amber-400/80">
+                {t('connection.noSensor')}
+              </span>
             ) : (
-              <span className="text-red-400/80">Server offline</span>
+              <span className="text-red-400/80">
+                {t('connection.serverOffline')}
+              </span>
             )}
           </span>
         </div>

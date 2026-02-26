@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/component/ui/button';
 
 import type { CrossingAlert } from '../model/types';
@@ -20,6 +21,7 @@ function formatLocation(alert: CrossingAlert): string | null {
 }
 
 export function CrossingAlertBanner({ alerts, onAcknowledge, onFocus }: Props) {
+  const { t } = useTranslation();
   if (!alerts.length) {
     return null;
   }
@@ -39,7 +41,7 @@ export function CrossingAlertBanner({ alerts, onAcknowledge, onFocus }: Props) {
                   &#x26A0;
                 </span>
                 <span className="self-baseline font-display text-xs font-semibold tracking-[0.18em] text-red-300 uppercase">
-                  Crossing
+                  {t('alerts.crossing')}
                 </span>
                 <span className="self-baseline font-display text-sm font-medium tracking-wide text-red-200">
                   S{alert.sensorA} &times; S{alert.sensorB}
@@ -59,9 +61,12 @@ export function CrossingAlertBanner({ alerts, onAcknowledge, onFocus }: Props) {
                   type="button"
                   className="gap-1.5 border-red-700/60 bg-red-900/30 font-display text-sm font-semibold tracking-wide text-red-200 hover:border-red-600 hover:bg-red-800/40"
                   onClick={() => onFocus(alert)}
-                  aria-label={`Focus S${alert.sensorA} × S${alert.sensorB}`}
+                  aria-label={t('alerts.ariaFocus', {
+                    sensorA: alert.sensorA,
+                    sensorB: alert.sensorB,
+                  })}
                 >
-                  Focus
+                  {t('alerts.focus')}
                 </Button>
               ) : null}
               <Button
@@ -70,9 +75,12 @@ export function CrossingAlertBanner({ alerts, onAcknowledge, onFocus }: Props) {
                 type="button"
                 className="gap-1.5 border-red-700/60 bg-red-900/50 font-display text-sm font-semibold tracking-wide text-red-200 hover:border-red-600 hover:bg-red-800/50"
                 onClick={() => onAcknowledge(alert)}
-                aria-label={`OK S${alert.sensorA} × S${alert.sensorB}`}
+                aria-label={t('alerts.ariaOk', {
+                  sensorA: alert.sensorA,
+                  sensorB: alert.sensorB,
+                })}
               >
-                OK
+                {t('alerts.ok')}
               </Button>
             </div>
           </div>

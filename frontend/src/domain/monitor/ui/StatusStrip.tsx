@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
@@ -35,22 +36,33 @@ const alarmConfig: Record<
   },
 };
 
-const alarmLabel: Record<AlarmState, string> = {
-  clear: 'ALL CLEAR',
-  alarm: 'ALARM',
-  comm_loss: 'COMM LOSS',
-  disconnected: 'DISCONNECTED',
-};
-
-function resolveLabel(alarm: AlarmState, serverOnline: boolean): string {
-  if (alarm !== 'disconnected') return alarmLabel[alarm];
-  return serverOnline ? 'NO SENSOR' : 'SERVER OFFLINE';
+function resolveLabel(
+  alarm: AlarmState,
+  serverOnline: boolean,
+  t: (key: string) => string,
+): string {
+  if (alarm === 'clear') {
+    return t('statusStrip.clear');
+  }
+  if (alarm === 'alarm') {
+    return t('statusStrip.alarm');
+  }
+  if (alarm === 'comm_loss') {
+    return t('statusStrip.commLoss');
+  }
+  if (alarm !== 'disconnected') {
+    return t('statusStrip.disconnected');
+  }
+  return serverOnline
+    ? t('statusStrip.noSensor')
+    : t('statusStrip.serverOffline');
 }
 
 export const StatusStrip = React.memo(function StatusStrip({
   alarm,
   serverOnline,
 }: Props) {
+  const { t } = useTranslation();
   const config = alarmConfig[alarm];
 
   return (
@@ -64,11 +76,11 @@ export const StatusStrip = React.memo(function StatusStrip({
       <div className="flex items-center gap-3">
         <span className="text-2xl leading-none opacity-80">{config.icon}</span>
         <h1 className="font-display text-xl font-bold tracking-[0.12em] text-white/95 sm:text-2xl">
-          {resolveLabel(alarm, serverOnline)}
+          {resolveLabel(alarm, serverOnline, t)}
         </h1>
       </div>
       <span className="ml-auto font-display text-xs font-medium tracking-[0.2em] text-white/30 uppercase">
-        TPL SIGNUM
+        {t('statusStrip.productName')}
       </span>
     </section>
   );

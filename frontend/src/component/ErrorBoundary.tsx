@@ -1,5 +1,6 @@
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import { Component, type ReactNode } from 'react';
+import { i18n } from '@/i18n/config';
 
 type FallbackProps = {
   error: Error;
@@ -23,7 +24,7 @@ function DefaultFallback({ error, resetError, section }: FallbackProps) {
     <div className="flex items-center justify-center p-4">
       <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-center">
         <p className="text-sm font-medium text-destructive">
-          {section} failed to render
+          {i18n.t('errors.sectionFailed', { section })}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
         <button
@@ -31,7 +32,7 @@ function DefaultFallback({ error, resetError, section }: FallbackProps) {
           onClick={resetError}
           className="mt-2 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90"
         >
-          Retry
+          {i18n.t('errors.retry')}
         </button>
       </div>
     </div>

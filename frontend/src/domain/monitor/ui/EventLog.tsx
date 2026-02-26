@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/component/ui/badge';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ function formatEventValue(value: unknown): string {
 }
 
 export function EventLog({ events }: Props) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(true);
 
   return (
@@ -79,10 +81,10 @@ export function EventLog({ events }: Props) {
           <rect width="20" height="14" x="2" y="6" rx="2" />
         </svg>
         <span className="font-display text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-          System Events
+          {t('events.title')}
         </span>
         <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground/40">
-          {events.length} entries
+          {t('events.entriesCount', { count: events.length })}
         </span>
       </button>
       {!collapsed && (

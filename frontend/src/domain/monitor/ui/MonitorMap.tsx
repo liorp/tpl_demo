@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { divIcon } from 'leaflet';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   MapContainer,
   Marker,
@@ -317,6 +318,7 @@ export function MonitorMap({
   onMoveUnit,
   onSelectUnit,
 }: Props) {
+  const { t } = useTranslation();
   const [offlineTilePackMissing, setOfflineTilePackMissing] = useState(false);
   const [offlineZoomRange, setOfflineZoomRange] = useState<{
     minZoom: number;
@@ -495,18 +497,20 @@ export function MonitorMap({
               <Popup className="sensor-popup" maxWidth={360}>
                 <div className="w-full rounded-md border border-border-bright bg-card p-4 font-body text-xs">
                   <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
-                    STATUS
+                    {t('map.status')}
                   </p>
                   <p className="mt-1 font-display text-sm text-foreground">
-                    Sensor #{unit.id}
+                    {t('map.sensorTitle', { id: unit.id })}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Last heartbeat: {toLastHeartbeat(unit.lastSeenAt)}
+                    {t('map.lastHeartbeat', {
+                      value: toLastHeartbeat(unit.lastSeenAt),
+                    })}
                   </p>
                   <div className="mt-3 space-y-1.5">
                     {sensorLinks.length === 0 ? (
                       <p className="font-body text-xs text-muted-foreground">
-                        No peer links
+                        {t('map.noPeerLinks')}
                       </p>
                     ) : (
                       sensorLinks.map((link) => (
@@ -515,23 +519,26 @@ export function MonitorMap({
                           className="rounded border border-border bg-card-elevated p-3"
                         >
                           <p className="font-body text-xs text-foreground">
-                            Link {link.side1} {'->'} {link.side2}
+                            {t('map.link', {
+                              side1: link.side1,
+                              side2: link.side2,
+                            })}
                           </p>
                           <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
                             <p className="font-body text-[11px] text-muted-foreground">
-                              Direction: {link.direction}
+                              {t('map.direction', { value: link.direction })}
                             </p>
                             <p className="font-body text-[11px] text-muted-foreground">
-                              RSSI: {link.rssi}dBm
+                              {t('map.rssi', { value: link.rssi })}
                             </p>
                             <p className="font-body text-[11px] text-muted-foreground">
-                              Threshold: {link.threshold}
+                              {t('map.threshold', { value: link.threshold })}
                             </p>
                             <p className="font-body text-[11px] text-muted-foreground">
-                              DT: {link.dt}
+                              {t('map.dt', { value: link.dt })}
                             </p>
                             <p className="font-body text-[11px] text-muted-foreground">
-                              Updated at: {link.updatedAt}
+                              {t('map.updatedAt', { value: link.updatedAt })}
                             </p>
                           </div>
                         </div>
@@ -546,7 +553,7 @@ export function MonitorMap({
       </MapContainer>
       {offlineModeEnabled && offlineTilePackMissing ? (
         <div className="pointer-events-none absolute inset-x-3 top-3 z-[1300] rounded border border-red-500/50 bg-red-950/90 px-3 py-2 text-xs text-red-100">
-          Offline map tiles are unavailable.
+          {t('map.offlineMissing')}
         </div>
       ) : null}
     </section>

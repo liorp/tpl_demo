@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Switch } from '@/component/ui/switch';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +25,7 @@ function hasPair(
 }
 
 export function PairingPanel({ units, pairings, onTogglePairing }: Props) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(true);
   const sortedUnits = [...units].sort((a, b) => a.id - b.id);
 
@@ -78,13 +80,13 @@ export function PairingPanel({ units, pairings, onTogglePairing }: Props) {
           <path d="M4 16h6" />
         </svg>
         <span className="font-display text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-          Sensor Pairings
+          {t('pairings.title')}
         </span>
       </button>
       {!collapsed &&
         (units.length < 2 ? (
           <p className="px-4 py-2 text-sm text-muted-foreground/60 italic">
-            Waiting for at least 2 units...
+            {t('pairings.waiting')}
           </p>
         ) : (
           <div className="grid gap-1 overflow-y-auto px-4 py-2.5">

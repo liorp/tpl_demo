@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { Button } from '@/component/ui/button';
@@ -13,7 +14,7 @@ import {
 import { Input } from '@/component/ui/input';
 import { Label } from '@/component/ui/label';
 import { Switch } from '@/component/ui/switch';
-
+import { useLanguage } from '@/i18n/useLanguage';
 import type { MonitorConfig } from '../model/types';
 import { parseInputNumber } from '../model/validation';
 
@@ -48,6 +49,8 @@ export function ConfigMenu({
   onOfflineModeEnabledChange,
   onResetAll,
 }: Props) {
+  const { t } = useTranslation();
+  const { language, setLanguage } = useLanguage();
   const [open, setOpen] = useState(false);
   const [noiseThreshold, setNoiseThreshold] = useState(
     toKnownValue(config.noise_threshold ?? null, DEFAULT_THRESHOLD),
@@ -109,17 +112,15 @@ export function ConfigMenu({
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
-          Settings
+          {t('settings.title')}
         </Button>
       </DialogTrigger>
       <DialogContent className="border-border-bright bg-card sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="font-display tracking-wide">
-            Settings
+            {t('settings.title')}
           </DialogTitle>
-          <DialogDescription>
-            Configure noise threshold, detection threshold, and gain parameters.
-          </DialogDescription>
+          <DialogDescription>{t('settings.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
@@ -127,7 +128,7 @@ export function ConfigMenu({
               htmlFor="noise-threshold"
               className="font-display text-xs tracking-wide text-muted-foreground"
             >
-              Noise Threshold
+              {t('settings.noiseThreshold')}
             </Label>
             <div className="flex items-center gap-2">
               <Input
@@ -144,16 +145,18 @@ export function ConfigMenu({
                   }
                   if (onSendThreshold(noiseThresholdNum)) {
                     toast.success(
-                      `Noise threshold set to ${noiseThresholdNum}`,
+                      t('configFeedback.noiseSet', {
+                        value: noiseThresholdNum,
+                      }),
                     );
                   } else {
-                    toast.error('Not connected — noise threshold not sent');
+                    toast.error(t('configFeedback.noiseNotConnected'));
                   }
                 }}
                 disabled={!noiseThresholdValid}
                 className="font-display tracking-wide"
               >
-                Send
+                {t('settings.send')}
               </Button>
             </div>
           </div>
@@ -162,7 +165,7 @@ export function ConfigMenu({
               htmlFor="detection-threshold"
               className="font-display text-xs tracking-wide text-muted-foreground"
             >
-              Detection Threshold
+              {t('settings.detectionThreshold')}
             </Label>
             <div className="flex items-center gap-2">
               <Input
@@ -185,16 +188,18 @@ export function ConfigMenu({
                   }
                   if (onSendDetectionThreshold(detectionThresholdNum)) {
                     toast.success(
-                      `Detection threshold set to ${detectionThresholdNum}`,
+                      t('configFeedback.detectionSet', {
+                        value: detectionThresholdNum,
+                      }),
                     );
                   } else {
-                    toast.error('Not connected — detection threshold not sent');
+                    toast.error(t('configFeedback.detectionNotConnected'));
                   }
                 }}
                 disabled={!detectionThresholdValid}
                 className="font-display tracking-wide"
               >
-                Send
+                {t('settings.send')}
               </Button>
             </div>
           </div>
@@ -203,7 +208,7 @@ export function ConfigMenu({
               htmlFor="gain"
               className="font-display text-xs tracking-wide text-muted-foreground"
             >
-              Gain
+              {t('settings.gain')}
             </Label>
             <div className="flex items-center gap-2">
               <Input
@@ -219,17 +224,38 @@ export function ConfigMenu({
                     return;
                   }
                   if (onSendGain(gainNum)) {
-                    toast.success(`Gain set to ${gainNum}`);
+                    toast.success(
+                      t('configFeedback.gainSet', { value: gainNum }),
+                    );
                   } else {
-                    toast.error('Not connected — gain not sent');
+                    toast.error(t('configFeedback.gainNotConnected'));
                   }
                 }}
                 disabled={!gainValid}
                 className="font-display tracking-wide"
               >
-                Send
+                {t('settings.send')}
               </Button>
             </div>
+          </div>
+          <div className="grid gap-2">
+            <Label
+              htmlFor="language"
+              className="font-display text-xs tracking-wide text-muted-foreground"
+            >
+              {t('settings.language')}
+            </Label>
+            <select
+              id="language"
+              value={language}
+              onChange={(event) => {
+                void setLanguage(event.target.value as 'en' | 'he');
+              }}
+              className="h-9 rounded-md border border-input bg-background px-3 font-body text-sm text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none"
+            >
+              <option value="en">{t('settings.languageEnglish')}</option>
+              <option value="he">{t('settings.languageHebrew')}</option>
+            </select>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-md border border-border-bright bg-background/70 px-3 py-2">
             <div className="space-y-0.5">
@@ -237,17 +263,17 @@ export function ConfigMenu({
                 htmlFor="alarm-sound"
                 className="font-display text-xs tracking-wide text-muted-foreground"
               >
-                Alarm Sound
+                {t('settings.alarmSound')}
               </Label>
               <p className="font-body text-xs text-muted-foreground/85">
-                Play a short alert sound when alarm is triggered.
+                {t('settings.alarmSoundHelp')}
               </p>
             </div>
             <Switch
               id="alarm-sound"
               checked={alarmSoundEnabled}
               onCheckedChange={onAlarmSoundEnabledChange}
-              aria-label="Alarm Sound"
+              aria-label={t('settings.alarmSound')}
             />
           </div>
           <div className="flex items-center justify-between gap-3 rounded-md border border-border-bright bg-background/70 px-3 py-2">
@@ -256,17 +282,17 @@ export function ConfigMenu({
                 htmlFor="offline-mode"
                 className="font-display text-xs tracking-wide text-muted-foreground"
               >
-                Offline Mode
+                {t('settings.offlineMode')}
               </Label>
               <p className="font-body text-xs text-muted-foreground/85">
-                Use local tiles. Disable to fetch maps from the internet.
+                {t('settings.offlineModeHelp')}
               </p>
             </div>
             <Switch
               id="offline-mode"
               checked={offlineModeEnabled}
               onCheckedChange={onOfflineModeEnabledChange}
-              aria-label="Offline Mode"
+              aria-label={t('settings.offlineMode')}
             />
           </div>
         </div>
@@ -280,14 +306,14 @@ export function ConfigMenu({
             }}
             className="font-display tracking-wide"
           >
-            Reset all
+            {t('settings.resetAll')}
           </Button>
           <Button
             variant="ghost"
             onClick={() => setOpen(false)}
             className="font-display tracking-wide"
           >
-            Close
+            {t('settings.close')}
           </Button>
         </div>
       </DialogContent>
