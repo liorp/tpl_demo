@@ -11,6 +11,7 @@ import {
   setPairing,
   shouldShowAck,
   toMonitorStateFromPayload,
+  toServerStateFromPayload,
   upsertUnit,
 } from './monitorState';
 import type { MonitorPayload } from './types';
@@ -39,6 +40,45 @@ describe('monitor state model', () => {
     expect(state.port).toBe('/dev/ttyUSB0');
     expect(state.alarm).toBe('alarm');
     expect(shouldShowAck(state)).toBe(true);
+  });
+
+  test('normalizes link updatedAt from backend payload and provides fallback when missing', () => {
+    const state = toServerStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [
+        {
+          side1: 11,
+          side2: 12,
+          threshold: 500,
+          rssi: -57,
+          dt: 180,
+          updated_at: 1234,
+        } as unknown as never,
+        {
+          side1: 12,
+          side2: 13,
+          threshold: 450,
+          rssi: -60,
+          dt: 200,
+        } as unknown as never,
+      ],
+      crossing_alert: null,
+      config: { gain: null },
+    } as MonitorPayload);
+
+    expect(state.links[0]).toMatchObject({
+      side1: 11,
+      side2: 12,
+      threshold: 500,
+      rssi: -57,
+      dt: 180,
+      updatedAt: 1234,
+    });
+    expect(typeof state.links[1]?.updatedAt).toBe('number');
+    expect(Number.isFinite(state.links[1]?.updatedAt)).toBe(true);
   });
 
   test('sorts events by timestamp descending so newest entries render on top', () => {

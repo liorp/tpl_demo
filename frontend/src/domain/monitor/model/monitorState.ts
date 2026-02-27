@@ -26,6 +26,39 @@ const CROSSING_ACK_SUPPRESSION_WINDOW_MS = 2_000;
 const MAP_FROM_RE = /MAP from (\d+)/;
 const CLOCK_TIME_RE = /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/;
 
+function toFiniteInteger(value: unknown): number | null {
+  return Number.isInteger(value) ? (value as number) : null;
+}
+
+function normalizeLinks(rawLinks: MonitorPayload['links']): SignalLinkState[] {
+  const observedAt = Math.floor(Date.now() / 1000);
+  const normalized: SignalLinkState[] = [];
+
+  for (const rawLink of rawLinks) {
+    if (typeof rawLink !== 'object' || rawLink === null) {
+      continue;
+    }
+    const link = rawLink as Record<string, unknown>;
+    const side1 = toFiniteInteger(link.side1);
+    const side2 = toFiniteInteger(link.side2);
+    if (side1 === null || side2 === null) {
+      continue;
+    }
+    const threshold = toFiniteInteger(link.threshold) ?? 0;
+    const rssi = toFiniteInteger(link.rssi) ?? 0;
+    const dt = toFiniteInteger(link.dt) ?? 0;
+    const updatedAt =
+      toFiniteInteger(link.updatedAt) ??
+      toFiniteInteger(link.updated_at) ??
+      toFiniteInteger(link.updatedat) ??
+      observedAt;
+
+    normalized.push({ side1, side2, threshold, rssi, dt, updatedAt });
+  }
+
+  return normalized;
+}
+
 export function toCrossingAlert(
   raw: MonitorPayload['crossing_alert'],
 ): CrossingAlert | null {
@@ -128,7 +161,7 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     port: payload.port,
     alarm: payload.alarm,
     events: sortEventsByTimestampDesc(payload.events).slice(0, MAX_EVENTS),
-    links: payload.links,
+    links: normalizeLinks(payload.links),
     config: {
       gain:
         typeof payload.config.gain === 'number' &&

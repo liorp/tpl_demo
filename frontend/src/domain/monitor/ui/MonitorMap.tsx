@@ -523,20 +523,20 @@ export function MonitorMap({
                               side2: link.side2,
                             })}
                           </p>
-                          <div className="mt-0.5 grid grid-cols-[max-content_max-content] justify-start gap-x-0.5 gap-y-0">
-                            <p className="font-body text-[11px] leading-none text-muted-foreground">
+                          <div className="mt-0.5 grid grid-cols-[max-content_max-content] justify-start gap-x-1 gap-y-0">
+                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.direction', { value: link.direction })}
                             </p>
-                            <p className="font-body text-[11px] leading-none text-muted-foreground">
+                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.rssi', { value: link.rssi })}
                             </p>
-                            <p className="font-body text-[11px] leading-none text-muted-foreground">
+                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.threshold', { value: link.threshold })}
                             </p>
-                            <p className="font-body text-[11px] leading-none text-muted-foreground">
+                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.dt', { value: link.dt })}
                             </p>
-                            <p className="font-body text-[11px] leading-none text-muted-foreground">
+                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.updatedAt', { value: link.updatedAt })}
                             </p>
                           </div>
