@@ -806,7 +806,7 @@ describe('MonitorMap', () => {
             threshold: 500,
             rssi: -57,
             dt: 180,
-            updatedAt: 1,
+            updatedAt: 1_700_012_000,
           },
         ]}
         focusPoint={null}
@@ -853,7 +853,7 @@ describe('MonitorMap', () => {
     expect(screen.getByText('RSSI: -57dBm')).not.toBeNull();
     expect(screen.getByText('Threshold: 500')).not.toBeNull();
     expect(screen.getByText('DT: 180')).not.toBeNull();
-    expect(screen.getByText('Updated at: 1')).not.toBeNull();
+    expect(screen.getByText(/^Updated at: \d{2}:\d{2}:\d{2}$/)).not.toBeNull();
     expect(
       screen
         .getByText('Direction: OUT')

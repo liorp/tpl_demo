@@ -137,7 +137,16 @@ def test_handle_map_event_updates_links():
     )
 
     assert changed is True
-    assert state.links == [{"side1": 2, "side2": 7, "threshold": 0, "rssi": -57, "dt": 180}]
+    assert state.links == [
+        {
+            "side1": 2,
+            "side2": 7,
+            "threshold": 0,
+            "rssi": -57,
+            "dt": 180,
+            "updated_at": 444,
+        }
+    ]
 
 
 def test_handle_event_log_keeps_raw_sensor_field_names():
@@ -195,7 +204,16 @@ def test_handle_map_event_deduplicates_bidirectional_links():
     )
 
     assert changed is True
-    assert state.links == [{"side1": 2, "side2": 7, "threshold": 0, "rssi": -57, "dt": 180}]
+    assert state.links == [
+        {
+            "side1": 2,
+            "side2": 7,
+            "threshold": 0,
+            "rssi": -57,
+            "dt": 180,
+            "updated_at": 445,
+        }
+    ]
 
 
 def test_handle_config_event_updates_config_values():

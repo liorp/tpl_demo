@@ -143,6 +143,19 @@ function toLastHeartbeat(lastSeenAt: number | undefined): string {
   return dayjs.unix(lastSeenAt).fromNow();
 }
 
+function toUpdatedAt(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '--';
+  }
+  if (value >= 1_000_000_000_000) {
+    return dayjs(value).format('HH:mm:ss');
+  }
+  if (value >= 1_000_000_000) {
+    return dayjs.unix(value).format('HH:mm:ss');
+  }
+  return String(value);
+}
+
 function getSensorLinks(
   sensorId: number,
   links: SignalLinkState[],
@@ -537,7 +550,9 @@ export function MonitorMap({
                               {t('map.dt', { value: link.dt })}
                             </p>
                             <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
-                              {t('map.updatedAt', { value: link.updatedAt })}
+                              {t('map.updatedAt', {
+                                value: toUpdatedAt(link.updatedAt),
+                              })}
                             </p>
                           </div>
                         </div>

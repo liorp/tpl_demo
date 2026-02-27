@@ -88,6 +88,7 @@ class SideLink(TypedDict):
     threshold: int
     rssi: int
     dt: int
+    updated_at: int
 
 
 class CrossingAlert(TypedDict):

@@ -19,7 +19,7 @@ from backend.core.models import (
 logger = logging.getLogger("tpl-signum")
 
 
-def _normalize_side_links(raw_links: list[dict]) -> list[SideLink]:
+def _normalize_side_links(raw_links: list[dict], updated_at: int) -> list[SideLink]:
     normalized: list[SideLink] = []
     seen: set[tuple[int, int]] = set()
     for link in raw_links:
@@ -42,6 +42,7 @@ def _normalize_side_links(raw_links: list[dict]) -> list[SideLink]:
                 "threshold": int(link.get("threshold", 0)),
                 "rssi": int(link.get("rssi", 0)),
                 "dt": int(link.get("dt", 0)),
+                "updated_at": updated_at,
             }
         )
     return normalized
@@ -238,7 +239,10 @@ def handle_event(state: SensorState, event: Event) -> bool:
             link for link in state.links
             if link["side1"] != reporting_unit and link["side2"] != reporting_unit
         ]
-        new_links = _normalize_side_links(list(event.get("links", [])))
+        map_updated_at = (
+            event["device_ts"] if isinstance(event.get("device_ts"), int) else _event_last_seen()
+        )
+        new_links = _normalize_side_links(list(event.get("links", [])), map_updated_at)
         state.links = remaining + new_links
         _refresh_sensor_status_from_map(
             state, unit_id=reporting_unit, last_seen=_event_last_seen()
