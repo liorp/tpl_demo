@@ -495,7 +495,7 @@ export function MonitorMap({
               }}
             >
               <Popup className="sensor-popup" maxWidth={360}>
-                <div className="w-full rounded-md border border-border-bright bg-card p-2 font-body text-xs md:max-h-[300px] md:overflow-y-auto lg:max-h-none lg:overflow-visible">
+                <div className="max-h-[60vh] w-full overflow-y-auto rounded-md border border-border-bright bg-card p-2 font-body text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-display text-sm text-foreground">
                       {t('map.sensorTitle', { id: unit.id })}
@@ -523,7 +523,7 @@ export function MonitorMap({
                               side2: link.side2,
                             })}
                           </p>
-                          <div className="mt-0.5 grid grid-cols-2 gap-x-0.5 gap-y-0">
+                          <div className="mt-0.5 grid grid-cols-[max-content_max-content] justify-start gap-x-0.5 gap-y-0">
                             <p className="font-body text-[11px] leading-none text-muted-foreground">
                               {t('map.direction', { value: link.direction })}
                             </p>

@@ -827,10 +827,8 @@ describe('MonitorMap', () => {
     const popupContainer =
       screen.getByText('Sensor #1').parentElement?.parentElement;
     expect(popupContainer).not.toBeNull();
-    expect(popupContainer?.className).toContain('md:max-h-[300px]');
-    expect(popupContainer?.className).toContain('md:overflow-y-auto');
-    expect(popupContainer?.className).toContain('lg:max-h-none');
-    expect(popupContainer?.className).toContain('lg:overflow-visible');
+    expect(popupContainer?.className).toContain('max-h-[60vh]');
+    expect(popupContainer?.className).toContain('overflow-y-auto');
     expect(popupContainer?.className).toContain('p-2');
     const heartbeat = screen.getByText(/Last heartbeat: .*ago/);
     expect(heartbeat.className).not.toContain('mt-0.5');
@@ -860,7 +858,7 @@ describe('MonitorMap', () => {
       screen
         .getByText('Direction: OUT')
         .parentElement?.className.includes(
-          'grid grid-cols-2 gap-x-0.5 gap-y-0',
+          'grid grid-cols-[max-content_max-content] justify-start gap-x-0.5 gap-y-0',
         ),
     ).toBe(true);
     expect(screen.getByText('Direction: OUT').className).toContain(

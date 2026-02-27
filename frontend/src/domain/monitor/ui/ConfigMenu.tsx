@@ -122,7 +122,7 @@ export function ConfigMenu({
           {t('settings.title')}
         </Button>
       </DialogTrigger>
-      <DialogContent className="border-border-bright bg-card sm:max-w-sm md:max-h-[300px] md:overflow-y-auto lg:max-h-none lg:overflow-visible">
+      <DialogContent className="max-h-[60vh] overflow-y-auto border-border-bright bg-card sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="font-display tracking-wide">
             {t('settings.title')}

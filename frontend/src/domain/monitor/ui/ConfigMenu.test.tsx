@@ -298,9 +298,7 @@ describe('ConfigMenu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     const dialog = screen.getByRole('dialog');
 
-    expect(dialog.className).toContain('md:max-h-[300px]');
-    expect(dialog.className).toContain('md:overflow-y-auto');
-    expect(dialog.className).toContain('lg:max-h-none');
-    expect(dialog.className).toContain('lg:overflow-visible');
+    expect(dialog.className).toContain('max-h-[60vh]');
+    expect(dialog.className).toContain('overflow-y-auto');
   });
 });
