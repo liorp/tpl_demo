@@ -820,29 +820,22 @@ describe('MonitorMap', () => {
       />,
     );
 
-    expect(screen.getByText('STATUS')).not.toBeNull();
+    expect(screen.queryByText('STATUS')).toBeNull();
     expect(screen.getByText('Sensor #1')).not.toBeNull();
     expect(screen.queryByText('active')).toBeNull();
     expect(screen.queryByText('inactive')).toBeNull();
-    expect(screen.getByText('STATUS').getAttribute('title')).toBeNull();
-    expect(screen.getByText('STATUS').parentElement?.className).toContain(
-      'md:max-h-[300px]',
-    );
-    expect(screen.getByText('STATUS').parentElement?.className).toContain(
-      'md:overflow-y-auto',
-    );
-    expect(screen.getByText('STATUS').parentElement?.className).toContain(
-      'lg:max-h-none',
-    );
-    expect(screen.getByText('STATUS').parentElement?.className).toContain(
-      'lg:overflow-visible',
-    );
-    expect(screen.getByText('STATUS').parentElement?.className).toContain(
-      'p-2',
-    );
-    expect(screen.getByText('Sensor #1').className).toContain('mt-0.5');
-    expect(screen.getByText(/Last heartbeat: .*ago/).className).toContain(
-      'mt-0.5',
+    const popupContainer =
+      screen.getByText('Sensor #1').parentElement?.parentElement;
+    expect(popupContainer).not.toBeNull();
+    expect(popupContainer?.className).toContain('md:max-h-[300px]');
+    expect(popupContainer?.className).toContain('md:overflow-y-auto');
+    expect(popupContainer?.className).toContain('lg:max-h-none');
+    expect(popupContainer?.className).toContain('lg:overflow-visible');
+    expect(popupContainer?.className).toContain('p-2');
+    const heartbeat = screen.getByText(/Last heartbeat: .*ago/);
+    expect(heartbeat.className).not.toContain('mt-0.5');
+    expect(screen.getByText('Sensor #1').parentElement).toBe(
+      heartbeat.parentElement,
     );
     expect(
       screen.getByText('Link 1 -> 2').parentElement?.parentElement?.className,
@@ -850,17 +843,14 @@ describe('MonitorMap', () => {
     expect(
       screen.getByText('Link 1 -> 2').parentElement?.parentElement?.className,
     ).toContain('space-y-0.5');
-    expect(screen.getByText('STATUS').parentElement?.className).toContain(
-      'w-full',
-    );
-    expect(screen.getByText('STATUS').parentElement?.className).not.toContain(
-      'w-[22rem]',
-    );
+    expect(popupContainer?.className).toContain('w-full');
+    expect(popupContainer?.className).not.toContain('w-[22rem]');
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
     expect(screen.getByText('Link 1 -> 2')).not.toBeNull();
-    expect(screen.getByText('Link 1 -> 2').parentElement?.className).toContain(
-      'p-1.5',
-    );
+    const linkCardClassName =
+      screen.getByText('Link 1 -> 2').parentElement?.className ?? '';
+    expect(linkCardClassName).toMatch(/(?:^|\s)p-1(?:\s|$)/);
+    expect(linkCardClassName).not.toContain('p-1.5');
     expect(screen.getByText('Direction: OUT')).not.toBeNull();
     expect(screen.getByText('RSSI: -57dBm')).not.toBeNull();
     expect(screen.getByText('Threshold: 500')).not.toBeNull();
@@ -869,9 +859,7 @@ describe('MonitorMap', () => {
     expect(
       screen
         .getByText('Direction: OUT')
-        .parentElement?.className.includes(
-          'grid grid-cols-2 gap-x-1.5 gap-y-0',
-        ),
+        .parentElement?.className.includes('grid grid-cols-2 gap-x-1 gap-y-0'),
     ).toBe(true);
   });
 

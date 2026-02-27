@@ -496,17 +496,16 @@ export function MonitorMap({
             >
               <Popup className="sensor-popup" maxWidth={360}>
                 <div className="w-full rounded-md border border-border-bright bg-card p-2 font-body text-xs md:max-h-[300px] md:overflow-y-auto lg:max-h-none lg:overflow-visible">
-                  <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
-                    {t('map.status')}
-                  </p>
-                  <p className="mt-0.5 font-display text-sm text-foreground">
-                    {t('map.sensorTitle', { id: unit.id })}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {t('map.lastHeartbeat', {
-                      value: toLastHeartbeat(unit.lastSeenAt),
-                    })}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-display text-sm text-foreground">
+                      {t('map.sensorTitle', { id: unit.id })}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {t('map.lastHeartbeat', {
+                        value: toLastHeartbeat(unit.lastSeenAt),
+                      })}
+                    </p>
+                  </div>
                   <div className="mt-1 space-y-0.5">
                     {sensorLinks.length === 0 ? (
                       <p className="font-body text-xs text-muted-foreground">
@@ -516,7 +515,7 @@ export function MonitorMap({
                       sensorLinks.map((link) => (
                         <div
                           key={`${link.direction}-${link.peerId}`}
-                          className="rounded border border-border bg-card-elevated p-1.5"
+                          className="rounded border border-border bg-card-elevated p-1"
                         >
                           <p className="font-body text-xs text-foreground">
                             {t('map.link', {
@@ -524,7 +523,7 @@ export function MonitorMap({
                               side2: link.side2,
                             })}
                           </p>
-                          <div className="mt-0.5 grid grid-cols-2 gap-x-1.5 gap-y-0">
+                          <div className="mt-0.5 grid grid-cols-2 gap-x-1 gap-y-0">
                             <p className="font-body text-[11px] text-muted-foreground">
                               {t('map.direction', { value: link.direction })}
                             </p>
