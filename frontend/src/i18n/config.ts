@@ -8,9 +8,25 @@ import heCommon from './resources/he';
 export const supportedLanguages = ['en', 'he'] as const;
 export type SupportedLanguage = (typeof supportedLanguages)[number];
 
+function normalizeLanguage(language: string | undefined): SupportedLanguage {
+  return language?.startsWith('he') ? 'he' : 'en';
+}
+
+function syncDocumentLanguage(language: string | undefined) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const normalizedLanguage = normalizeLanguage(language);
+  document.documentElement.lang = normalizedLanguage;
+  document.documentElement.dir = i18n.dir(normalizedLanguage);
+}
+
+let initPromise: Promise<unknown> | null = null;
+
 if (!i18n.isInitialized) {
   const isTestEnv = Boolean(import.meta.env?.VITEST);
-  void i18n
+  initPromise = i18n
     .use(LanguageDetector)
     .use(initReactI18next)
     .init({
@@ -31,6 +47,24 @@ if (!i18n.isInitialized) {
       },
       returnEmptyString: false,
     });
+}
+
+if (typeof document !== 'undefined') {
+  i18n.on('languageChanged', (language) => {
+    syncDocumentLanguage(language);
+  });
+
+  if (i18n.isInitialized) {
+    syncDocumentLanguage(i18n.resolvedLanguage ?? i18n.language);
+  } else if (initPromise) {
+    void initPromise
+      .then(() => {
+        syncDocumentLanguage(i18n.resolvedLanguage ?? i18n.language);
+      })
+      .catch(() => {
+        syncDocumentLanguage('en');
+      });
+  }
 }
 
 export { i18n };
