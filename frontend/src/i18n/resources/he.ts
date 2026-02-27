@@ -35,6 +35,7 @@ const heCommon = {
     noSensor: 'אין חיישן',
     serverOffline: 'שרת לא זמין',
     productName: 'TPL SIGNUM',
+    fullscreen: 'מסך מלא',
   },
   connection: {
     tooltipConnected: 'מחובר לחיישן בפורט {{port}}',

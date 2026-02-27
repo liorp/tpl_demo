@@ -37,6 +37,7 @@ const enCommon = {
     noSensor: 'NO SENSOR',
     serverOffline: 'SERVER OFFLINE',
     productName: 'TPL SIGNUM',
+    fullscreen: 'Fullscreen',
   },
   connection: {
     tooltipConnected: 'Connected to sensor on port {{port}}',

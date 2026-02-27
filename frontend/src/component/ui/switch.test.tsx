@@ -21,4 +21,15 @@ describe('Switch', () => {
     );
     expect(className).toContain('rtl:data-[state=unchecked]:translate-x-0');
   });
+
+  test('uses visible borders for checked and unchecked states', () => {
+    render(<Switch defaultChecked />);
+
+    const root = document.querySelector('[data-slot="switch"]');
+    expect(root).not.toBeNull();
+
+    const className = root?.className ?? '';
+    expect(className).toContain('data-[state=unchecked]:border-border-bright');
+    expect(className).toContain('data-[state=checked]:border-primary/70');
+  });
 });

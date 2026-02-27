@@ -3,10 +3,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
+import { i18n } from '@/i18n/config';
 import { ConfigMenu } from './ConfigMenu';
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await i18n.changeLanguage('en');
 });
 
 describe('ConfigMenu', () => {
@@ -25,7 +27,7 @@ describe('ConfigMenu', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('button', { name: /Settings|הגדרות/ }));
 
     const threshold = screen.getByLabelText(
       'Noise Threshold',
@@ -57,7 +59,7 @@ describe('ConfigMenu', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('button', { name: /Settings|הגדרות/ }));
 
     const threshold = screen.getByLabelText(
       'Noise Threshold',
@@ -276,5 +278,29 @@ describe('ConfigMenu', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Hebrew' }));
 
     expect(screen.getByRole('heading', { name: 'הגדרות' })).not.toBeNull();
+  });
+
+  test('limits settings dialog height and enables scrolling', () => {
+    render(
+      <ConfigMenu
+        config={{ gain: null }}
+        alarmSoundEnabled
+        offlineModeEnabled
+        onSendThreshold={vi.fn().mockReturnValue(true)}
+        onSendDetectionThreshold={vi.fn().mockReturnValue(true)}
+        onSendGain={vi.fn().mockReturnValue(true)}
+        onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={vi.fn()}
+        onResetAll={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(dialog.className).toContain('md:max-h-[300px]');
+    expect(dialog.className).toContain('md:overflow-y-auto');
+    expect(dialog.className).toContain('lg:max-h-none');
+    expect(dialog.className).toContain('lg:overflow-visible');
   });
 });

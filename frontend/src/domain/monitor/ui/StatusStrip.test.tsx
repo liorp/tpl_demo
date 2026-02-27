@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, test } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { i18n } from '@/i18n/config';
 import { StatusStrip } from './StatusStrip';
@@ -24,5 +24,33 @@ describe('StatusStrip', () => {
     render(<StatusStrip alarm="alarm" serverOnline={true} />);
 
     expect(screen.getAllByText('אזעקה').length).toBeGreaterThan(0);
+  });
+
+  test('renders fullscreen button and toggles fullscreen mode', () => {
+    const requestFullscreenMock = vi.fn();
+    const exitFullscreenMock = vi.fn();
+
+    Object.defineProperty(document.documentElement, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreenMock,
+    });
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: exitFullscreenMock,
+    });
+
+    render(<StatusStrip alarm="clear" serverOnline={true} />);
+
+    const toggleButton = screen.getByRole('button', { name: 'Fullscreen' });
+    fireEvent.click(toggleButton);
+    expect(requestFullscreenMock).toHaveBeenCalledTimes(1);
+    expect(exitFullscreenMock).toHaveBeenCalledTimes(0);
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: document.documentElement,
+    });
+    fireEvent.click(toggleButton);
+    expect(exitFullscreenMock).toHaveBeenCalledTimes(1);
   });
 });

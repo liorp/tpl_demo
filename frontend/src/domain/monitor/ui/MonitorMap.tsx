@@ -495,7 +495,7 @@ export function MonitorMap({
               }}
             >
               <Popup className="sensor-popup" maxWidth={360}>
-                <div className="w-full rounded-md border border-border-bright bg-card p-4 font-body text-xs">
+                <div className="w-full rounded-md border border-border-bright bg-card p-3 font-body text-xs md:max-h-[300px] md:overflow-y-auto lg:max-h-none lg:overflow-visible">
                   <p className="font-display text-[11px] tracking-[0.2em] text-muted-foreground">
                     {t('map.status')}
                   </p>
@@ -507,7 +507,7 @@ export function MonitorMap({
                       value: toLastHeartbeat(unit.lastSeenAt),
                     })}
                   </p>
-                  <div className="mt-3 space-y-1.5">
+                  <div className="mt-2 space-y-1">
                     {sensorLinks.length === 0 ? (
                       <p className="font-body text-xs text-muted-foreground">
                         {t('map.noPeerLinks')}
@@ -516,7 +516,7 @@ export function MonitorMap({
                       sensorLinks.map((link) => (
                         <div
                           key={`${link.direction}-${link.peerId}`}
-                          className="rounded border border-border bg-card-elevated p-3"
+                          className="rounded border border-border bg-card-elevated p-2"
                         >
                           <p className="font-body text-xs text-foreground">
                             {t('map.link', {
@@ -524,7 +524,7 @@ export function MonitorMap({
                               side2: link.side2,
                             })}
                           </p>
-                          <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
+                          <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5">
                             <p className="font-body text-[11px] text-muted-foreground">
                               {t('map.direction', { value: link.direction })}
                             </p>

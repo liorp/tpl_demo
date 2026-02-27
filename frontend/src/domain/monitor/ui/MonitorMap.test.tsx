@@ -826,7 +826,19 @@ describe('MonitorMap', () => {
     expect(screen.queryByText('inactive')).toBeNull();
     expect(screen.getByText('STATUS').getAttribute('title')).toBeNull();
     expect(screen.getByText('STATUS').parentElement?.className).toContain(
-      'p-4',
+      'md:max-h-[300px]',
+    );
+    expect(screen.getByText('STATUS').parentElement?.className).toContain(
+      'md:overflow-y-auto',
+    );
+    expect(screen.getByText('STATUS').parentElement?.className).toContain(
+      'lg:max-h-none',
+    );
+    expect(screen.getByText('STATUS').parentElement?.className).toContain(
+      'lg:overflow-visible',
+    );
+    expect(screen.getByText('STATUS').parentElement?.className).toContain(
+      'p-3',
     );
     expect(screen.getByText('STATUS').parentElement?.className).toContain(
       'w-full',
@@ -837,7 +849,7 @@ describe('MonitorMap', () => {
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
     expect(screen.getByText('Link 1 -> 2')).not.toBeNull();
     expect(screen.getByText('Link 1 -> 2').parentElement?.className).toContain(
-      'p-3',
+      'p-2',
     );
     expect(screen.getByText('Direction: OUT')).not.toBeNull();
     expect(screen.getByText('RSSI: -57dBm')).not.toBeNull();
