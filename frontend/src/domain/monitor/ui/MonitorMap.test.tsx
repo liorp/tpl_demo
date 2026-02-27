@@ -838,8 +838,18 @@ describe('MonitorMap', () => {
       'lg:overflow-visible',
     );
     expect(screen.getByText('STATUS').parentElement?.className).toContain(
-      'p-3',
+      'p-2',
     );
+    expect(screen.getByText('Sensor #1').className).toContain('mt-0.5');
+    expect(screen.getByText(/Last heartbeat: .*ago/).className).toContain(
+      'mt-0.5',
+    );
+    expect(
+      screen.getByText('Link 1 -> 2').parentElement?.parentElement?.className,
+    ).toContain('mt-1');
+    expect(
+      screen.getByText('Link 1 -> 2').parentElement?.parentElement?.className,
+    ).toContain('space-y-0.5');
     expect(screen.getByText('STATUS').parentElement?.className).toContain(
       'w-full',
     );
@@ -849,7 +859,7 @@ describe('MonitorMap', () => {
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
     expect(screen.getByText('Link 1 -> 2')).not.toBeNull();
     expect(screen.getByText('Link 1 -> 2').parentElement?.className).toContain(
-      'p-2',
+      'p-1.5',
     );
     expect(screen.getByText('Direction: OUT')).not.toBeNull();
     expect(screen.getByText('RSSI: -57dBm')).not.toBeNull();
@@ -859,7 +869,9 @@ describe('MonitorMap', () => {
     expect(
       screen
         .getByText('Direction: OUT')
-        .parentElement?.className.includes('grid grid-cols-2'),
+        .parentElement?.className.includes(
+          'grid grid-cols-2 gap-x-1.5 gap-y-0',
+        ),
     ).toBe(true);
   });
 
