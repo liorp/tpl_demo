@@ -859,8 +859,13 @@ describe('MonitorMap', () => {
     expect(
       screen
         .getByText('Direction: OUT')
-        .parentElement?.className.includes('grid grid-cols-2 gap-x-1 gap-y-0'),
+        .parentElement?.className.includes(
+          'grid grid-cols-2 gap-x-0.5 gap-y-0',
+        ),
     ).toBe(true);
+    expect(screen.getByText('Direction: OUT').className).toContain(
+      'leading-none',
+    );
   });
 
   test('uses conservative offline zoom defaults before manifest resolves', () => {
