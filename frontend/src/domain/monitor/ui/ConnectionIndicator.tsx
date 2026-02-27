@@ -35,7 +35,7 @@ export const ConnectionIndicator = React.memo(function ConnectionIndicator({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="ml-auto flex cursor-default items-center gap-2.5 text-sm">
+        <div className="ms-auto flex cursor-default items-center gap-2.5 text-sm">
           <span className="relative flex h-2.5 w-2.5">
             {connected ? (
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />

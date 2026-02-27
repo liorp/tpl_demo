@@ -16,7 +16,11 @@ describe('StatusStrip', () => {
     render(<StatusStrip alarm="alarm" serverOnline={true} />);
 
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
-    expect(screen.getByText('TPL SIGNUM')).not.toBeNull();
+    const productName = screen.getByText('TPL SIGNUM');
+    expect(productName).not.toBeNull();
+    const productClusterClassName = productName.parentElement?.className ?? '';
+    expect(productClusterClassName).toContain('ms-auto');
+    expect(productClusterClassName).not.toContain('ml-auto');
   });
 
   test('renders translated status label in hebrew', async () => {

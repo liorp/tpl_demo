@@ -87,7 +87,7 @@ export const StatusStrip = React.memo(function StatusStrip({
           {resolveLabel(alarm, serverOnline, t)}
         </h1>
       </div>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ms-auto flex items-center gap-2">
         <span className="font-display text-xs font-medium tracking-[0.2em] text-white/30 uppercase">
           {t('statusStrip.productName')}
         </span>

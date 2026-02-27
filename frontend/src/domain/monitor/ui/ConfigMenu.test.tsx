@@ -301,4 +301,32 @@ describe('ConfigMenu', () => {
     expect(dialog.className).toContain('max-h-[60vh]');
     expect(dialog.className).toContain('overflow-y-auto');
   });
+
+  test('uses logical alignment classes in settings dialog chrome', () => {
+    render(
+      <ConfigMenu
+        config={{ gain: null }}
+        alarmSoundEnabled
+        offlineModeEnabled
+        onSendThreshold={vi.fn().mockReturnValue(true)}
+        onSendDetectionThreshold={vi.fn().mockReturnValue(true)}
+        onSendGain={vi.fn().mockReturnValue(true)}
+        onAlarmSoundEnabledChange={vi.fn()}
+        onOfflineModeEnabledChange={vi.fn()}
+        onResetAll={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+
+    const headerClassName =
+      document.querySelector('[data-slot="dialog-header"]')?.className ?? '';
+    expect(headerClassName).toContain('sm:text-start');
+    expect(headerClassName).not.toContain('sm:text-left');
+
+    const closeClassName =
+      document.querySelector('[data-slot="dialog-close"]')?.className ?? '';
+    expect(closeClassName).toContain('end-4');
+    expect(closeClassName).not.toContain('right-4');
+  });
 });

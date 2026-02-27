@@ -830,6 +830,7 @@ describe('MonitorMap', () => {
     expect(popupContainer?.className).toContain('max-h-[60vh]');
     expect(popupContainer?.className).toContain('overflow-y-auto');
     expect(popupContainer?.className).toContain('p-2');
+    expect(popupContainer?.className).toContain('text-start');
     const heartbeat = screen.getByText(/Last heartbeat: .*ago/);
     expect(heartbeat.className).not.toContain('mt-0.5');
     expect(screen.getByText('Sensor #1').parentElement).toBe(

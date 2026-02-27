@@ -514,7 +514,7 @@ export function MonitorMap({
               }}
             >
               <Popup className="sensor-popup" maxWidth={360}>
-                <div className="max-h-[60vh] w-full overflow-y-auto rounded-md border border-border-bright bg-card p-2 font-body text-xs">
+                <div className="max-h-[60vh] w-full overflow-y-auto rounded-md border border-border-bright bg-card p-2 font-body text-start text-xs">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-display text-sm text-foreground">
                       {t('map.sensorTitle', { id: unit.id })}

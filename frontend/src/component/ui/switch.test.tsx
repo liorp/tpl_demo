@@ -31,5 +31,10 @@ describe('Switch', () => {
     const className = root?.className ?? '';
     expect(className).toContain('data-[state=unchecked]:border-border-bright');
     expect(className).toContain('data-[state=checked]:border-primary/70');
+    expect(className).toContain('data-[state=unchecked]:bg-muted/70');
+
+    const thumb = document.querySelector('[data-slot="switch-thumb"]');
+    const thumbClassName = thumb?.className ?? '';
+    expect(thumbClassName).toContain('data-[state=unchecked]:bg-foreground/90');
   });
 });
