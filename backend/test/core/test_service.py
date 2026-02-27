@@ -120,7 +120,8 @@ def test_handle_detection_updates_crossing_and_config():
     assert state.crossing_alert["sensor_b"] == 2
 
 
-def test_handle_map_event_updates_links():
+def test_handle_map_event_updates_links(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_123.0)
     state = SensorState()
 
     changed = handle_event(
@@ -144,7 +145,7 @@ def test_handle_map_event_updates_links():
             "threshold": 0,
             "rssi": -57,
             "dt": 180,
-            "updated_at": 444,
+            "updated_at": 1_700_000_123,
         }
     ]
 
@@ -184,7 +185,8 @@ def test_handle_event_log_keeps_raw_sensor_field_names():
     assert state.logs[0]["links"][0]["th3"] == 500
 
 
-def test_handle_map_event_deduplicates_bidirectional_links():
+def test_handle_map_event_deduplicates_bidirectional_links(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_321.0)
     state = SensorState()
 
     changed = handle_event(
@@ -211,7 +213,7 @@ def test_handle_map_event_deduplicates_bidirectional_links():
             "threshold": 0,
             "rssi": -57,
             "dt": 180,
-            "updated_at": 445,
+            "updated_at": 1_700_000_321,
         }
     ]
 

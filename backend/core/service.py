@@ -239,9 +239,7 @@ def handle_event(state: SensorState, event: Event) -> bool:
             link for link in state.links
             if link["side1"] != reporting_unit and link["side2"] != reporting_unit
         ]
-        map_updated_at = (
-            event["device_ts"] if isinstance(event.get("device_ts"), int) else _event_last_seen()
-        )
+        map_updated_at = _event_last_seen()
         new_links = _normalize_side_links(list(event.get("links", [])), map_updated_at)
         state.links = remaining + new_links
         _refresh_sensor_status_from_map(

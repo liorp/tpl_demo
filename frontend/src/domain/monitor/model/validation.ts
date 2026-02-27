@@ -5,6 +5,7 @@ import type {
   MapPolicy,
   MonitorPayload,
   SensorStatusMap,
+  SignalLinkState,
   UnitPlacement,
 } from './types';
 
@@ -50,6 +51,19 @@ const unitPayloadSchema = z
     lat: finiteNumberSchema,
     lng: finiteNumberSchema,
     label: z.string().optional(),
+  })
+  .passthrough();
+
+const signalLinkPayloadSchema = z
+  .object({
+    side1: finiteNumberSchema.int(),
+    side2: finiteNumberSchema.int(),
+    threshold: finiteNumberSchema.int().optional(),
+    rssi: finiteNumberSchema.int().optional(),
+    dt: finiteNumberSchema.int().optional(),
+    updatedAt: finiteNumberSchema.int().optional(),
+    updated_at: finiteNumberSchema.int().optional(),
+    updatedat: finiteNumberSchema.int().optional(),
   })
   .passthrough();
 
@@ -171,6 +185,38 @@ export function parsePayloadUnits(payloadUnits: unknown): UnitPlacement[] {
             : `S${unit.data.id}`,
         lat: unit.data.lat,
         lng: unit.data.lng,
+      },
+    ];
+  });
+}
+
+export function parseSignalLinks(
+  payloadLinks: MonitorPayload['links'],
+  observedAt: number,
+): SignalLinkState[] {
+  const parsed = z.array(z.unknown()).safeParse(payloadLinks);
+  if (!parsed.success) {
+    return [];
+  }
+
+  return parsed.data.flatMap((entry) => {
+    const link = signalLinkPayloadSchema.safeParse(entry);
+    if (!link.success) {
+      return [];
+    }
+    const updatedAt =
+      link.data.updated_at ??
+      link.data.updatedAt ??
+      link.data.updatedat ??
+      observedAt;
+    return [
+      {
+        side1: link.data.side1,
+        side2: link.data.side2,
+        threshold: link.data.threshold ?? 0,
+        rssi: link.data.rssi ?? 0,
+        dt: link.data.dt ?? 0,
+        updatedAt,
       },
     ];
   });

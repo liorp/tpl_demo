@@ -866,6 +866,43 @@ describe('MonitorMap', () => {
     );
   });
 
+  test('renders non-epoch link updated_at values as placeholder instead of raw numbers', () => {
+    render(
+      <MonitorMap
+        units={[
+          {
+            id: 1,
+            label: 'Sensor 1',
+            lat: 33.2,
+            lng: 35.7,
+            status: 'active',
+            lastSeenAt: 1_700_002,
+          },
+        ]}
+        links={[
+          {
+            side1: 1,
+            side2: 2,
+            threshold: 500,
+            rssi: -57,
+            dt: 180,
+            updatedAt: 12345,
+          },
+        ]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Updated at: --')).not.toBeNull();
+  });
+
   test('uses conservative offline zoom defaults before manifest resolves', () => {
     vi.stubGlobal(
       'fetch',

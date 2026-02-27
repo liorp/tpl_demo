@@ -147,13 +147,19 @@ function toUpdatedAt(value: number): string {
   if (!Number.isFinite(value)) {
     return '--';
   }
+  if (value >= 100_000_000_000_000_000) {
+    return dayjs(Math.floor(value / 1_000_000)).format('HH:mm:ss');
+  }
+  if (value >= 100_000_000_000_000) {
+    return dayjs(Math.floor(value / 1_000)).format('HH:mm:ss');
+  }
   if (value >= 1_000_000_000_000) {
     return dayjs(value).format('HH:mm:ss');
   }
   if (value >= 1_000_000_000) {
     return dayjs.unix(value).format('HH:mm:ss');
   }
-  return String(value);
+  return '--';
 }
 
 function getSensorLinks(
