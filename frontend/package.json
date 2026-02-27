@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "build:clean": "rm -rf ./dist && mkdir -p ./dist/asset",
-    "build:js": "bun build ./src/main.tsx --target browser --define __TPL_BACKEND_PORT__='\"${TPL_BACKEND_PORT:-}\"' --outfile ./dist/asset/main.js --minify",
+    "build:js": "bun ./scripts/build-js.ts",
     "build:css": "bunx --bun @tailwindcss/cli -i ./src/style/globals.css -o ./dist/asset/index.css --minify",
     "build:html": "cp ./index.html ./dist/index.html",
     "build": "bun run build:clean && bun run build:js && bun run build:css && bun run build:html",
-    "watch:js": "bun build ./src/main.tsx --target browser --define __TPL_BACKEND_PORT__='\"${TPL_BACKEND_PORT:-}\"' --outfile ./dist/asset/main.js --minify --watch",
+    "watch:js": "bun ./scripts/build-js.ts --watch",
     "watch:css": "bunx --bun @tailwindcss/cli -i ./src/style/globals.css -o ./dist/asset/index.css --watch",
     "watch": "bun run build:clean && bun run build:html && bunx --bun concurrently -k -n JS,CSS -c magenta,blue \"bun run watch:js\" \"bun run watch:css\"",
     "format": "biome format --write .",

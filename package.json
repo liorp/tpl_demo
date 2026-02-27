@@ -6,7 +6,7 @@
     "demo": "export TPL_BACKEND_PORT=18080 && rm -f /tmp/tpl-dummy-port && bunx --bun concurrently -k -n DEV,BE,FE -c yellow,green,cyan \"python dummy_device.py --port-file /tmp/tpl-dummy-port\" \"bash scripts/demo-backend.sh\" \"bun run dev:frontend\"",
     "dev": "bunx --bun concurrently -k -n FE,BE -c cyan,green \"bun run dev:frontend\" \"bun run dev:backend\"",
     "dev:frontend": "cd frontend && bun run watch",
-    "dev:backend": "uv run --project backend uvicorn backend.main:app --host 0.0.0.0 --port ${TPL_BACKEND_PORT:-8080} --reload",
+    "dev:backend": "bun ./scripts/dev-backend.ts",
     "build": "cd frontend && bun run build",
     "lint": "bun run lint:frontend && bun run lint:backend",
     "lint:frontend": "cd frontend && bun run lint && bun run typecheck",
