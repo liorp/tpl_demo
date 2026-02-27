@@ -525,7 +525,7 @@ export function MonitorMap({
                       })}
                     </p>
                   </div>
-                  <div className="mt-1 space-y-0.5">
+                  <div className="mt-1 space-y-1">
                     {sensorLinks.length === 0 ? (
                       <p className="font-body text-xs text-muted-foreground">
                         {t('map.noPeerLinks')}
@@ -536,26 +536,26 @@ export function MonitorMap({
                           key={`${link.direction}-${link.peerId}`}
                           className="rounded border border-border bg-card-elevated p-1"
                         >
-                          <p className="font-body text-xs text-foreground">
+                          <p className="m-1 font-body text-xs text-foreground">
                             {t('map.link', {
                               side1: link.side1,
                               side2: link.side2,
                             })}
                           </p>
-                          <div className="mt-0.5 grid grid-cols-[max-content_max-content] justify-start gap-x-1 gap-y-0">
-                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
+                          <div className="m-1 grid grid-cols-[max-content_max-content] justify-start gap-x-1">
+                            <p className="m-1 font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.direction', { value: link.direction })}
                             </p>
-                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
+                            <p className="m-1 font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.rssi', { value: link.rssi })}
                             </p>
-                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
+                            <p className="m-1 font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.threshold', { value: link.threshold })}
                             </p>
-                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
+                            <p className="m-1 font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.dt', { value: link.dt })}
                             </p>
-                            <p className="font-body text-[11px] leading-[10px] text-muted-foreground">
+                            <p className="m-1 font-body text-[11px] leading-[10px] text-muted-foreground">
                               {t('map.updatedAt', {
                                 value: toUpdatedAt(link.updatedAt),
                               })}

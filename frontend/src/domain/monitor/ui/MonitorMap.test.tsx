@@ -840,7 +840,7 @@ describe('MonitorMap', () => {
     ).toContain('mt-1');
     expect(
       screen.getByText('Link 1 -> 2').parentElement?.parentElement?.className,
-    ).toContain('space-y-0.5');
+    ).toContain('space-y-1');
     expect(popupContainer?.className).toContain('w-full');
     expect(popupContainer?.className).not.toContain('w-[22rem]');
     expect(screen.getByText(/Last heartbeat: .*ago/)).not.toBeNull();
@@ -849,6 +849,9 @@ describe('MonitorMap', () => {
       screen.getByText('Link 1 -> 2').parentElement?.className ?? '';
     expect(linkCardClassName).toMatch(/(?:^|\s)p-1(?:\s|$)/);
     expect(linkCardClassName).not.toContain('p-1.5');
+    expect(screen.getByText('Link 1 -> 2').className).toMatch(
+      /(?:^|\s)m-1(?:\s|$)/,
+    );
     expect(screen.getByText('Direction: OUT')).not.toBeNull();
     expect(screen.getByText('RSSI: -57dBm')).not.toBeNull();
     expect(screen.getByText('Threshold: 500')).not.toBeNull();
@@ -858,11 +861,11 @@ describe('MonitorMap', () => {
       screen
         .getByText('Direction: OUT')
         .parentElement?.className.includes(
-          'grid grid-cols-[max-content_max-content] justify-start gap-x-1 gap-y-0',
+          'm-1 grid grid-cols-[max-content_max-content] justify-start gap-x-1',
         ),
     ).toBe(true);
-    expect(screen.getByText('Direction: OUT').className).toContain(
-      'leading-[10px]',
+    expect(screen.getByText('Direction: OUT').className).toMatch(
+      /(?:^|\s)m-1(?:\s|$)/,
     );
   });
 
