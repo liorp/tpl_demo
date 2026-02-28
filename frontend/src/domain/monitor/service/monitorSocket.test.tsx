@@ -296,6 +296,44 @@ describe('monitor socket lifecycle', () => {
     });
   });
 
+  test('ignores websocket payloads with unknown alarm values', async () => {
+    const onState = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} />
+      </TestWrapper>,
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    socket.emitOpen();
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'panic',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { gain: null },
+      units: [],
+      sensor_status: {},
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    await waitFor(() => {
+      const latestState = onState.mock.calls.at(-1)?.[0] as {
+        connected: boolean;
+        alarm: string;
+      };
+      expect(latestState.connected).toBe(false);
+      expect(latestState.alarm).toBe('disconnected');
+    });
+  });
+
   test('broadcast with old position does not overwrite optimistic placeUnit update', async () => {
     const onState = vi.fn();
     const onApi = vi.fn();
@@ -509,6 +547,58 @@ describe('monitor socket lifecycle', () => {
         units: Array<{ id: number; lastSeenAt: number }>;
       };
       expect(latest.units[0]?.lastSeenAt).toBe(103);
+    });
+  });
+
+  test('placeUnit does not create stale pending position when socket is not open', async () => {
+    const onState = vi.fn();
+    const onApi = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} onApi={onApi} />
+      </TestWrapper>,
+    );
+
+    const socket = FakeWebSocket.instances[0];
+
+    const latestApi = onApi.mock.calls.at(-1)?.[0] as {
+      placeUnit: (unit: {
+        id: number;
+        label: string;
+        lat: number;
+        lng: number;
+      }) => void;
+    };
+    latestApi.placeUnit({ id: 7, label: 'S7', lat: 33.4, lng: 35.85 });
+    expect(socket.send).not.toHaveBeenCalled();
+
+    socket.emitOpen();
+    socket.emitMessage({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      alarm: 'clear',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { gain: null },
+      units: [{ id: 7, label: 'S7', lat: 33.31, lng: 35.78 }],
+      sensor_status: {
+        '7': { last_seen: 101, connected_peers: [8] },
+      },
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    await waitFor(() => {
+      const latest = onState.mock.calls.at(-1)?.[0] as {
+        units: Array<{ id: number; lat: number; lng: number }>;
+      };
+      expect(latest.units[0]?.lat).toBe(33.31);
+      expect(latest.units[0]?.lng).toBe(35.78);
     });
   });
 

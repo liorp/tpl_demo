@@ -80,7 +80,10 @@ class _AsyncSink:
 async def _serial_consumer(queue: asyncio.Queue[SerialMessage]) -> None:
     while True:
         msg = await queue.get()
-        _handle_serial_message(msg)
+        try:
+            _handle_serial_message(msg)
+        except Exception:
+            logger.exception("Failed to process serial message")
 
 
 def _handle_serial_message(msg: SerialMessage) -> None:
@@ -105,16 +108,29 @@ async def lifespan(_: FastAPI):
     persisted = load_layout_state(layout_state_path)
     state.units = persisted["units"]
     state.map_policy = persisted["map_policy"]
-    asyncio.create_task(broadcaster.start())
+    broadcaster_task = asyncio.create_task(broadcaster.start())
 
     queue: asyncio.Queue[SerialMessage] = asyncio.Queue()
     loop = asyncio.get_running_loop()
     sink = _AsyncSink(queue, loop)
-    asyncio.create_task(_serial_consumer(queue))
-    threading.Thread(
-        target=serial_manager.serial_reader_loop, args=(sink,), daemon=True
-    ).start()
-    yield
+    consumer_task = asyncio.create_task(_serial_consumer(queue))
+    stop_event = threading.Event()
+    serial_thread = threading.Thread(
+        target=serial_manager.serial_reader_loop,
+        args=(sink, stop_event),
+        daemon=True,
+    )
+    serial_thread.start()
+    try:
+        yield
+    finally:
+        stop_event.set()
+        serial_manager.close_connection()
+        serial_thread.join(timeout=2.0)
+
+        consumer_task.cancel()
+        broadcaster_task.cancel()
+        await asyncio.gather(consumer_task, broadcaster_task, return_exceptions=True)
 
 
 app = FastAPI(lifespan=lifespan)

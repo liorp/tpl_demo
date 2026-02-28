@@ -64,7 +64,7 @@ export const StatusStrip = React.memo(function StatusStrip({
   serverOnline,
 }: Props) {
   const { t } = useTranslation();
-  const config = alarmConfig[alarm];
+  const config = alarmConfig[alarm] ?? alarmConfig.disconnected;
   const handleToggleFullscreen = React.useCallback(() => {
     if (document.fullscreenElement) {
       void document.exitFullscreen?.();

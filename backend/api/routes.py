@@ -14,6 +14,18 @@ from backend.core.service import acknowledge_alarm, set_unit_position
 from backend.realtime.broadcaster import Broadcaster
 
 
+def _is_strict_int(value: Any) -> bool:
+    return type(value) is int
+
+
+def _is_json_number(value: Any) -> bool:
+    return type(value) is int or type(value) is float
+
+
+def _is_non_negative_int(value: Any) -> bool:
+    return _is_strict_int(value) and value >= 0
+
+
 @dataclass
 class AppDeps:
     state: SensorState
@@ -29,12 +41,12 @@ def _build_serial_command(payload: dict[str, Any]) -> str | None:
     cmd = payload.get("cmd")
     if cmd == "set_threshold":
         value = payload.get("value")
-        if isinstance(value, int):
+        if _is_non_negative_int(value):
             return f"threshold {value}"
         return None
     if cmd == "set_gain":
         value = payload.get("value")
-        if isinstance(value, int):
+        if _is_non_negative_int(value):
             return f"gain {value}"
         return None
     if cmd == "map":
@@ -46,7 +58,7 @@ def _handle_detection_threshold(deps: AppDeps, payload: dict[str, Any]) -> bool:
     if payload.get("cmd") != "set_detection_threshold":
         return False
     value = payload.get("value")
-    if not isinstance(value, int):
+    if not _is_non_negative_int(value):
         return True
     noise_threshold = deps.state.config.get("noise_threshold")
     if isinstance(noise_threshold, int) and value < noise_threshold:
@@ -63,9 +75,9 @@ def _handle_unit_position(deps: AppDeps, payload: dict[str, Any]) -> bool:
     lat = payload.get("lat")
     lng = payload.get("lng")
     if (
-        not isinstance(unit_id, int)
-        or not isinstance(lat, (float, int))
-        or not isinstance(lng, (float, int))
+        not _is_strict_int(unit_id)
+        or not _is_json_number(lat)
+        or not _is_json_number(lng)
     ):
         return False
     changed = set_unit_position(
@@ -129,7 +141,7 @@ def register_routes(app: FastAPI, deps: AppDeps) -> None:
                     value = payload.get("value")
                     detection_threshold = deps.state.config.get("detection_threshold")
                     if (
-                        isinstance(value, int)
+                        _is_non_negative_int(value)
                         and isinstance(detection_threshold, int)
                         and value > detection_threshold
                     ):

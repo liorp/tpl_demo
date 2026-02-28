@@ -10,6 +10,18 @@ import type {
 } from './types';
 
 const finiteNumberSchema = z.number().refine(Number.isFinite);
+const alarmStateSchema = z.enum([
+  'clear',
+  'alarm',
+  'comm_loss',
+  'disconnected',
+]);
+const monitorEventSchema = z
+  .object({
+    time: z.string(),
+    msg: z.string(),
+  })
+  .passthrough();
 
 const crossingAlertInputSchema = z
   .object({
@@ -70,8 +82,8 @@ const signalLinkPayloadSchema = z
 const monitorPayloadEnvelopeSchema = z.object({
   connected: z.boolean(),
   port: z.string(),
-  alarm: z.string(),
-  events: z.array(z.unknown()),
+  alarm: alarmStateSchema,
+  events: z.array(monitorEventSchema),
   links: z.array(z.unknown()),
   crossing_alert: z.unknown().nullable().optional(),
   config: z.object({ gain: z.unknown() }),

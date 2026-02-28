@@ -102,64 +102,63 @@ export function useMonitorSocket(): {
       socket.onmessage = (event: MessageEvent<string>) => {
         try {
           const payload: unknown = JSON.parse(event.data);
-          if (isMonitorPayload(payload)) {
-            // Update server state in React Query cache
-            const nextServer = toServerStateFromPayload(payload);
-            queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, nextServer);
+          if (!isMonitorPayload(payload)) {
+            return;
+          }
+          // Update server state in React Query cache
+          const nextServer = toServerStateFromPayload(payload);
+          queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, nextServer);
 
-            // Handle crossing alerts (transient)
-            const incomingAlert = toCrossingAlert(payload.crossing_alert);
-            const pairedAlert =
-              incomingAlert &&
-              isPairEnabled(
-                pairingsRef.current,
-                incomingAlert.sensorA,
-                incomingAlert.sensorB,
-              )
-                ? incomingAlert
-                : null;
-            const allowedAlert = isCrossingAlertSuppressed(
-              pairedAlert,
-              crossingAckWindowsRef.current,
+          // Handle crossing alerts (transient)
+          const incomingAlert = toCrossingAlert(payload.crossing_alert);
+          const pairedAlert =
+            incomingAlert &&
+            isPairEnabled(
+              pairingsRef.current,
+              incomingAlert.sensorA,
+              incomingAlert.sensorB,
             )
-              ? null
-              : pairedAlert;
-            setCrossingAlerts((prev) =>
-              mergeCrossingAlerts(prev, allowedAlert),
-            );
+              ? incomingAlert
+              : null;
+          const allowedAlert = isCrossingAlertSuppressed(
+            pairedAlert,
+            crossingAckWindowsRef.current,
+          )
+            ? null
+            : pairedAlert;
+          setCrossingAlerts((prev) => mergeCrossingAlerts(prev, allowedAlert));
 
-            // Handle units (client state)
-            const hasServerUnits = Array.isArray(payload.units);
-            if (hasServerUnits) {
-              setClientState((prev) => {
-                const serverUnits = toPayloadUnits(
-                  payload.units,
-                  nextServer.sensorStatus,
-                );
-                const pending = pendingPositionsRef.current;
-                if (pending.size === 0) {
-                  return { ...prev, units: serverUnits };
+          // Handle units (client state)
+          const hasServerUnits = Array.isArray(payload.units);
+          if (hasServerUnits) {
+            setClientState((prev) => {
+              const serverUnits = toPayloadUnits(
+                payload.units,
+                nextServer.sensorStatus,
+              );
+              const pending = pendingPositionsRef.current;
+              if (pending.size === 0) {
+                return { ...prev, units: serverUnits };
+              }
+              const units = serverUnits.map((unit) => {
+                const pendingPos = pending.get(unit.id);
+                if (!pendingPos) return unit;
+                if (
+                  Math.abs(unit.lat - pendingPos.lat) < 1e-6 &&
+                  Math.abs(unit.lng - pendingPos.lng) < 1e-6
+                ) {
+                  pending.delete(unit.id);
+                  return unit;
                 }
-                const units = serverUnits.map((unit) => {
-                  const pendingPos = pending.get(unit.id);
-                  if (!pendingPos) return unit;
-                  if (
-                    Math.abs(unit.lat - pendingPos.lat) < 1e-6 &&
-                    Math.abs(unit.lng - pendingPos.lng) < 1e-6
-                  ) {
-                    pending.delete(unit.id);
-                    return unit;
-                  }
-                  return { ...unit, lat: pendingPos.lat, lng: pendingPos.lng };
-                });
-                return { ...prev, units };
+                return { ...unit, lat: pendingPos.lat, lng: pendingPos.lng };
               });
-            } else {
-              setClientState((prev) => ({
-                ...prev,
-                units: mergeTelemetryUnits(prev.units, payload),
-              }));
-            }
+              return { ...prev, units };
+            });
+          } else {
+            setClientState((prev) => ({
+              ...prev,
+              units: mergeTelemetryUnits(prev.units, payload),
+            }));
           }
         } catch {
           // Ignore malformed websocket payloads.
@@ -171,6 +170,7 @@ export function useMonitorSocket(): {
           return;
         }
         socketRef.current = null;
+        pendingPositionsRef.current.clear();
         queryClient.setQueryData<ServerState>(
           SERVER_QUERY_KEY,
           createInitialServerState(),
@@ -210,81 +210,32 @@ export function useMonitorSocket(): {
     }
   }, []);
 
-  const requestMap = useCallback(() => {
-    const socket = socketRef.current;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ cmd: 'map' }));
-    }
-  }, []);
-
-  const sendThreshold = useCallback((value: number): boolean => {
-    const socket = socketRef.current;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ cmd: 'set_threshold', value }));
+  const sendCommand = useCallback(
+    (cmd: string, payload: Record<string, unknown> = {}): boolean => {
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        return false;
+      }
+      socket.send(JSON.stringify({ cmd, ...payload }));
       return true;
-    }
-    return false;
-  }, []);
+    },
+    [],
+  );
 
-  const sendDetectionThreshold = useCallback((value: number): boolean => {
-    const socket = socketRef.current;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ cmd: 'set_detection_threshold', value }));
-      return true;
-    }
-    return false;
-  }, []);
-
-  const sendGain = useCallback((value: number): boolean => {
-    const socket = socketRef.current;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ cmd: 'set_gain', value }));
-      return true;
-    }
-    return false;
-  }, []);
-
-  const placeUnit = useCallback((unit: UnitPlacement) => {
-    const socket = socketRef.current;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(
-        JSON.stringify({
-          cmd: 'set_unit_position',
-          unit_id: unit.id,
-          lat: unit.lat,
-          lng: unit.lng,
-        }),
-      );
-    }
-
-    pendingPositionsRef.current.set(unit.id, {
-      lat: unit.lat,
-      lng: unit.lng,
-    });
-
-    setClientState((prev) => {
-      const units = upsertUnitInList(prev.units, unit);
-      const next = { ...prev, units };
-      savePersistedMonitorConfig({
-        units: next.units,
-        pairings: next.pairings,
-        globalSettings: next.globalSettings,
-      });
-      return next;
-    });
-  }, []);
-
-  const setUnitPairing = useCallback(
-    (side1Id: number, side2Id: number, enabled: boolean) => {
+  const setClientStateAndPersist = useCallback(
+    (
+      updater: (prev: {
+        units: UnitPlacement[];
+        pairings: PairLink[];
+        globalSettings: GlobalSettings;
+      }) => {
+        units: UnitPlacement[];
+        pairings: PairLink[];
+        globalSettings: GlobalSettings;
+      },
+    ) => {
       setClientState((prev) => {
-        const pairings = setPairingInList(
-          prev.units,
-          prev.pairings,
-          side1Id,
-          side2Id,
-          enabled,
-        );
-        const next = { ...prev, pairings };
+        const next = updater(prev);
         savePersistedMonitorConfig({
           units: next.units,
           pairings: next.pairings,
@@ -296,38 +247,92 @@ export function useMonitorSocket(): {
     [],
   );
 
-  const setAlarmSoundEnabled = useCallback((enabled: boolean) => {
-    setClientState((prev) => {
-      const next = {
+  const requestMap = useCallback(() => {
+    sendCommand('map');
+  }, [sendCommand]);
+
+  const sendThreshold = useCallback(
+    (value: number): boolean => {
+      return sendCommand('set_threshold', { value });
+    },
+    [sendCommand],
+  );
+
+  const sendDetectionThreshold = useCallback(
+    (value: number): boolean => {
+      return sendCommand('set_detection_threshold', { value });
+    },
+    [sendCommand],
+  );
+
+  const sendGain = useCallback(
+    (value: number): boolean => {
+      return sendCommand('set_gain', { value });
+    },
+    [sendCommand],
+  );
+
+  const placeUnit = useCallback(
+    (unit: UnitPlacement) => {
+      if (
+        sendCommand('set_unit_position', {
+          unit_id: unit.id,
+          lat: unit.lat,
+          lng: unit.lng,
+        })
+      ) {
+        pendingPositionsRef.current.set(unit.id, {
+          lat: unit.lat,
+          lng: unit.lng,
+        });
+      }
+
+      setClientStateAndPersist((prev) => {
+        const units = upsertUnitInList(prev.units, unit);
+        return { ...prev, units };
+      });
+    },
+    [sendCommand, setClientStateAndPersist],
+  );
+
+  const setUnitPairing = useCallback(
+    (side1Id: number, side2Id: number, enabled: boolean) => {
+      setClientStateAndPersist((prev) => {
+        const pairings = setPairingInList(
+          prev.units,
+          prev.pairings,
+          side1Id,
+          side2Id,
+          enabled,
+        );
+        return { ...prev, pairings };
+      });
+    },
+    [setClientStateAndPersist],
+  );
+
+  const setAlarmSoundEnabled = useCallback(
+    (enabled: boolean) => {
+      setClientStateAndPersist((prev) => ({
         ...prev,
         globalSettings: { ...prev.globalSettings, alarmSoundEnabled: enabled },
-      };
-      savePersistedMonitorConfig({
-        units: next.units,
-        pairings: next.pairings,
-        globalSettings: next.globalSettings,
-      });
-      return next;
-    });
-  }, []);
+      }));
+    },
+    [setClientStateAndPersist],
+  );
 
-  const setOfflineModeEnabled = useCallback((enabled: boolean) => {
-    setClientState((prev) => {
-      const next = {
+  const setOfflineModeEnabled = useCallback(
+    (enabled: boolean) => {
+      setClientStateAndPersist((prev) => ({
         ...prev,
         globalSettings: {
           ...prev.globalSettings,
           offlineModeEnabled: enabled,
         },
-      };
-      savePersistedMonitorConfig({
-        units: next.units,
-        pairings: next.pairings,
-        globalSettings: next.globalSettings,
-      });
-      return next;
-    });
-  }, []);
+      }));
+    },
+    [setClientStateAndPersist],
+  );
 
   const resetAll = useCallback(() => {
     clearPersistedMonitorConfig();

@@ -126,6 +126,44 @@ def test_set_threshold_rejects_values_above_known_detection_threshold(tmp_path: 
     assert sent_cmds == []
 
 
+def test_set_threshold_rejects_boolean_value(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, _ = _build_app(tmp_path, sent_cmds)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_threshold","value":true}')
+
+    assert sent_cmds == []
+
+
+def test_set_gain_rejects_negative_value(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, _ = _build_app(tmp_path, sent_cmds)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_gain","value":-1}')
+
+    assert sent_cmds == []
+
+
+def test_set_detection_threshold_rejects_boolean_value(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, broadcaster = _build_app(
+        tmp_path,
+        sent_cmds,
+        initial_config={"noise_threshold": 600, "detection_threshold": None},
+    )
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_detection_threshold","value":true}')
+
+    assert sent_cmds == []
+    assert broadcaster.payload["config"]["detection_threshold"] is None
+
+
 def test_serves_favicon_without_404(tmp_path: Path):
     client, _, _ = _build_app(tmp_path, [])
 
@@ -223,6 +261,20 @@ def test_set_unit_position_rejects_negative_unit_id(tmp_path: Path):
     with client.websocket_connect("/ws") as ws:
         _ = ws.receive_json()
         ws.send_text('{"cmd":"set_unit_position","unit_id":-1,"lat":33.31,"lng":35.78}')
+
+    assert persisted_layouts == []
+
+
+def test_set_unit_position_rejects_boolean_unit_id_and_coordinates(tmp_path: Path):
+    sent_cmds: list[str] = []
+    persisted_layouts: list[dict] = []
+    client, _, _ = _build_app(tmp_path, sent_cmds, persisted_layouts)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text(
+            '{"cmd":"set_unit_position","unit_id":true,"lat":true,"lng":35.78}'
+        )
 
     assert persisted_layouts == []
 

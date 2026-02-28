@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 class GeoBounds(TypedDict):
@@ -35,6 +35,9 @@ class DetectionEvent(TypedDict):
     value: int
     count: int
     device_ts: int
+    th: NotRequired[int]
+    val: NotRequired[int]
+    c: NotRequired[int]
 
 
 class CommLossEvent(TypedDict):
@@ -45,6 +48,7 @@ class CommLossEvent(TypedDict):
     unit_b: int
     value: int
     device_ts: int
+    val: NotRequired[int]
 
 
 class ConnectedEvent(TypedDict):
@@ -57,14 +61,26 @@ class ConnectedEvent(TypedDict):
     device_ts: int
 
 
+class MapLink(TypedDict):
+    side1: int
+    side2: int
+    threshold: int
+    rssi: int
+    dt: int
+    th3: NotRequired[int]
+
+
 class MapEvent(TypedDict):
     type: Literal["map"]
     unit_id: int
     version: str
     gain: int
     voltage: int
-    links: list[dict[str, int]]
+    links: list[MapLink]
     device_ts: int
+    ver: NotRequired[str]
+    scan: NotRequired[int]
+    adv: NotRequired[int]
 
 
 class ConfigEvent(TypedDict):
@@ -72,6 +88,7 @@ class ConfigEvent(TypedDict):
     threshold: int
     value: int
     device_ts: int
+    val: NotRequired[int]
 
 
 Event = DetectionEvent | CommLossEvent | ConnectedEvent | MapEvent | ConfigEvent
