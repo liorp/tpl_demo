@@ -209,6 +209,17 @@
 }
 
 @layer components {
+  .fixed-map-scale {
+    width: 96px;
+  }
+
+  .fixed-map-scale__line {
+    box-sizing: border-box;
+    min-width: 96px;
+    max-width: 96px;
+    text-align: center;
+  }
+
   .leaflet-popup.sensor-popup .leaflet-popup-content-wrapper {
     @apply rounded-md border border-border-bright bg-card text-foreground shadow-lg;
     padding: 0;

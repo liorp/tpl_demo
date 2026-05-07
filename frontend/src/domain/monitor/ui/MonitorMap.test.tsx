@@ -32,6 +32,19 @@ const polylineSegments: Array<{
 const mapFlyTo = vi.fn();
 const mapSetView = vi.fn();
 const mapFitBounds = vi.fn();
+const mapOn = vi.fn();
+const mapOff = vi.fn();
+const mapControlCorners = {
+  bottomleft:
+    typeof document === 'undefined' ? null : document.createElement('div'),
+};
+const mapDistance = vi.fn(() => 1234);
+const mapContainerPointToLatLng = vi.fn(
+  (point: [number, number] | { x: number; y: number }) => {
+    const x = Array.isArray(point) ? point[0] : point.x;
+    return { lat: 33.3, lng: 35.7 + x / 1000 };
+  },
+);
 
 vi.mock('react-leaflet', () => ({
   MapContainer: ({
@@ -57,6 +70,12 @@ vi.mock('react-leaflet', () => ({
       data-max-zoom={maxZoom}
       data-max-bounds={JSON.stringify(maxBounds)}
     >
+      <div
+        ref={(node) => {
+          mapControlCorners.bottomleft = node;
+        }}
+        data-testid="bottomleft-control-corner"
+      />
       {children}
     </div>
   ),
@@ -143,6 +162,12 @@ vi.mock('react-leaflet', () => ({
     getZoom: () => 8,
     setView: mapSetView,
     fitBounds: mapFitBounds,
+    getSize: () => ({ y: 400 }),
+    containerPointToLatLng: mapContainerPointToLatLng,
+    distance: mapDistance,
+    on: mapOn,
+    off: mapOff,
+    _controlCorners: mapControlCorners,
   }),
 }));
 
@@ -156,6 +181,10 @@ describe('MonitorMap', () => {
     mapFlyTo.mockClear();
     mapSetView.mockClear();
     mapFitBounds.mockClear();
+    mapOn.mockClear();
+    mapOff.mockClear();
+    mapDistance.mockClear();
+    mapContainerPointToLatLng.mockClear();
   });
   afterEach(() => {
     cleanup();
@@ -198,9 +227,36 @@ describe('MonitorMap', () => {
       />,
     );
 
-    const scaleControl = screen.getByTestId('scale-control');
-    expect(scaleControl.getAttribute('data-position')).toBe('bottomleft');
-    expect(scaleControl.getAttribute('data-imperial')).toBe('false');
+    const scaleCorner = screen.getByTestId('bottomleft-control-corner');
+    const scaleControl = screen.getByTestId('fixed-scale-control');
+    expect(scaleCorner.contains(scaleControl)).toBe(true);
+    expect(screen.getByTestId('fixed-scale-line').textContent).toMatch(/m|km/);
+  });
+
+  test('keeps the map scale control width fixed while updating the metric label', () => {
+    render(
+      <MonitorMap
+        units={[]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    const fixedScaleControl = screen.getByTestId('fixed-scale-control');
+    const fixedScaleLine = screen.getByTestId('fixed-scale-line');
+    expect(fixedScaleControl.className).toContain('fixed-map-scale');
+    expect(fixedScaleLine.style.width).toBe('96px');
+    expect(fixedScaleLine.textContent).toBe('1.2 km');
+    expect(mapOn).toHaveBeenCalledWith(
+      'zoomend moveend resize',
+      expect.any(Function),
+    );
   });
 
   test('passes explicit map bounds to leaflet container', () => {
