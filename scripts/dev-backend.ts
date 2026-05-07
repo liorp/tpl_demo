@@ -1,4 +1,4 @@
-const backendPort = process.env.TPL_BACKEND_PORT ?? '8080';
+const backendPort = process.env.TPL_BACKEND_PORT ?? '8181';
 
 const processHandle = Bun.spawn(
   [

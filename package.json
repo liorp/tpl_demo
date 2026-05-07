@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "bun@1.3.2",
   "scripts": {
-    "demo": "export TPL_BACKEND_PORT=18080 && rm -f /tmp/tpl-dummy-port && bunx --bun concurrently -k -n DEV,BE,FE -c yellow,green,cyan \"python dummy_device.py --port-file /tmp/tpl-dummy-port\" \"bash scripts/demo-backend.sh\" \"bun run dev:frontend\"",
+    "demo": "export TPL_BACKEND_PORT=18181 && rm -f /tmp/tpl-dummy-port && bunx --bun concurrently -k -n DEV,BE,FE -c yellow,green,cyan \"python dummy_device.py --port-file /tmp/tpl-dummy-port\" \"bash scripts/demo-backend.sh\" \"bun run dev:frontend\"",
     "dev": "bunx --bun concurrently -k -n FE,BE -c cyan,green \"bun run dev:frontend\" \"bun run dev:backend\"",
     "dev:frontend": "cd frontend && bun run watch",
     "dev:backend": "bun ./scripts/dev-backend.ts",

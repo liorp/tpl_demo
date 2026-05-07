@@ -138,6 +138,9 @@ register_routes(app, deps)
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    port = int(os.environ.get("TPL_BACKEND_PORT", "8181"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

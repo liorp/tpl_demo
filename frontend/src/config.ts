@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const DEFAULT_BACKEND_PORT = 8080;
+export const DEFAULT_BACKEND_PORT = 8181;
 export const SENSOR_STALE_AFTER_SECONDS = 60;
 declare const __TPL_BACKEND_PORT__: string | undefined;
 
