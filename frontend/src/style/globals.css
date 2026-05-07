@@ -209,14 +209,16 @@
 }
 
 @layer components {
-  .fixed-map-scale {
+  .leaflet-control-scale {
     width: 96px;
   }
 
-  .fixed-map-scale__line {
+  .leaflet-control-scale-line {
     box-sizing: border-box;
-    min-width: 96px;
-    max-width: 96px;
+    /* biome-ignore lint/complexity/noImportantStyles: Leaflet mutates scale width inline on each zoom. */
+    width: 100% !important;
+    min-width: 100%;
+    max-width: 100%;
     text-align: center;
   }
 

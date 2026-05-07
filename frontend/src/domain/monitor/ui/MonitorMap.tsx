@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { Control, DomUtil, divIcon, type Map as LeafletMap } from 'leaflet';
+import { divIcon } from 'leaflet';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,6 +8,7 @@ import {
   Marker,
   Polyline,
   Popup,
+  ScaleControl,
   TileLayer,
   useMap,
 } from 'react-leaflet';
@@ -114,83 +115,6 @@ function MapUnitsViewportController({ units }: { units: UnitPlacement[] }) {
 
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
   }, [map, units]);
-
-  return null;
-}
-
-function formatScaleDistance(meters: number): string {
-  if (!Number.isFinite(meters) || meters <= 0) {
-    return '';
-  }
-
-  if (meters >= 1000) {
-    const kilometers = meters / 1000;
-    if (kilometers >= 10) {
-      return `${Math.round(kilometers)} km`;
-    }
-    return `${Math.round(kilometers * 10) / 10} km`;
-  }
-
-  if (meters >= 100) {
-    return `${Math.round(meters / 10) * 10} m`;
-  }
-
-  return `${Math.max(1, Math.round(meters))} m`;
-}
-
-function getFixedScaleMeters(map: LeafletMap): number {
-  const size = map.getSize();
-  const y = size.y / 2;
-  const start = map.containerPointToLatLng([0, y]);
-  const end = map.containerPointToLatLng([FIXED_SCALE_WIDTH_PX, y]);
-  return map.distance(start, end);
-}
-
-function FixedMetricScaleControl() {
-  const map = useMap();
-
-  useEffect(() => {
-    const control = new Control({ position: 'bottomleft' });
-    let scaleLine: HTMLDivElement | null = null;
-
-    const update = () => {
-      if (!scaleLine) {
-        return;
-      }
-
-      const label = formatScaleDistance(getFixedScaleMeters(map));
-      scaleLine.textContent = label;
-      scaleLine.setAttribute('aria-label', `Map scale: ${label}`);
-    };
-
-    control.onAdd = () => {
-      const container = DomUtil.create(
-        'div',
-        'leaflet-control-scale fixed-map-scale',
-      );
-      container.setAttribute('data-testid', 'fixed-scale-control');
-
-      scaleLine = DomUtil.create(
-        'div',
-        'leaflet-control-scale-line fixed-map-scale__line',
-        container,
-      );
-      scaleLine.setAttribute('data-testid', 'fixed-scale-line');
-      scaleLine.style.width = `${FIXED_SCALE_WIDTH_PX}px`;
-      scaleLine.style.minWidth = `${FIXED_SCALE_WIDTH_PX}px`;
-      scaleLine.style.maxWidth = `${FIXED_SCALE_WIDTH_PX}px`;
-      update();
-      return container;
-    };
-
-    control.addTo(map);
-    map.on('zoomend moveend resize', update);
-
-    return () => {
-      map.off('zoomend moveend resize', update);
-      control.remove();
-    };
-  }, [map]);
 
   return null;
 }
@@ -606,7 +530,11 @@ export function MonitorMap({
             maxNativeZoom={ONLINE_TILE_NATIVE_MAX_ZOOM}
           />
         ) : null}
-        <FixedMetricScaleControl />
+        <ScaleControl
+          position="bottomleft"
+          imperial={false}
+          maxWidth={FIXED_SCALE_WIDTH_PX}
+        />
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
         {pairingEllipses.map((ellipse) => (
