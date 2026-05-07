@@ -51,9 +51,6 @@ function resolveLabel(
   if (alarm === 'comm_loss') {
     return t('statusStrip.commLoss');
   }
-  if (alarm !== 'disconnected') {
-    return t('statusStrip.disconnected');
-  }
   return serverOnline
     ? t('statusStrip.noSensor')
     : t('statusStrip.serverOffline');
@@ -64,7 +61,7 @@ export const StatusStrip = React.memo(function StatusStrip({
   serverOnline,
 }: Props) {
   const { t } = useTranslation();
-  const config = alarmConfig[alarm] ?? alarmConfig.disconnected;
+  const config = alarmConfig[alarm];
   const handleToggleFullscreen = React.useCallback(() => {
     if (document.fullscreenElement) {
       void document.exitFullscreen?.();

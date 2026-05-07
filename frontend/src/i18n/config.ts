@@ -2,24 +2,12 @@ import i18n from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import { initReactI18next } from 'react-i18next';
 
+import { applyDocumentLanguage, supportedLanguages } from './language';
 import enCommon from './resources/en';
 import heCommon from './resources/he';
 
-export const supportedLanguages = ['en', 'he'] as const;
-export type SupportedLanguage = (typeof supportedLanguages)[number];
-
-function normalizeLanguage(language: string | undefined): SupportedLanguage {
-  return language?.startsWith('he') ? 'he' : 'en';
-}
-
 function syncDocumentLanguage(language: string | undefined) {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  const normalizedLanguage = normalizeLanguage(language);
-  document.documentElement.lang = normalizedLanguage;
-  document.documentElement.dir = i18n.dir(normalizedLanguage);
+  applyDocumentLanguage(language, i18n.dir.bind(i18n));
 }
 
 let initPromise: Promise<unknown> | null = null;

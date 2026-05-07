@@ -1,4 +1,11 @@
-export type AlarmState = 'clear' | 'alarm' | 'comm_loss' | 'disconnected';
+export const ALARM_STATES = [
+  'clear',
+  'alarm',
+  'comm_loss',
+  'disconnected',
+] as const;
+
+export type AlarmState = (typeof ALARM_STATES)[number];
 
 export type MonitorEvent = {
   time: string;

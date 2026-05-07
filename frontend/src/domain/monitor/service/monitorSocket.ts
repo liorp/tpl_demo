@@ -33,6 +33,12 @@ import { isMonitorPayload } from '../model/validation';
 
 const SERVER_QUERY_KEY = ['monitor', 'server'] as const;
 
+type ClientState = {
+  units: UnitPlacement[];
+  pairings: PairLink[];
+  globalSettings: GlobalSettings;
+};
+
 export function useMonitorSocket(): {
   state: MonitorState;
   acknowledgeCrossing: (alert: CrossingAlert) => void;
@@ -56,8 +62,7 @@ export function useMonitorSocket(): {
     initialData: createInitialServerState,
   });
 
-  // Client state (persisted to localStorage)
-  const [clientState, setClientState] = useState(() => {
+  const [clientState, setClientState] = useState<ClientState>(() => {
     const persisted = loadPersistedMonitorConfig();
     return {
       units: persisted.units as UnitPlacement[],
@@ -105,11 +110,9 @@ export function useMonitorSocket(): {
           if (!isMonitorPayload(payload)) {
             return;
           }
-          // Update server state in React Query cache
           const nextServer = toServerStateFromPayload(payload);
           queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, nextServer);
 
-          // Handle crossing alerts (transient)
           const incomingAlert = toCrossingAlert(payload.crossing_alert);
           const pairedAlert =
             incomingAlert &&
@@ -128,7 +131,6 @@ export function useMonitorSocket(): {
             : pairedAlert;
           setCrossingAlerts((prev) => mergeCrossingAlerts(prev, allowedAlert));
 
-          // Handle units (client state)
           const hasServerUnits = Array.isArray(payload.units);
           if (hasServerUnits) {
             setClientState((prev) => {
@@ -223,19 +225,12 @@ export function useMonitorSocket(): {
   );
 
   const setClientStateAndPersist = useCallback(
-    (
-      updater: (prev: {
-        units: UnitPlacement[];
-        pairings: PairLink[];
-        globalSettings: GlobalSettings;
-      }) => {
-        units: UnitPlacement[];
-        pairings: PairLink[];
-        globalSettings: GlobalSettings;
-      },
-    ) => {
+    (updater: (prev: ClientState) => ClientState) => {
       setClientState((prev) => {
         const next = updater(prev);
+        if (next === prev) {
+          return prev;
+        }
         savePersistedMonitorConfig({
           units: next.units,
           pairings: next.pairings,
@@ -343,7 +338,6 @@ export function useMonitorSocket(): {
     });
   }, []);
 
-  // Compose final MonitorState from the three sources
   const safeServerState = serverState ?? createInitialServerState();
   const state: MonitorState = useMemo(
     () => ({

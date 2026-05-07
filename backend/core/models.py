@@ -61,12 +61,15 @@ class ConnectedEvent(TypedDict):
     device_ts: int
 
 
-class MapLink(TypedDict):
+class _LinkBase(TypedDict):
     side1: int
     side2: int
     threshold: int
     rssi: int
     dt: int
+
+
+class MapLink(_LinkBase):
     th3: NotRequired[int]
 
 
@@ -99,12 +102,7 @@ class LogEntry(TypedDict, total=False):
     msg: str
 
 
-class SideLink(TypedDict):
-    side1: int
-    side2: int
-    threshold: int
-    rssi: int
-    dt: int
+class SideLink(_LinkBase):
     updated_at: int
 
 

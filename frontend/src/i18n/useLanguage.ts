@@ -1,24 +1,12 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { SupportedLanguage } from './config';
-import { supportedLanguages } from './config';
-
-function normalizeLanguage(language: string): SupportedLanguage {
-  return language.startsWith('he') ? 'he' : 'en';
-}
-
-function applyDocumentLanguage(
-  language: SupportedLanguage,
-  i18nDir: (language: string) => string,
-) {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  document.documentElement.lang = language;
-  document.documentElement.dir = i18nDir(language);
-}
+import {
+  applyDocumentLanguage,
+  normalizeLanguage,
+  type SupportedLanguage,
+  supportedLanguages,
+} from './language';
 
 export function useLanguage() {
   const { i18n } = useTranslation();

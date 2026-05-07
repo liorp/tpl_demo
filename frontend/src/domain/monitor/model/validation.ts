@@ -8,14 +8,10 @@ import type {
   SignalLinkState,
   UnitPlacement,
 } from './types';
+import { ALARM_STATES } from './types';
 
 const finiteNumberSchema = z.number().refine(Number.isFinite);
-const alarmStateSchema = z.enum([
-  'clear',
-  'alarm',
-  'comm_loss',
-  'disconnected',
-]);
+const alarmStateSchema = z.enum(ALARM_STATES);
 const monitorEventSchema = z
   .object({
     time: z.string(),
