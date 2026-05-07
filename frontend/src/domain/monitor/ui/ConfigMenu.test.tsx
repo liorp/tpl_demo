@@ -15,7 +15,6 @@ afterEach(async () => {
 function renderConfigMenu(
   overrides: Partial<{
     config: MonitorConfig;
-    onSendDetectionThreshold: ReturnType<typeof vi.fn>;
     onSendDetectionMode: ReturnType<typeof vi.fn>;
     onSendRequestDetectionMode: ReturnType<typeof vi.fn>;
     onRefreshMap: ReturnType<typeof vi.fn>;
@@ -29,14 +28,11 @@ function renderConfigMenu(
     config: overrides.config ?? {
       gain: null,
       noise_threshold: null,
-      detection_threshold: null,
       detection_mode: null,
     },
     sensorStatus: {},
     alarmSoundEnabled: true,
     offlineModeEnabled: true,
-    onSendDetectionThreshold:
-      overrides.onSendDetectionThreshold ?? vi.fn().mockReturnValue(true),
     onSendDetectionMode:
       overrides.onSendDetectionMode ?? vi.fn().mockReturnValue(true),
     onSendRequestDetectionMode:
@@ -51,48 +47,18 @@ function renderConfigMenu(
 }
 
 describe('ConfigMenu', () => {
-  test('opens settings modal and pre-populates detection threshold from config', () => {
+  test('does not render a global detection threshold control', () => {
     renderConfigMenu({
       config: {
         gain: 64,
         noise_threshold: 550,
-        detection_threshold: 750,
         detection_mode: 1,
       },
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Settings|הגדרות/ }));
 
-    const detectionThreshold = screen.getByLabelText(
-      'Detection Threshold',
-    ) as HTMLInputElement;
-
-    expect(detectionThreshold.value).toBe('750');
-  });
-
-  test('sends detection threshold via Send button', () => {
-    const onSendDetectionThreshold = vi.fn().mockReturnValue(true);
-    renderConfigMenu({ onSendDetectionThreshold });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    fireEvent.change(screen.getByLabelText('Detection Threshold'), {
-      target: { value: '800' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
-
-    expect(onSendDetectionThreshold).toHaveBeenCalledWith(800);
-  });
-
-  test('disables Send when detection threshold is non-numeric', () => {
-    renderConfigMenu();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
-    fireEvent.change(screen.getByLabelText('Detection Threshold'), {
-      target: { value: '0x10' },
-    });
-
-    const sendButton = screen.getByRole('button', { name: 'Send' });
-    expect(sendButton.hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByLabelText('Detection Threshold')).toBeNull();
   });
 
   test('selecting Mode 2 calls onSendDetectionMode', () => {

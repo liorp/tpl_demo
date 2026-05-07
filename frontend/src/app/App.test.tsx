@@ -57,7 +57,7 @@ const state: MonitorState = {
       acknowledged: false,
     },
   ],
-  config: { noise_threshold: null, detection_threshold: null, gain: null },
+  config: { noise_threshold: null, gain: null },
   globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
   units: [
     {
@@ -100,7 +100,6 @@ const state: MonitorState = {
 
 const acknowledgeCrossing = vi.fn();
 const requestMap = vi.fn();
-const sendDetectionThreshold = vi.fn().mockReturnValue(true);
 const sendPairThreshold = vi.fn().mockReturnValue(true);
 const sendPairGain = vi.fn().mockReturnValue(true);
 const sendPing = vi.fn().mockReturnValue(true);
@@ -125,7 +124,6 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
     state,
     acknowledgeCrossing,
     requestMap,
-    sendDetectionThreshold,
     sendPairThreshold,
     sendPairGain,
     sendPing,
@@ -209,7 +207,6 @@ describe('App', () => {
     acknowledgeCrossing.mockClear();
     requestMap.mockClear();
     sendPairThreshold.mockClear();
-    sendDetectionThreshold.mockClear();
     sendPairGain.mockClear();
     sendPing.mockClear();
     sendSetActiveAntenna.mockClear();

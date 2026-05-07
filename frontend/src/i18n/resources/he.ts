@@ -5,9 +5,8 @@ const heCommon = {
   settings: {
     title: 'הגדרות',
     description:
-      'ניהול סף זיהוי, מצב והרשת. ספים וגיין לכל זוג נמצאים בלוח הצימודים.',
+      'ניהול מצב הזיהוי והרשת. ספים וגיין לכל זוג נמצאים בלוח הצימודים.',
     noiseThreshold: 'סף רעש',
-    detectionThreshold: 'סף זיהוי',
     gain: 'גיין',
     send: 'שליחה',
     refresh: 'רענון',
@@ -40,8 +39,6 @@ const heCommon = {
   configFeedback: {
     noiseSet: 'סף הרעש הוגדר ל-{{value}}',
     noiseNotConnected: 'אין חיבור — סף הרעש לא נשלח',
-    detectionSet: 'סף הזיהוי הוגדר ל-{{value}}',
-    detectionNotConnected: 'אין חיבור — סף הזיהוי לא נשלח',
     gainSet: 'הגיין הוגדר ל-{{value}}',
     gainNotConnected: 'אין חיבור — הגיין לא נשלח',
     detectionModeSet: 'מצב הזיהוי הוגדר ל-{{value}}',

@@ -109,20 +109,6 @@ def _build_serial_command(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def _handle_detection_threshold(deps: AppDeps, payload: dict[str, Any]) -> bool:
-    if payload.get("cmd") != "set_detection_threshold":
-        return False
-    value = payload.get("value")
-    if not _is_non_negative_int(value):
-        return True
-    noise_threshold = deps.state.config.get("noise_threshold")
-    if isinstance(noise_threshold, int) and value < noise_threshold:
-        return True
-    deps.state.config["detection_threshold"] = value
-    deps.broadcaster.enqueue(snapshot(deps.state))
-    return True
-
-
 def _handle_unit_position(deps: AppDeps, payload: dict[str, Any]) -> bool:
     if payload.get("cmd") != "set_unit_position":
         return False
@@ -189,8 +175,6 @@ def register_routes(app: FastAPI, deps: AppDeps) -> None:
                 if not isinstance(payload, dict):
                     continue
                 if _handle_unit_position(deps, payload):
-                    continue
-                if _handle_detection_threshold(deps, payload):
                     continue
                 serial_cmd = _build_serial_command(payload)
                 if serial_cmd:

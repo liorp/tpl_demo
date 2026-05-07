@@ -228,6 +228,8 @@ describe('monitor state model', () => {
         sensor_a: 11,
         sensor_b: 12,
         timestamp: 1_739_742_000,
+        value: 860,
+        threshold: 500,
         lat: null,
         lng: null,
         acknowledged: false,
@@ -240,6 +242,8 @@ describe('monitor state model', () => {
         sensorA: 11,
         sensorB: 12,
         at: 1_739_742_000,
+        value: 860,
+        threshold: 500,
         lat: null,
         lng: null,
         acknowledged: false,
@@ -351,12 +355,14 @@ describe('monitor state model', () => {
     expect(state.pairings).toEqual([]);
   });
 
-  test('deduplicates crossing alerts within a sliding time window', () => {
+  test('deduplicates crossing alerts while preserving first received timestamp', () => {
     const initial = [
       {
         sensorA: 2,
         sensorB: 12,
         at: 1_000,
+        value: 530,
+        threshold: 500,
         lat: null,
         lng: null,
         acknowledged: false,
@@ -366,6 +372,8 @@ describe('monitor state model', () => {
       sensorA: 12,
       sensorB: 2,
       at: 4_000,
+      value: 860,
+      threshold: 500,
       lat: 33.1,
       lng: 35.7,
       acknowledged: false,
@@ -381,14 +389,16 @@ describe('monitor state model', () => {
 
     const deduped = mergeCrossingAlerts(initial, duplicate, 5_000, 50);
     expect(deduped).toHaveLength(1);
-    expect(deduped[0]?.at).toBe(4_000);
+    expect(deduped[0]?.at).toBe(1_000);
+    expect(deduped[0]?.value).toBe(860);
+    expect(deduped[0]?.threshold).toBe(500);
     expect(deduped[0]?.lat).toBe(33.1);
     expect(deduped[0]?.lng).toBe(35.7);
 
     const appended = mergeCrossingAlerts(deduped, outsideWindow, 5_000, 50);
     expect(appended).toHaveLength(2);
     expect(appended[0]?.at).toBe(12_000);
-    expect(appended[1]?.at).toBe(4_000);
+    expect(appended[1]?.at).toBe(1_000);
   });
 
   test('removes a crossing alert when it is acknowledged', () => {

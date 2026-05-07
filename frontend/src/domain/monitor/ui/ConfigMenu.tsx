@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -11,7 +11,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/component/ui/dialog';
-import { Input } from '@/component/ui/input';
 import { Label } from '@/component/ui/label';
 import {
   Select,
@@ -27,7 +26,6 @@ import type {
   MonitorConfig,
   SensorStatusMap,
 } from '../model/types';
-import { parseInputNumber } from '../model/validation';
 import { MeshSettingsPanel } from './MeshSettingsPanel';
 
 type Props = {
@@ -35,7 +33,6 @@ type Props = {
   sensorStatus: SensorStatusMap;
   alarmSoundEnabled: boolean;
   offlineModeEnabled: boolean;
-  onSendDetectionThreshold: (value: number) => boolean;
   onSendDetectionMode: (mode: DetectionMode) => boolean;
   onSendRequestDetectionMode: () => boolean;
   onRefreshMap: () => void;
@@ -45,18 +42,11 @@ type Props = {
   onResetAll: () => void;
 };
 
-const DEFAULT_DETECTION_THRESHOLD = 700;
-
-function toKnownValue(value: number | null, fallback: number): string {
-  return value !== null ? String(value) : String(fallback);
-}
-
 export function ConfigMenu({
   config,
   sensorStatus,
   alarmSoundEnabled,
   offlineModeEnabled,
-  onSendDetectionThreshold,
   onSendDetectionMode,
   onSendRequestDetectionMode,
   onRefreshMap,
@@ -68,27 +58,6 @@ export function ConfigMenu({
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
   const [open, setOpen] = useState(false);
-  const [detectionThreshold, setDetectionThreshold] = useState(
-    toKnownValue(
-      config.detection_threshold ?? null,
-      DEFAULT_DETECTION_THRESHOLD,
-    ),
-  );
-
-  useEffect(() => {
-    if (open) {
-      return;
-    }
-    setDetectionThreshold(
-      toKnownValue(
-        config.detection_threshold ?? null,
-        DEFAULT_DETECTION_THRESHOLD,
-      ),
-    );
-  }, [config.detection_threshold, open]);
-
-  const detectionThresholdNum = parseInputNumber(detectionThreshold);
-  const detectionThresholdValid = detectionThresholdNum !== null;
   const currentDetectionMode: DetectionMode = config.detection_mode ?? 1;
 
   return (
@@ -126,44 +95,6 @@ export function ConfigMenu({
           <DialogDescription>{t('settings.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label
-              htmlFor="detection-threshold"
-              className="font-display text-xs tracking-wide text-muted-foreground"
-            >
-              {t('settings.detectionThreshold')}
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="detection-threshold"
-                value={detectionThreshold}
-                onChange={(event) => setDetectionThreshold(event.target.value)}
-                className="bg-background font-mono tabular-nums"
-              />
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (detectionThresholdNum === null) {
-                    return;
-                  }
-                  if (onSendDetectionThreshold(detectionThresholdNum)) {
-                    toast.success(
-                      t('configFeedback.detectionSet', {
-                        value: detectionThresholdNum,
-                      }),
-                    );
-                  } else {
-                    toast.error(t('configFeedback.detectionNotConnected'));
-                  }
-                }}
-                disabled={!detectionThresholdValid}
-                className="font-display tracking-wide"
-              >
-                {t('settings.send')}
-              </Button>
-            </div>
-          </div>
-
           <div className="grid gap-2 rounded-md border border-border-bright bg-background/70 p-3">
             <Label
               htmlFor="detection-mode"

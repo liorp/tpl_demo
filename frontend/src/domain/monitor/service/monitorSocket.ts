@@ -49,7 +49,6 @@ type MonitorSocketApi = {
   requestMap: () => void;
   sendPairThreshold: (unitA: number, unitB: number, value: number) => boolean;
   sendPairGain: (unitA: number, unitB: number, value: number) => boolean;
-  sendDetectionThreshold: (value: number) => boolean;
   sendPing: (unit?: number) => boolean;
   sendSetActiveAntenna: (unit: number, antenna: AntennaMode) => boolean;
   sendRequestActiveAntenna: (unit?: number) => boolean;
@@ -329,12 +328,6 @@ export function useMonitorSocket(): MonitorSocketApi {
     [sendCommand],
   );
 
-  const sendDetectionThreshold = useCallback(
-    (value: number): boolean =>
-      sendCommand('set_detection_threshold', { value }),
-    [sendCommand],
-  );
-
   const sendPing = useCallback(
     (unit = 0): boolean => sendCommand('ping', { unit }),
     [sendCommand],
@@ -547,7 +540,6 @@ export function useMonitorSocket(): MonitorSocketApi {
     requestMap,
     sendPairThreshold,
     sendPairGain,
-    sendDetectionThreshold,
     sendPing,
     sendSetActiveAntenna,
     sendRequestActiveAntenna,

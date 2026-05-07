@@ -26,6 +26,8 @@ const crossingAlertInputSchema = z
     sensor_a: finiteNumberSchema.optional(),
     sensor_b: finiteNumberSchema.optional(),
     timestamp: finiteNumberSchema.optional(),
+    value: finiteNumberSchema.optional(),
+    threshold: finiteNumberSchema.optional(),
     lat: finiteNumberSchema.nullable().optional(),
     lng: finiteNumberSchema.nullable().optional(),
     acknowledged: z.boolean().optional(),
@@ -113,10 +115,10 @@ export function parseCrossingAlert(raw: unknown): CrossingAlert | null {
     return null;
   }
 
-  const value = parsed.data;
-  const sensorA = value.sensor_a ?? null;
-  const sensorB = value.sensor_b ?? null;
-  const at = value.timestamp ?? null;
+  const alert = parsed.data;
+  const sensorA = alert.sensor_a ?? null;
+  const sensorB = alert.sensor_b ?? null;
+  const at = alert.timestamp ?? null;
 
   if (sensorA === null || sensorB === null || at === null) {
     return null;
@@ -129,9 +131,11 @@ export function parseCrossingAlert(raw: unknown): CrossingAlert | null {
     sensorA: side1,
     sensorB: side2,
     at,
-    lat: value.lat ?? null,
-    lng: value.lng ?? null,
-    acknowledged: value.acknowledged === true,
+    ...(alert.value !== undefined ? { value: alert.value } : {}),
+    ...(alert.threshold !== undefined ? { threshold: alert.threshold } : {}),
+    lat: alert.lat ?? null,
+    lng: alert.lng ?? null,
+    acknowledged: alert.acknowledged === true,
   };
 }
 

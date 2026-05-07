@@ -32,7 +32,6 @@ export function App() {
     state,
     requestMap,
     acknowledgeCrossing,
-    sendDetectionThreshold,
     sendPairThreshold,
     sendPairGain,
     sendPing,
@@ -243,7 +242,6 @@ export function App() {
             sensorStatus={state.sensorStatus}
             alarmSoundEnabled={state.globalSettings.alarmSoundEnabled}
             offlineModeEnabled={state.globalSettings.offlineModeEnabled}
-            onSendDetectionThreshold={sendDetectionThreshold}
             onSendDetectionMode={sendSetDetectionMode}
             onSendRequestDetectionMode={sendRequestDetectionMode}
             onRefreshMap={requestMap}

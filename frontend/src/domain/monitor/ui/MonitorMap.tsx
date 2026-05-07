@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   MapContainer,
   Marker,
-  Polyline,
+  Polygon,
   Popup,
   ScaleControl,
   TileLayer,
@@ -39,6 +39,10 @@ const MIN_BASE_DISTANCE_METERS = 100;
 const MIN_SEMI_MAJOR_PADDING_METERS = 90;
 const MIN_SEMI_MINOR_AXIS_METERS = 170;
 const FIXED_SCALE_WIDTH_PX = 96;
+const AUTO_FIT_MAX_ZOOM = 17;
+const DETECTION_GRADIENT_MAX_EXCESS = 1000;
+const DETECTION_GRADIENT_START = { r: 34, g: 197, b: 94 };
+const DETECTION_GRADIENT_END = { r: 37, g: 99, b: 235 };
 dayjs.extend(relativeTime);
 
 type Props = {
@@ -113,7 +117,7 @@ function MapUnitsViewportController({ units }: { units: UnitPlacement[] }) {
       return;
     }
 
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: AUTO_FIT_MAX_ZOOM });
   }, [map, units]);
 
   return null;
@@ -217,6 +221,30 @@ function toFiniteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function toHexChannel(value: number): string {
+  return Math.round(value).toString(16).padStart(2, '0');
+}
+
+function toDetectionFillColor(alert: CrossingAlert): string {
+  const value = toFiniteNumber(alert.value);
+  const threshold = toFiniteNumber(alert.threshold);
+  const excess =
+    value === null || threshold === null ? 0 : Math.max(0, value - threshold);
+  const ratio =
+    Math.min(excess, DETECTION_GRADIENT_MAX_EXCESS) /
+    DETECTION_GRADIENT_MAX_EXCESS;
+  const r =
+    DETECTION_GRADIENT_START.r +
+    (DETECTION_GRADIENT_END.r - DETECTION_GRADIENT_START.r) * ratio;
+  const g =
+    DETECTION_GRADIENT_START.g +
+    (DETECTION_GRADIENT_END.g - DETECTION_GRADIENT_START.g) * ratio;
+  const b =
+    DETECTION_GRADIENT_START.b +
+    (DETECTION_GRADIENT_END.b - DETECTION_GRADIENT_START.b) * ratio;
+  return `#${toHexChannel(r)}${toHexChannel(g)}${toHexChannel(b)}`;
+}
+
 function parseClockTimeMs(value: unknown): number | null {
   if (typeof value !== 'string') {
     return null;
@@ -252,7 +280,6 @@ function toYellowPairKeys(
   const yellowKeys = new Set<string>();
   const seenPairs = new Set<string>();
   const configuredNoise = toFiniteNumber(config?.noise_threshold);
-  const configuredDetection = toFiniteNumber(config?.detection_threshold);
 
   for (const event of events) {
     if (event.type !== 'detection') {
@@ -271,7 +298,7 @@ function toYellowPairKeys(
     seenPairs.add(key);
 
     const noiseThreshold = configuredNoise ?? toFiniteNumber(event.threshold);
-    const detectionThreshold = configuredDetection;
+    const detectionThreshold = toFiniteNumber(event.threshold);
     if (noiseThreshold === null || detectionThreshold === null) {
       continue;
     }
@@ -401,11 +428,16 @@ export function MonitorMap({
     typeof navigator !== 'undefined' &&
     navigator.onLine === false;
   const useOfflineTiles = offlineModeEnabled || policyForcesOffline;
-  const alertingPairKeys = new Set(
-    crossingAlerts
-      .filter((alert) => !alert.acknowledged)
-      .map((alert) => toPairKey(alert.sensorA, alert.sensorB)),
-  );
+  const alertingPairs = new Map<string, CrossingAlert>();
+  for (const alert of crossingAlerts) {
+    if (alert.acknowledged) {
+      continue;
+    }
+    const key = toPairKey(alert.sensorA, alert.sensorB);
+    if (!alertingPairs.has(key)) {
+      alertingPairs.set(key, alert);
+    }
+  }
   const yellowPairKeys = toYellowPairKeys(events, config, Date.now());
 
   // Cache divIcon instances so Leaflet doesn't replace the DOM element on
@@ -440,7 +472,7 @@ export function MonitorMap({
       {
         key,
         positions: toPairingEllipsePositions(side1, side2),
-        alerting: alertingPairKeys.has(key),
+        alert: alertingPairs.get(key) ?? null,
       },
     ];
   });
@@ -537,21 +569,29 @@ export function MonitorMap({
         />
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
-        {pairingEllipses.map((ellipse) => (
-          <Polyline
-            key={ellipse.key}
-            positions={ellipse.positions}
-            pathOptions={{
-              color: ellipse.alerting
-                ? '#ef4444'
-                : yellowPairKeys.has(ellipse.key)
-                  ? '#eab308'
-                  : '#67e8f9',
-              weight: 3,
-              opacity: 0.85,
-            }}
-          />
-        ))}
+        {pairingEllipses.map((ellipse) => {
+          const alertFillColor = ellipse.alert
+            ? toDetectionFillColor(ellipse.alert)
+            : null;
+          return (
+            <Polygon
+              key={ellipse.key}
+              positions={ellipse.positions}
+              pathOptions={{
+                color: alertFillColor
+                  ? '#ef4444'
+                  : yellowPairKeys.has(ellipse.key)
+                    ? '#eab308'
+                    : '#67e8f9',
+                fill: alertFillColor !== null,
+                fillColor: alertFillColor ?? undefined,
+                fillOpacity: alertFillColor ? 0.42 : 0,
+                weight: 3,
+                opacity: 0.85,
+              }}
+            />
+          );
+        })}
         {units.map((unit) => {
           const sensorLinks = getSensorLinks(unit.id, links);
           return (
