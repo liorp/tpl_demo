@@ -12,6 +12,7 @@ import {
   useMap,
 } from 'react-leaflet';
 
+import type { Annotation } from '../model/annotations';
 import { getUnitBounds, ISRAEL_MAP_BOUNDS } from '../model/mapViewport';
 import type {
   CrossingAlert,
@@ -21,6 +22,7 @@ import type {
   SignalLinkState,
   UnitPlacement,
 } from '../model/types';
+import { AnnotationLayer } from './AnnotationLayer';
 
 const DEFAULT_CENTER: [number, number] = [33.31, 35.78];
 const ONLINE_TILE_NATIVE_MAX_ZOOM = 19;
@@ -47,6 +49,10 @@ type Props = {
   mapBounds: [[number, number], [number, number]] | null;
   onMoveUnit: (unitId: number, lat: number, lng: number) => void;
   onSelectUnit: (unitId: number) => void;
+  annotations?: Annotation[];
+  onAddAnnotation?: (annotation: Annotation) => void;
+  onUpdateAnnotation?: (id: string, patch: Partial<Annotation>) => void;
+  onRemoveAnnotation?: (id: string) => void;
 };
 
 type CommandPeerLink = {
@@ -336,6 +342,10 @@ export function MonitorMap({
   mapBounds,
   onMoveUnit,
   onSelectUnit,
+  annotations = [],
+  onAddAnnotation,
+  onUpdateAnnotation,
+  onRemoveAnnotation,
 }: Props) {
   const { t } = useTranslation();
   const [offlineTilePackMissing, setOfflineTilePackMissing] = useState(false);
@@ -570,6 +580,14 @@ export function MonitorMap({
             </Marker>
           );
         })}
+        {onAddAnnotation && onUpdateAnnotation && onRemoveAnnotation ? (
+          <AnnotationLayer
+            annotations={annotations}
+            onAdd={onAddAnnotation}
+            onUpdate={onUpdateAnnotation}
+            onRemove={onRemoveAnnotation}
+          />
+        ) : null}
       </MapContainer>
       {offlineModeEnabled && offlineTilePackMissing ? (
         <div className="pointer-events-none absolute inset-x-3 top-3 z-[1300] rounded border border-red-500/50 bg-red-950/90 px-3 py-2 text-xs text-red-100">

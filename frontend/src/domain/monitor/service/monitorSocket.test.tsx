@@ -602,6 +602,125 @@ describe('monitor socket lifecycle', () => {
     });
   });
 
+  test('annotation actions add, update, remove, clear and persist', async () => {
+    const onApi = vi.fn();
+    const onState = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} onApi={onApi} />
+      </TestWrapper>,
+    );
+
+    type AnnotationsApi = {
+      addAnnotation: (a: unknown) => void;
+      updateAnnotation: (id: string, patch: unknown) => void;
+      removeAnnotation: (id: string) => void;
+      clearAnnotations: () => void;
+    };
+    const api = () => onApi.mock.calls.at(-1)?.[0] as AnnotationsApi;
+    const lastAnnotations = () =>
+      (
+        onState.mock.calls.at(-1)?.[0] as {
+          annotations: Array<{ id: string; type: string }>;
+        }
+      ).annotations;
+    const persisted = () =>
+      JSON.parse(store.get('monitor:persisted:v1') ?? '{}') as {
+        annotations: Array<{ id: string }>;
+      };
+
+    api().addAnnotation({
+      type: 'pen',
+      id: 'a1',
+      points: [
+        [33.3, 35.7],
+        [33.31, 35.71],
+      ],
+      color: '#ef4444',
+      width: 3,
+      createdAt: 1,
+    });
+
+    await waitFor(() => {
+      expect(lastAnnotations().map((a) => a.id)).toEqual(['a1']);
+    });
+    expect(persisted().annotations.map((a) => a.id)).toEqual(['a1']);
+
+    api().updateAnnotation('a1', { color: '#00ff00' });
+    await waitFor(() => {
+      expect((lastAnnotations()[0] as unknown as { color: string }).color).toBe(
+        '#00ff00',
+      );
+    });
+
+    api().addAnnotation({
+      type: 'text',
+      id: 'a2',
+      position: [33.3, 35.7],
+      text: 'Hi',
+      color: '#fff',
+      size: 14,
+      createdAt: 2,
+    });
+    await waitFor(() => {
+      expect(lastAnnotations().map((a) => a.id)).toEqual(['a1', 'a2']);
+    });
+
+    api().removeAnnotation('a1');
+    await waitFor(() => {
+      expect(lastAnnotations().map((a) => a.id)).toEqual(['a2']);
+    });
+    expect(persisted().annotations.map((a) => a.id)).toEqual(['a2']);
+
+    api().clearAnnotations();
+    await waitFor(() => {
+      expect(lastAnnotations()).toEqual([]);
+    });
+    expect(persisted().annotations).toEqual([]);
+  });
+
+  test('resetAll clears annotations along with units and pairings', async () => {
+    const onApi = vi.fn();
+    const onState = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} onApi={onApi} />
+      </TestWrapper>,
+    );
+
+    type ApiShape = {
+      addAnnotation: (a: unknown) => void;
+      resetAll: () => void;
+    };
+    const api = () => onApi.mock.calls.at(-1)?.[0] as ApiShape;
+    const lastAnnotations = () =>
+      (
+        onState.mock.calls.at(-1)?.[0] as {
+          annotations: Array<{ id: string }>;
+        }
+      ).annotations;
+
+    api().addAnnotation({
+      type: 'pen',
+      id: 'r1',
+      points: [
+        [33.3, 35.7],
+        [33.31, 35.71],
+      ],
+      color: '#ef4444',
+      width: 3,
+      createdAt: 1,
+    });
+    await waitFor(() => {
+      expect(lastAnnotations()).toHaveLength(1);
+    });
+
+    api().resetAll();
+    await waitFor(() => {
+      expect(lastAnnotations()).toEqual([]);
+    });
+  });
+
   test('keeps active socket usable when stale socket closes in Strict Mode', async () => {
     const onApi = vi.fn();
     render(

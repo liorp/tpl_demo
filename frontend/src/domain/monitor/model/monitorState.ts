@@ -108,6 +108,7 @@ export function createInitialMonitorState(): MonitorState {
     globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     units: [],
     pairings: [],
+    annotations: [],
   };
 }
 
@@ -214,6 +215,7 @@ export function toMonitorStateFromPayload(
     globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     units: toPayloadUnits(payload.units, serverState.sensorStatus),
     pairings: [],
+    annotations: [],
   };
 }
 

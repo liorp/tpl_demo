@@ -1,6 +1,7 @@
 import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createAppWebSocketUrl } from '@/config';
+import type { Annotation } from '../model/annotations';
 import {
   acknowledgeCrossingAlert,
   addCrossingAckWindow,
@@ -37,6 +38,7 @@ type ClientState = {
   units: UnitPlacement[];
   pairings: PairLink[];
   globalSettings: GlobalSettings;
+  annotations: Annotation[];
 };
 
 export function useMonitorSocket(): {
@@ -51,6 +53,10 @@ export function useMonitorSocket(): {
   resetAll: () => void;
   placeUnit: (unit: UnitPlacement) => void;
   setUnitPairing: (side1Id: number, side2Id: number, enabled: boolean) => void;
+  addAnnotation: (annotation: Annotation) => void;
+  updateAnnotation: (id: string, patch: Partial<Annotation>) => void;
+  removeAnnotation: (id: string) => void;
+  clearAnnotations: () => void;
 } {
   const queryClient = useQueryClient();
 
@@ -68,6 +74,7 @@ export function useMonitorSocket(): {
       units: persisted.units as UnitPlacement[],
       pairings: persisted.pairings as PairLink[],
       globalSettings: persisted.globalSettings as GlobalSettings,
+      annotations: persisted.annotations,
     };
   });
 
@@ -235,6 +242,7 @@ export function useMonitorSocket(): {
           units: next.units,
           pairings: next.pairings,
           globalSettings: next.globalSettings,
+          annotations: next.annotations,
         });
         return next;
       });
@@ -335,8 +343,58 @@ export function useMonitorSocket(): {
       units: [],
       pairings: [],
       globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
+      annotations: [],
     });
   }, []);
+
+  const addAnnotation = useCallback(
+    (annotation: Annotation) => {
+      setClientStateAndPersist((prev) => ({
+        ...prev,
+        annotations: [...prev.annotations, annotation],
+      }));
+    },
+    [setClientStateAndPersist],
+  );
+
+  const updateAnnotation = useCallback(
+    (id: string, patch: Partial<Annotation>) => {
+      setClientStateAndPersist((prev) => {
+        const idx = prev.annotations.findIndex((a) => a.id === id);
+        if (idx === -1) {
+          return prev;
+        }
+        const current = prev.annotations[idx];
+        const merged = { ...current, ...patch } as Annotation;
+        const annotations = [...prev.annotations];
+        annotations[idx] = merged;
+        return { ...prev, annotations };
+      });
+    },
+    [setClientStateAndPersist],
+  );
+
+  const removeAnnotation = useCallback(
+    (id: string) => {
+      setClientStateAndPersist((prev) => {
+        const next = prev.annotations.filter((a) => a.id !== id);
+        if (next.length === prev.annotations.length) {
+          return prev;
+        }
+        return { ...prev, annotations: next };
+      });
+    },
+    [setClientStateAndPersist],
+  );
+
+  const clearAnnotations = useCallback(() => {
+    setClientStateAndPersist((prev) => {
+      if (prev.annotations.length === 0) {
+        return prev;
+      }
+      return { ...prev, annotations: [] };
+    });
+  }, [setClientStateAndPersist]);
 
   const safeServerState = serverState ?? createInitialServerState();
   const state: MonitorState = useMemo(
@@ -346,6 +404,7 @@ export function useMonitorSocket(): {
       units: clientState.units,
       pairings: clientState.pairings,
       globalSettings: clientState.globalSettings,
+      annotations: clientState.annotations,
     }),
     [safeServerState, crossingAlerts, clientState],
   );
@@ -362,5 +421,9 @@ export function useMonitorSocket(): {
     resetAll,
     placeUnit,
     setUnitPairing,
+    addAnnotation,
+    updateAnnotation,
+    removeAnnotation,
+    clearAnnotations,
   };
 }

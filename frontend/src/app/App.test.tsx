@@ -81,6 +81,7 @@ const state: MonitorState = {
     },
   ],
   pairings: [],
+  annotations: [],
   sensorStatus: {
     '1': { lastSeen: 1_700_002, connectedPeers: [2, 3] },
     '2': { lastSeen: null, connectedPeers: [] },
@@ -121,6 +122,10 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
     resetAll,
     placeUnit,
     setUnitPairing,
+    addAnnotation: vi.fn(),
+    updateAnnotation: vi.fn(),
+    removeAnnotation: vi.fn(),
+    clearAnnotations: vi.fn(),
   }),
 }));
 
