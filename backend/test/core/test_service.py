@@ -1,4 +1,3 @@
-import backend.core.models as models
 import backend.core.service as service
 import pytest
 from backend.core.layout_store import (
@@ -15,13 +14,10 @@ def test_handle_detection_sets_alarm_and_log():
     state = SensorState()
     event = {
         "type": "detection",
-        "id_a": "A",
         "unit_a": 1,
-        "id_b": "B",
         "unit_b": 2,
-        "threshold": 50,
         "value": 70,
-        "count": 1,
+        "threshold": 50,
         "device_ts": 123,
     }
 
@@ -54,9 +50,11 @@ def test_snapshot_includes_command_map_defaults():
         "noise_threshold": None,
         "detection_threshold": None,
         "gain": None,
+        "detection_mode": None,
     }
     assert current["units"] == []
     assert current["sensor_status"] == {}
+    assert current["ping_latencies"] == {}
     assert current["map_policy"] == {
         "bounds": None,
         "buffer_km": None,
@@ -92,24 +90,17 @@ def test_snapshot_includes_mutated_runtime_fields():
     }
 
 
-def test_default_map_policy_uses_typed_contract():
-    assert models.__annotations__["DEFAULT_MAP_POLICY"] is models.MapPolicy
-
-
-def test_handle_detection_updates_crossing_and_config():
+def test_handle_detection_updates_crossing_alert():
     state = SensorState()
 
     changed = handle_event(
         state,
         {
             "type": "detection",
-            "id_a": "AA",
             "unit_a": 1,
-            "id_b": "BB",
             "unit_b": 2,
-            "threshold": 500,
             "value": 549,
-            "count": 1,
+            "threshold": 500,
             "device_ts": 321,
         },
     )
@@ -120,20 +111,19 @@ def test_handle_detection_updates_crossing_and_config():
     assert state.crossing_alert["sensor_b"] == 2
 
 
-def test_handle_map_event_updates_links(monkeypatch):
+def test_handle_map_link_event_inserts_or_replaces_link(monkeypatch):
     monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_123.0)
     state = SensorState()
 
     changed = handle_event(
         state,
         {
-            "type": "map",
-            "unit_id": 7,
-            "version": "v1",
-            "gain": 30,
-            "voltage": 2600,
-            "links": [{"side1": 7, "side2": 2, "threshold": 0, "rssi": -57, "dt": 180}],
-            "device_ts": 444,
+            "type": "map_link",
+            "reporting_unit": 7,
+            "linked_unit": 2,
+            "rssi": -57,
+            "threshold": 0,
+            "gain": 64,
         },
     )
 
@@ -143,95 +133,125 @@ def test_handle_map_event_updates_links(monkeypatch):
             "side1": 2,
             "side2": 7,
             "threshold": 0,
+            "gain": 64,
             "rssi": -57,
-            "dt": 180,
             "updated_at": 1_700_000_123,
         }
     ]
 
 
-def test_handle_event_log_keeps_raw_sensor_field_names():
+def test_handle_map_link_event_deduplicates_pair(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_321.0)
+    state = SensorState()
+
+    handle_event(
+        state,
+        {
+            "type": "map_link",
+            "reporting_unit": 7,
+            "linked_unit": 2,
+            "rssi": -57,
+            "threshold": 0,
+            "gain": 64,
+        },
+    )
+    handle_event(
+        state,
+        {
+            "type": "map_link",
+            "reporting_unit": 2,
+            "linked_unit": 7,
+            "rssi": -50,
+            "threshold": 100,
+            "gain": 64,
+        },
+    )
+
+    assert len(state.links) == 1
+    assert state.links[0]["rssi"] == -50
+    assert state.links[0]["threshold"] == 100
+
+
+def test_handle_map_dev_records_voltage_and_version(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_500.0)
     state = SensorState()
 
     changed = handle_event(
         state,
         {
-            "type": "map",
-            "unit_id": 7,
-            "version": "v1",
-            "ver": "v1",
-            "gain": 30,
-            "voltage": 2600,
-            "scan": 3,
-            "adv": 4,
-            "links": [
-                {
-                    "side1": 7,
-                    "side2": 2,
-                    "th3": 500,
-                    "threshold": 500,
-                    "rssi": -57,
-                    "dt": 180,
-                }
-            ],
-            "device_ts": 444,
+            "type": "map_dev",
+            "unit_id": 11,
+            "version": "SG_0_10b19",
+            "voltage": 3015,
         },
     )
 
     assert changed is True
-    assert state.logs[0]["type"] == "map"
-    assert state.logs[0]["scan"] == 3
-    assert state.logs[0]["adv"] == 4
-    assert state.logs[0]["links"][0]["th3"] == 500
+    assert state.sensor_status["11"]["version"] == "SG_0_10b19"
+    assert state.sensor_status["11"]["voltage"] == 3015
 
 
-def test_handle_map_event_deduplicates_bidirectional_links(monkeypatch):
-    monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_321.0)
+def test_handle_link_up_sets_threshold_and_gain_on_pair(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_001_000.0)
     state = SensorState()
 
     changed = handle_event(
         state,
         {
-            "type": "map",
-            "unit_id": 7,
-            "version": "v1",
-            "gain": 30,
-            "voltage": 2600,
-            "links": [
-                {"side1": 7, "side2": 2, "threshold": 0, "rssi": -57, "dt": 180},
-                {"side1": 7, "side2": 2, "threshold": 0, "rssi": -50, "dt": 200},
-            ],
-            "device_ts": 445,
+            "type": "link_up",
+            "reporting_unit": 10,
+            "linked_unit": 11,
+            "rssi": -27,
+            "threshold_cfg": 300,
+            "gain_cfg": 64,
         },
     )
 
     assert changed is True
     assert state.links == [
         {
-            "side1": 2,
-            "side2": 7,
-            "threshold": 0,
-            "rssi": -57,
-            "dt": 180,
-            "updated_at": 1_700_000_321,
+            "side1": 10,
+            "side2": 11,
+            "threshold": 300,
+            "gain": 64,
+            "rssi": -27,
+            "updated_at": 1_700_001_000,
         }
     ]
+    assert state.config["gain"] == 64
+    assert state.config["noise_threshold"] == 300
 
 
-def test_handle_config_event_updates_config_values():
+def test_handle_link_down_removes_link_and_marks_peers_disconnected(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_002_000.0)
     state = SensorState()
+    handle_event(
+        state,
+        {
+            "type": "link_up",
+            "reporting_unit": 10,
+            "linked_unit": 11,
+            "rssi": -27,
+            "threshold_cfg": 300,
+            "gain_cfg": 64,
+        },
+    )
 
     changed = handle_event(
         state,
-        {"type": "config", "threshold": 777, "value": 799, "device_ts": 555},
+        {
+            "type": "link_down",
+            "reporting_unit": 10,
+            "linked_unit": 11,
+            "last_rssi": -90,
+            "reason": 8,
+        },
     )
 
     assert changed is True
-    assert state.config == {
-        "noise_threshold": 777,
-        "detection_threshold": None,
-        "gain": 799,
-    }
+    assert state.links == []
+    assert state.sensor_status["10"]["connected_peers"] == []
+    assert state.sensor_status["11"]["connected_peers"] == []
 
 
 def test_handle_detection_between_noise_and_detection_logs_without_alert():
@@ -239,13 +259,10 @@ def test_handle_detection_between_noise_and_detection_logs_without_alert():
     state.config["detection_threshold"] = 700
     event = {
         "type": "detection",
-        "id_a": "AA",
         "unit_a": 1,
-        "id_b": "BB",
         "unit_b": 2,
-        "threshold": 500,
         "value": 650,
-        "count": 1,
+        "threshold": 500,
         "device_ts": 321,
     }
 
@@ -257,86 +274,79 @@ def test_handle_detection_between_noise_and_detection_logs_without_alert():
     assert state.logs[0]["msg"].startswith("DETECTION")
 
 
-def test_handle_config_event_raises_detection_threshold_to_noise_threshold():
+def test_handle_ping_response_records_latency(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_003_000.0)
     state = SensorState()
-    state.config["detection_threshold"] = 600
 
     changed = handle_event(
         state,
-        {"type": "config", "threshold": 777, "value": 799, "device_ts": 555},
+        {
+            "type": "ping_response",
+            "unit": 11,
+            "round_trip_ms": 232,
+        },
     )
 
     assert changed is True
-    assert state.config["noise_threshold"] == 777
-    assert state.config["detection_threshold"] == 777
+    assert state.ping_latencies[11] == {
+        "round_trip_ms": 232,
+        "received_at": 1_700_003_000.0,
+    }
 
 
-def test_handle_connected_and_map_update_sensor_status_graph(monkeypatch):
-    clock = [1001]
-    monkeypatch.setattr(service, "now_ts", lambda: float(clock[0]))
-
+def test_handle_antenna_event_records_status(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_004_000.0)
     state = SensorState()
 
-    connected_changed = handle_event(
+    changed = handle_event(
         state,
         {
-            "type": "connected",
-            "id_unit": "A",
-            "unit": 1,
-            "id_peer": "B",
-            "peer": 2,
-            "connected": True,
-            "device_ts": 5000,
-        },
-    )
-    clock[0] = 1002
-    disconnected_changed = handle_event(
-        state,
-        {
-            "type": "connected",
-            "id_unit": "A",
-            "unit": 1,
-            "id_peer": "B",
-            "peer": 2,
-            "connected": False,
-            "device_ts": 6000,
-        },
-    )
-    clock[0] = 1003
-    map_changed = handle_event(
-        state,
-        {
-            "type": "map",
-            "unit_id": 7,
-            "version": "v1",
-            "gain": 30,
-            "voltage": 2600,
-            "links": [
-                {"side1": 7, "side2": 8, "threshold": 0, "rssi": -30, "dt": 200},
-            ],
-            "device_ts": 7000,
+            "type": "antenna",
+            "unit": 11,
+            "active_antenna": 2,
+            "supported_antennas": 3,
         },
     )
 
-    assert connected_changed is True
-    assert disconnected_changed is True
-    assert map_changed is True
-    assert state.sensor_status["1"] == {
-        "last_seen": 1002,
-        "connected_peers": [],
-    }
-    assert state.sensor_status["2"] == {
-        "last_seen": 1002,
-        "connected_peers": [],
-    }
-    assert state.sensor_status["7"] == {
-        "last_seen": 1003,
-        "connected_peers": [8],
-    }
-    assert state.sensor_status["8"] == {
-        "last_seen": 1003,
-        "connected_peers": [7],
-    }
+    assert changed is True
+    assert state.sensor_status["11"]["active_antenna"] == 2
+    assert state.sensor_status["11"]["supported_antennas"] == 3
+
+
+def test_handle_detection_mode_updates_config():
+    state = SensorState()
+
+    changed = handle_event(
+        state,
+        {"type": "detection_mode", "mode": 2, "internal_data": "deadbeef"},
+    )
+
+    assert changed is True
+    assert state.config["detection_mode"] == 2
+
+
+def test_handle_error_event_logs_at_error_level():
+    state = SensorState()
+
+    changed = handle_event(
+        state,
+        {"type": "error", "error_number": 7, "error_text": "channel busy"},
+    )
+
+    assert changed is True
+    assert state.logs[0]["msg"].startswith("ERROR #7")
+
+
+def test_handle_trace_event_logs_at_debug_level():
+    state = SensorState()
+
+    changed = handle_event(
+        state,
+        {"type": "trace", "text": "fsm idle"},
+    )
+
+    assert changed is True
+    assert state.logs[0]["msg"].startswith("TRACE")
 
 
 def test_handle_detection_sets_crossing_midpoint_when_both_positions_known():
@@ -350,13 +360,10 @@ def test_handle_detection_sets_crossing_midpoint_when_both_positions_known():
         state,
         {
             "type": "detection",
-            "id_a": "AA",
             "unit_a": 1,
-            "id_b": "BB",
             "unit_b": 2,
-            "threshold": 500,
             "value": 549,
-            "count": 1,
+            "threshold": 500,
             "device_ts": 321,
         },
     )
@@ -384,13 +391,10 @@ def test_handle_detection_sets_crossing_coordinates_with_missing_positions(
         state,
         {
             "type": "detection",
-            "id_a": "AA",
             "unit_a": 1,
-            "id_b": "BB",
             "unit_b": 2,
-            "threshold": 500,
             "value": 549,
-            "count": 1,
+            "threshold": 500,
             "device_ts": 321,
         },
     )

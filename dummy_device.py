@@ -1,42 +1,46 @@
 #!/usr/bin/env python3
 """Dummy TPL Signum device simulator.
 
-Creates a PTY pair and writes scripted protocol messages that the real
-backend can consume via SERIAL_PORT=<slave_path>.
-
-Usage:
-    python dummy_device.py
+Creates a PTY pair and writes scripted AT-Commands protocol messages that the
+real backend can consume via SERIAL_PORT=<slave_path>. Also responds to AT
+command requests sent by the backend (handshake, map refresh, ping, antenna,
+detection mode, reset).
 """
 
 import errno
 import fcntl
 import os
 import pty
+import re
 import select
+import threading
 import time
 from argparse import ArgumentParser, Namespace
 
+DUMMY_VERSION = "0.10b219"
+
+# Scripted unsolicited events. Each entry runs at `offset` seconds in the cycle.
 # fmt: off
 TIMELINE = [
-    ( 0, "CMD:CONFIG threshold:50 val:30"),
-    ( 1, "CMD:CONNECTED 1001(1) connected:1002(2) 1"),
-    ( 2, "CMD:CONNECTED 1002(2) connected:1003(3) 1"),
-    ( 3, "CMD:CONNECTED 1003(3) connected:1004(4) 1"),
-    ( 4, "CMD:CONNECTED 1004(4) connected:1005(5) 1"),
-    ( 6, "CMD:MAP_RSP from 1001 ver:1 gain:3 voltage:36 scan:1 adv:1: 1001(1)>1002(2) q:85 i:72, 1002(2)>1003(3) q:78 i:65"),
-    ( 7, "CMD:MAP_RSP from 1003 ver:1 gain:3 voltage:35 scan:1 adv:1: 1003(3)>1004(4) q:90 i:68, 1004(4)>1005(5) q:82 i:70"),
-    (10, "CMD:DETECTION 1001(1)-1002(2) th:50 val:65 c:1"),
-    (14, "CMD:DETECTION 1003(3)-1004(4) th:50 val:58 c:1"),
-    (17, "CMD:DETECTION 1002(2)-1003(3) th:50 val:71 c:2"),
-    (20, "CMD:DETECTION-COMM 1004(4)-1005(5) 0"),
-    (23, "CMD:CONFIG threshold:45 val:25"),
-    (25, "CMD:CONNECTED 1004(4) connected:1005(5) 0"),
-    (27, "CMD:DETECTION 1004(4)-1005(5) th:45 val:52 c:1"),
-    (28, "CMD:CONNECTED 1004(4) connected:1005(5) 1"),
+    ( 1, "#EVTMESHMAPDEV=1,\"SG_0_10b19\",3000,00000000"),
+    ( 1, "#EVTMESHMAPDEV=10,\"SG_0_10b19\",3015,00000000"),
+    ( 1, "#EVTMESHMAPDEV=11,\"SG_0_10b19\",2926,00000000"),
+    ( 2, "#EVTMESHMAPDEVLINK=10,11,-27,300,64,00000000"),
+    ( 2, "#EVTMESHMAPDEVLINK=11,10,-28,300,64,00000000"),
+    ( 2, "#EVTMESHMAPDEVLINK=10,1,-33,0,0,00000000"),
+    ( 2, "#EVTMESHMAPDEVLINK=11,1,-41,0,0,00000000"),
+    ( 4, "#EVTMESHLINKUP=10,11,0,300,64,00000000"),
+    ( 4, "#EVTMESHLINKUP=11,10,0,300,64,00000000"),
+    (10, "#EVTDETECT=10,11,555,300"),
+    (14, "#EVTDETECT=11,10,612,300"),
+    (17, "#EVTDETECT=10,11,701,300"),
+    (20, "#EVTDETCOM=10,11,2025,2000"),
+    (24, "#EVTDETECT=10,11,640,300"),
+    (28, "#EVTACTANT=10,1,3"),
 ]
 # fmt: on
 
-CYCLE_DURATION = 30  # seconds
+CYCLE_DURATION = 32  # seconds
 
 
 def build_start_commands(slave_path: str) -> dict[str, str]:
@@ -46,17 +50,6 @@ def build_start_commands(slave_path: str) -> dict[str, str]:
         "run_backend": "bun run dev:backend",
         "run_frontend": "bun run dev:frontend",
     }
-
-
-def _drain_incoming(master_fd: int) -> None:
-    """Read and discard commands the backend sends (/, cmd, re 3 4)."""
-    while True:
-        try:
-            ready, _, _ = select.select([master_fd], [], [], 0.1)
-            if ready:
-                os.read(master_fd, 1024)
-        except OSError:
-            break
 
 
 PORT_FILE = "/tmp/tpl-dummy-port"
@@ -70,6 +63,94 @@ def _parse_args(argv: list[str] | None = None) -> Namespace:
         help="Write the slave PTY path to this file (default: none)",
     )
     return parser.parse_args(argv)
+
+
+def _safe_write(master_fd: int, payload: str, lock: threading.Lock) -> None:
+    with lock:
+        try:
+            os.write(master_fd, payload.encode())
+        except OSError as e:
+            if e.errno != errno.EAGAIN:
+                raise
+
+
+_AT_PATTERN = re.compile(r"^AT(#[A-Z0-9]+)(?:[=?](.*))?$")
+
+
+def _build_replies(command: str) -> list[str]:
+    """Return one or more lines (without trailing terminators) to reply with."""
+    cmd = command.strip()
+    if not cmd:
+        return []
+    match = _AT_PATTERN.match(cmd)
+    if not match:
+        return []
+    tag, args = match.group(1), match.group(2) or ""
+    if tag == "#GETVERSION":
+        return [f"#GETVERSION:{DUMMY_VERSION}", "OK"]
+    if tag == "#REQMESHMAP":
+        return [
+            "OK",
+            "#EVTMESHMAPDEV=10,\"SG_0_10b19\",3015,00000000",
+            "#EVTMESHMAPDEVLINK=10,11,-27,300,64,00000000",
+            "#EVTMESHMAPDEV=11,\"SG_0_10b19\",2926,00000000",
+            "#EVTMESHMAPDEVLINK=11,10,-28,300,64,00000000",
+        ]
+    if tag == "#PING":
+        unit = args or "0"
+        return ["OK", "#PINGRSP=10,160", "#PINGRSP=11,232"] if unit.strip() == "0" else [
+            "OK",
+            f"#PINGRSP={unit.strip()},180",
+        ]
+    if tag == "#REQACTANT":
+        return ["OK", "#EVTACTANT=10,1,3", "#EVTACTANT=11,1,3"]
+    if tag == "#SETACTANT":
+        parts = [p.strip() for p in args.split(",") if p.strip()]
+        if len(parts) >= 2:
+            return ["OK", f"#EVTACTANT={parts[0]},{parts[1]},3"]
+        return ["ERROR"]
+    if tag == "#REQDETMODE":
+        return ["OK", "#EVTDETMODE=1,"]
+    if tag == "#SETDETMODE":
+        parts = [p.strip() for p in args.split(",")]
+        if parts and parts[0]:
+            return ["OK", f"#EVTDETMODE={parts[0]},"]
+        return ["ERROR"]
+    if tag == "#SETDETTHR":
+        return ["OK"]
+    if tag == "#SETDETGAIN":
+        return ["OK"]
+    if tag == "#RESET":
+        return ["OK", "ATCMD_CLI_READY"]
+    return ["OK"]
+
+
+def _command_responder(master_fd: int, write_lock: threading.Lock) -> None:
+    buffer = ""
+    while True:
+        try:
+            ready, _, _ = select.select([master_fd], [], [], 0.1)
+        except OSError:
+            return
+        if not ready:
+            continue
+        try:
+            data = os.read(master_fd, 1024)
+        except OSError as e:
+            if e.errno == errno.EAGAIN:
+                continue
+            return
+        if not data:
+            return
+        buffer += data.decode("utf-8", errors="replace")
+        # commands end in CR, but tolerate LF too
+        for terminator in ("\r\n", "\n", "\r"):
+            buffer = buffer.replace(terminator, "\r")
+        while "\r" in buffer:
+            command, _, buffer = buffer.partition("\r")
+            replies = _build_replies(command)
+            for reply in replies:
+                _safe_write(master_fd, reply + "\r\n", write_lock)
 
 
 def main() -> None:
@@ -91,14 +172,14 @@ def main() -> None:
     print(f"Or frontend command:    {commands['run_frontend']}")
     print()
 
-    # Always drain inbound writes so backend serial commands don't block.
-    import threading
+    write_lock = threading.Lock()
+    threading.Thread(
+        target=_command_responder,
+        args=(master_fd, write_lock),
+        daemon=True,
+    ).start()
 
-    threading.Thread(target=_drain_incoming, args=(master_fd,), daemon=True).start()
-
-    device_ts = 1000
     cycle = 0
-
     try:
         while True:
             cycle += 1
@@ -111,20 +192,12 @@ def main() -> None:
                     time.sleep(delta)
                 prev_offset = offset
 
-                line = f"[{device_ts}] I {payload}\r\n"
-                device_ts += 1
-
-                try:
-                    os.write(master_fd, line.encode())
-                except OSError as e:
-                    if e.errno != errno.EAGAIN:
-                        raise
+                _safe_write(master_fd, payload + "\r\n", write_lock)
                 print(f"  [{offset:2d}s] {payload}")
 
             remaining = CYCLE_DURATION - prev_offset
             if remaining > 0:
                 time.sleep(remaining)
-
     except KeyboardInterrupt:
         print("\nStopped.")
     finally:

@@ -22,24 +22,30 @@ import {
 } from '@/component/ui/select';
 import { Switch } from '@/component/ui/switch';
 import { useLanguage } from '@/i18n/useLanguage';
-import type { MonitorConfig } from '../model/types';
+import type {
+  DetectionMode,
+  MonitorConfig,
+  SensorStatusMap,
+} from '../model/types';
 import { parseInputNumber } from '../model/validation';
+import { MeshSettingsPanel } from './MeshSettingsPanel';
 
 type Props = {
   config: MonitorConfig;
+  sensorStatus: SensorStatusMap;
   alarmSoundEnabled: boolean;
   offlineModeEnabled: boolean;
-  onSendThreshold: (value: number) => boolean;
   onSendDetectionThreshold: (value: number) => boolean;
-  onSendGain: (value: number) => boolean;
+  onSendDetectionMode: (mode: DetectionMode) => boolean;
+  onSendRequestDetectionMode: () => boolean;
+  onRefreshMap: () => void;
+  onSendReset: () => boolean;
   onAlarmSoundEnabledChange: (enabled: boolean) => void;
   onOfflineModeEnabledChange: (enabled: boolean) => void;
   onResetAll: () => void;
 };
 
-const DEFAULT_THRESHOLD = 500;
 const DEFAULT_DETECTION_THRESHOLD = 700;
-const DEFAULT_GAIN = 64;
 
 function toKnownValue(value: number | null, fallback: number): string {
   return value !== null ? String(value) : String(fallback);
@@ -47,11 +53,14 @@ function toKnownValue(value: number | null, fallback: number): string {
 
 export function ConfigMenu({
   config,
+  sensorStatus,
   alarmSoundEnabled,
   offlineModeEnabled,
-  onSendThreshold,
   onSendDetectionThreshold,
-  onSendGain,
+  onSendDetectionMode,
+  onSendRequestDetectionMode,
+  onRefreshMap,
+  onSendReset,
   onAlarmSoundEnabledChange,
   onOfflineModeEnabledChange,
   onResetAll,
@@ -59,41 +68,28 @@ export function ConfigMenu({
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
   const [open, setOpen] = useState(false);
-  const [noiseThreshold, setNoiseThreshold] = useState(
-    toKnownValue(config.noise_threshold ?? null, DEFAULT_THRESHOLD),
-  );
   const [detectionThreshold, setDetectionThreshold] = useState(
     toKnownValue(
       config.detection_threshold ?? null,
       DEFAULT_DETECTION_THRESHOLD,
     ),
   );
-  const [gain, setGain] = useState(toKnownValue(config.gain, DEFAULT_GAIN));
 
   useEffect(() => {
     if (open) {
       return;
     }
-    setNoiseThreshold(
-      toKnownValue(config.noise_threshold ?? null, DEFAULT_THRESHOLD),
-    );
     setDetectionThreshold(
       toKnownValue(
         config.detection_threshold ?? null,
         DEFAULT_DETECTION_THRESHOLD,
       ),
     );
-    setGain(toKnownValue(config.gain, DEFAULT_GAIN));
-  }, [config.gain, config.noise_threshold, config.detection_threshold, open]);
+  }, [config.detection_threshold, open]);
 
-  const noiseThresholdNum = parseInputNumber(noiseThreshold);
   const detectionThresholdNum = parseInputNumber(detectionThreshold);
-  const gainNum = parseInputNumber(gain);
-  const noiseThresholdValid = noiseThresholdNum !== null;
-  const detectionThresholdValid =
-    detectionThresholdNum !== null &&
-    (noiseThresholdNum === null || detectionThresholdNum >= noiseThresholdNum);
-  const gainValid = gainNum !== null;
+  const detectionThresholdValid = detectionThresholdNum !== null;
+  const currentDetectionMode: DetectionMode = config.detection_mode ?? 1;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -122,7 +118,7 @@ export function ConfigMenu({
           {t('settings.title')}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[60vh] overflow-y-auto border-border-bright bg-card sm:max-w-sm">
+      <DialogContent className="max-h-[75vh] overflow-y-auto border-border-bright bg-card sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display tracking-wide">
             {t('settings.title')}
@@ -130,43 +126,6 @@ export function ConfigMenu({
           <DialogDescription>{t('settings.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label
-              htmlFor="noise-threshold"
-              className="font-display text-xs tracking-wide text-muted-foreground"
-            >
-              {t('settings.noiseThreshold')}
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="noise-threshold"
-                value={noiseThreshold}
-                onChange={(event) => setNoiseThreshold(event.target.value)}
-                className="bg-background font-mono tabular-nums"
-              />
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (noiseThresholdNum === null) {
-                    return;
-                  }
-                  if (onSendThreshold(noiseThresholdNum)) {
-                    toast.success(
-                      t('configFeedback.noiseSet', {
-                        value: noiseThresholdNum,
-                      }),
-                    );
-                  } else {
-                    toast.error(t('configFeedback.noiseNotConnected'));
-                  }
-                }}
-                disabled={!noiseThresholdValid}
-                className="font-display tracking-wide"
-              >
-                {t('settings.send')}
-              </Button>
-            </div>
-          </div>
           <div className="grid gap-2">
             <Label
               htmlFor="detection-threshold"
@@ -187,12 +146,6 @@ export function ConfigMenu({
                   if (detectionThresholdNum === null) {
                     return;
                   }
-                  if (
-                    noiseThresholdNum !== null &&
-                    detectionThresholdNum < noiseThresholdNum
-                  ) {
-                    return;
-                  }
                   if (onSendDetectionThreshold(detectionThresholdNum)) {
                     toast.success(
                       t('configFeedback.detectionSet', {
@@ -210,41 +163,64 @@ export function ConfigMenu({
               </Button>
             </div>
           </div>
-          <div className="grid gap-2">
+
+          <div className="grid gap-2 rounded-md border border-border-bright bg-background/70 p-3">
             <Label
-              htmlFor="gain"
+              htmlFor="detection-mode"
               className="font-display text-xs tracking-wide text-muted-foreground"
             >
-              {t('settings.gain')}
+              {t('settings.detectionMode')}
             </Label>
+            <p className="font-body text-xs text-muted-foreground/85">
+              {t('settings.detectionModeHelp')}
+            </p>
             <div className="flex items-center gap-2">
-              <Input
-                id="gain"
-                value={gain}
-                onChange={(event) => setGain(event.target.value)}
-                className="bg-background font-mono tabular-nums"
-              />
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (gainNum === null) {
-                    return;
-                  }
-                  if (onSendGain(gainNum)) {
+              <Select
+                value={String(currentDetectionMode)}
+                onValueChange={(value) => {
+                  const next = value === '2' ? 2 : 1;
+                  if (onSendDetectionMode(next)) {
                     toast.success(
-                      t('configFeedback.gainSet', { value: gainNum }),
+                      t('configFeedback.detectionModeSet', { value: next }),
                     );
                   } else {
-                    toast.error(t('configFeedback.gainNotConnected'));
+                    toast.error(t('configFeedback.detectionModeNotConnected'));
                   }
                 }}
-                disabled={!gainValid}
+              >
+                <SelectTrigger
+                  id="detection-mode"
+                  aria-label={t('settings.detectionMode')}
+                  className="font-body text-sm text-foreground"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">
+                    {t('settings.detectionModeMode1')}
+                  </SelectItem>
+                  <SelectItem value="2">
+                    {t('settings.detectionModeMode2')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onSendRequestDetectionMode()}
                 className="font-display tracking-wide"
               >
-                {t('settings.send')}
+                {t('settings.refresh')}
               </Button>
             </div>
           </div>
+
+          <MeshSettingsPanel
+            sensorStatus={sensorStatus}
+            onRefreshMap={onRefreshMap}
+            onSendReset={onSendReset}
+          />
+
           <div className="grid gap-2">
             <Label
               htmlFor="language"

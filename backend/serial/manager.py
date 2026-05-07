@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import contextlib
 import logging
 import os
 import re
 import threading
 import time
+from collections import deque
+from typing import Any
 
 import serial.tools.list_ports
 
@@ -16,11 +20,16 @@ from backend.core.events import (
     SerialEvent,
     SerialIdle,
 )
-from backend.parsing.parser import ANSI_RE, TIMESTAMP_RE, parse_line
+from backend.parsing.encoder import format_get_version, format_request_map
+from backend.parsing.parser import ControlFrame, parse_line
 
 logger = logging.getLogger("tpl-signum")
 PROTOCOL_VALIDATION_TIMEOUT_SEC = 8.0
-MAP_HEARTBEAT_INTERVAL_SEC = 3.0
+MAP_HEARTBEAT_INTERVAL_SEC = 10.0
+COMMAND_ACK_TIMEOUT_SEC = 2.0
+_PROTOCOL_VALIDATING_EVENT_TYPES = frozenset(
+    {"version", "map_dev", "map_link", "detection", "link_up"}
+)
 
 
 def list_serial_ports(forced_port: str) -> list[str]:
@@ -50,16 +59,13 @@ class SerialManager:
         self.forced_port = forced_port
         self._serial_lock = threading.Lock()
         self._serial_conn: serial.Serial | None = None
-        self._pending_commands: list[str] = []
+        self._pending_commands: deque[str] = deque()
 
-    def send_serial(self, cmd: str):
+    def send_serial(self, cmd: str) -> None:
         with self._serial_lock:
-            if self._serial_conn and self._serial_conn.is_open:
-                self._serial_conn.write((cmd + "\r").encode())
-            else:
-                self._pending_commands.append(cmd)
+            self._pending_commands.append(cmd)
 
-    def close_connection(self):
+    def close_connection(self) -> None:
         with self._serial_lock:
             if self._serial_conn:
                 with contextlib.suppress(Exception):
@@ -79,15 +85,28 @@ class SerialManager:
         )
         with self._serial_lock:
             self._serial_conn = ser
-            while self._pending_commands:
-                pending_cmd = self._pending_commands.pop(0)
-                ser.write((pending_cmd + "\r").encode())
         return ser
 
     def _is_port_available(self, port: str) -> bool:
         if self.forced_port:
             return os.path.exists(port)
         return port in list_serial_ports(self.forced_port)
+
+    def _write_command(self, ser: serial.Serial, cmd: str) -> None:
+        ser.write((cmd + "\r").encode())
+
+    def _drain_one_pending(
+        self, ser: serial.Serial, *, awaiting_ack: bool
+    ) -> tuple[bool, float | None]:
+        """Send one queued command if pacing allows. Returns (now_awaiting, sent_at)."""
+        if awaiting_ack:
+            return True, None
+        with self._serial_lock:
+            if not self._pending_commands:
+                return False, None
+            cmd = self._pending_commands.popleft()
+        self._write_command(ser, cmd)
+        return True, time.monotonic()
 
     def serial_reader_loop(
         self,
@@ -107,68 +126,10 @@ class SerialManager:
                     logger.info("Trying port: %s", port)
                     ser = self._connect(port)
                     connected_any = True
-
-                    time.sleep(1.0)
-                    ser.reset_input_buffer()
-                    self.send_serial("/")
-                    time.sleep(0.5)
-                    self.send_serial("cmd")
-                    time.sleep(0.5)
-                    self.send_serial("re 3 4")
-                    time.sleep(0.5)
-                    self.send_serial("/")
-                    time.sleep(0.5)
-                    self.send_serial("mpedT")
-                    time.sleep(0.5)
-                    self.send_serial("map")
-
-                    buffer = ""
-                    validated_protocol = False
-                    validation_started_at = time.monotonic()
-                    last_map_time = validation_started_at
-                    while not (stop_event and stop_event.is_set()):
-                        data = ser.read(ser.in_waiting or 1)
-                        if not data:
-                            if not self._is_port_available(port):
-                                break
-                            if (
-                                not validated_protocol
-                                and time.monotonic() - validation_started_at
-                                >= PROTOCOL_VALIDATION_TIMEOUT_SEC
-                            ):
-                                logger.info("Ignoring %s: no valid protocol events", port)
-                                break
-                            if (
-                                validated_protocol
-                                and time.monotonic() - last_map_time
-                                >= MAP_HEARTBEAT_INTERVAL_SEC
-                            ):
-                                self.send_serial("map")
-                                last_map_time = time.monotonic()
-                            sink.put_nowait(SerialIdle())
-                            continue
-
-                        buffer += data.decode("utf-8", errors="replace")
-                        while "\n" in buffer:
-                            line, buffer = buffer.split("\n", 1)
-                            if not validated_protocol and TIMESTAMP_RE.match(
-                                ANSI_RE.sub("", line).strip()
-                            ):
-                                validated_protocol = True
-                                sink.put_nowait(SerialConnected(port))
-                            event = parse_line(line)
-                            if event:
-                                sink.put_nowait(SerialEvent(event))
-                        if (
-                            validated_protocol
-                            and time.monotonic() - last_map_time
-                            >= MAP_HEARTBEAT_INTERVAL_SEC
-                        ):
-                            self.send_serial("map")
-                            last_map_time = time.monotonic()
+                    self._handle_port_session(ser, port, sink, stop_event)
                 except serial.SerialException:
                     continue
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     logger.warning("Serial loop error on %s: %s", port, exc)
                 finally:
                     sink.put_nowait(SerialDisconnect(f"Disconnected from {port}"))
@@ -176,3 +137,108 @@ class SerialManager:
             if not connected_any:
                 sink.put_nowait(SerialDisconnect(None))
                 time.sleep(2)
+
+    def _handle_port_session(
+        self,
+        ser: serial.Serial,
+        port: str,
+        sink: MessageSink,
+        stop_event: threading.Event | None,
+    ) -> None:
+        time.sleep(0.5)
+        ser.reset_input_buffer()
+
+        with self._serial_lock:
+            self._pending_commands.appendleft(format_get_version())
+
+        validated_protocol = False
+        validation_started_at = time.monotonic()
+        last_map_time = validation_started_at
+        awaiting_ack = False
+        ack_sent_at: float | None = None
+        buffer = ""
+
+        while not (stop_event and stop_event.is_set()):
+            data = ser.read(ser.in_waiting or 1)
+
+            if data:
+                buffer += data.decode("utf-8", errors="replace")
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    awaiting_ack, validated_protocol = self._consume_line(
+                        line=line,
+                        sink=sink,
+                        port=port,
+                        awaiting_ack=awaiting_ack,
+                        validated_protocol=validated_protocol,
+                    )
+
+            if not data and not self._is_port_available(port):
+                break
+
+            if (
+                not validated_protocol
+                and time.monotonic() - validation_started_at
+                >= PROTOCOL_VALIDATION_TIMEOUT_SEC
+            ):
+                logger.info("Ignoring %s: no valid protocol events", port)
+                break
+
+            now = time.monotonic()
+            if (
+                awaiting_ack
+                and ack_sent_at is not None
+                and now - ack_sent_at >= COMMAND_ACK_TIMEOUT_SEC
+            ):
+                logger.warning("AT command ack timed out, releasing pacing lock")
+                awaiting_ack = False
+                ack_sent_at = None
+
+            if (
+                validated_protocol
+                and now - last_map_time >= MAP_HEARTBEAT_INTERVAL_SEC
+            ):
+                with self._serial_lock:
+                    self._pending_commands.append(format_request_map(0))
+                last_map_time = now
+
+            now_awaiting, sent_at = self._drain_one_pending(
+                ser, awaiting_ack=awaiting_ack
+            )
+            if not awaiting_ack and now_awaiting:
+                ack_sent_at = sent_at
+            awaiting_ack = now_awaiting
+
+            if not data:
+                sink.put_nowait(SerialIdle())
+
+    def _consume_line(
+        self,
+        *,
+        line: str,
+        sink: MessageSink,
+        port: str,
+        awaiting_ack: bool,
+        validated_protocol: bool,
+    ) -> tuple[bool, bool]:
+        result = parse_line(line)
+        if result is None:
+            return awaiting_ack, validated_protocol
+        if isinstance(result, ControlFrame):
+            if result.type in ("ok", "error"):
+                awaiting_ack = False
+            elif result.type == "ready":
+                logger.info("Device READY token received")
+                with self._serial_lock:
+                    self._pending_commands.append(format_request_map(0))
+            return awaiting_ack, validated_protocol
+
+        event: dict[str, Any] = result
+        event_type = event.get("type")
+        if not validated_protocol and event_type in _PROTOCOL_VALIDATING_EVENT_TYPES:
+            validated_protocol = True
+            sink.put_nowait(SerialConnected(port))
+        if event_type == "version":
+            return awaiting_ack, validated_protocol
+        sink.put_nowait(SerialEvent(event))
+        return awaiting_ack, validated_protocol

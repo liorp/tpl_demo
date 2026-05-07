@@ -261,7 +261,14 @@ describe('monitor socket lifecycle', () => {
         },
       ]);
       expect(latestState.sensorStatus).toEqual({
-        '7': { lastSeen: 100, connectedPeers: [8] },
+        '7': {
+          lastSeen: 100,
+          connectedPeers: [8],
+          activeAntenna: null,
+          supportedAntennas: null,
+          voltage: null,
+          version: null,
+        },
       });
       expect(latestState.mapPolicy.tileRoot).toBe('/tiles');
     });
@@ -744,16 +751,70 @@ describe('monitor socket lifecycle', () => {
     firstSocket?.emitClose();
 
     const latestApi = onApi.mock.calls.at(-1)?.[0] as {
-      sendThreshold: (value: number) => boolean;
+      sendPairThreshold: (a: number, b: number, value: number) => boolean;
       sendDetectionThreshold: (value: number) => boolean;
     };
-    expect(latestApi.sendThreshold(600)).toBe(true);
+    expect(latestApi.sendPairThreshold(11, 12, 600)).toBe(true);
     expect(secondSocket?.send).toHaveBeenCalledWith(
-      JSON.stringify({ cmd: 'set_threshold', value: 600 }),
+      JSON.stringify({
+        cmd: 'set_threshold',
+        unit_a: 11,
+        unit_b: 12,
+        value: 600,
+      }),
     );
     expect(latestApi.sendDetectionThreshold(700)).toBe(true);
     expect(secondSocket?.send).toHaveBeenCalledWith(
       JSON.stringify({ cmd: 'set_detection_threshold', value: 700 }),
+    );
+  });
+
+  test('exposes new AT commands: ping, antenna, detection mode, reset', async () => {
+    const onApi = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={vi.fn()} onApi={onApi} />
+      </TestWrapper>,
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    socket.emitOpen();
+
+    const api = onApi.mock.calls.at(-1)?.[0] as {
+      sendPing: (unit?: number) => boolean;
+      sendSetActiveAntenna: (unit: number, antenna: 1 | 2) => boolean;
+      sendRequestActiveAntenna: (unit?: number) => boolean;
+      sendSetDetectionMode: (mode: 1 | 2) => boolean;
+      sendRequestDetectionMode: () => boolean;
+      sendReset: () => boolean;
+      sendPairGain: (a: number, b: number, value: number) => boolean;
+    };
+
+    expect(api.sendPing()).toBe(true);
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'ping', unit: 0 }),
+    );
+    expect(api.sendSetActiveAntenna(11, 2)).toBe(true);
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'set_active_antenna', unit: 11, antenna: 2 }),
+    );
+    expect(api.sendRequestActiveAntenna()).toBe(true);
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'request_active_antenna', unit: 0 }),
+    );
+    expect(api.sendSetDetectionMode(2)).toBe(true);
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'set_detection_mode', mode: 2 }),
+    );
+    expect(api.sendRequestDetectionMode()).toBe(true);
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'request_detection_mode' }),
+    );
+    expect(api.sendReset()).toBe(true);
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ cmd: 'reset' }));
+    expect(api.sendPairGain(11, 12, 64)).toBe(true);
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'set_gain', unit_a: 11, unit_b: 12, value: 64 }),
     );
   });
 });
