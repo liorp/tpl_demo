@@ -1,3 +1,4 @@
+import { Redo2, Undo2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,9 +13,13 @@ import {
 
 type Props = {
   onClearAll: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 };
 
-const TOOL_ORDER: AnnotationTool[] = ['none', 'pen', 'text', 'eraser'];
+const TOOL_ORDER: AnnotationTool[] = ['pen', 'text', 'eraser'];
 
 const TOOL_ICONS: Record<AnnotationTool, ReactElement> = {
   none: (
@@ -86,7 +91,13 @@ const TOOL_ICONS: Record<AnnotationTool, ReactElement> = {
   ),
 };
 
-export function AnnotationToolbar({ onClearAll }: Props) {
+export function AnnotationToolbar({
+  onClearAll,
+  onUndo = () => {},
+  onRedo = () => {},
+  canUndo = false,
+  canRedo = false,
+}: Props) {
   const { t } = useTranslation();
   const { tool, color } = useAnnotationTool();
 
@@ -96,14 +107,20 @@ export function AnnotationToolbar({ onClearAll }: Props) {
     }
   };
 
+  const handleToolClick = (candidate: AnnotationTool) => {
+    setAnnotationTool(
+      tool === candidate && candidate !== 'none' ? 'none' : candidate,
+    );
+  };
+
   return (
-    <div className="pointer-events-none absolute top-4 end-4 z-[1200]">
+    <div className="pointer-events-none absolute inset-x-4 top-4 z-[1200] flex justify-center">
       <div
-        className="pointer-events-auto flex flex-col gap-2 rounded-md border border-border-bright bg-card/90 p-2 backdrop-blur-sm"
+        className="pointer-events-auto flex max-w-full flex-row flex-wrap items-center justify-center gap-2 rounded-md border border-border-bright bg-card/90 p-2 backdrop-blur-sm"
         role="toolbar"
         aria-label={t('annotations.title')}
       >
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-row flex-wrap justify-center gap-1">
           {TOOL_ORDER.map((candidate) => {
             const labelKey =
               candidate === 'none'
@@ -122,7 +139,7 @@ export function AnnotationToolbar({ onClearAll }: Props) {
                 size="sm"
                 data-active={isActive}
                 aria-pressed={isActive}
-                onClick={() => setAnnotationTool(candidate)}
+                onClick={() => handleToolClick(candidate)}
                 className="justify-start gap-2 font-display text-xs tracking-wide"
               >
                 {TOOL_ICONS[candidate]}
@@ -131,7 +148,31 @@ export function AnnotationToolbar({ onClearAll }: Props) {
             );
           })}
         </div>
-        <fieldset className="flex flex-wrap gap-1 border-0 border-t border-border pt-2">
+        <div className="flex flex-row gap-1 border-l border-border ps-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={t('annotations.undo')}
+            disabled={!canUndo}
+            onClick={onUndo}
+            className="h-8 w-8 px-0"
+          >
+            <Undo2 aria-hidden="true" size={14} />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={t('annotations.redo')}
+            disabled={!canRedo}
+            onClick={onRedo}
+            className="h-8 w-8 px-0"
+          >
+            <Redo2 aria-hidden="true" size={14} />
+          </Button>
+        </div>
+        <fieldset className="flex flex-wrap justify-center gap-1 border-0 border-t border-border pt-2 sm:border-l sm:border-t-0 sm:pt-0 sm:ps-2">
           <legend className="sr-only">{t('annotations.color')}</legend>
           {ANNOTATION_COLORS.map((swatch) => {
             const isActive = color === swatch;

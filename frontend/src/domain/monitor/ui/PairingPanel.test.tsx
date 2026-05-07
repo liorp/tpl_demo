@@ -48,6 +48,14 @@ describe('PairingPanel', () => {
     expect(screen.queryByText('S2')).toBeNull();
   });
 
+  test('renders a decorative heading icon next to the collapse chevron', () => {
+    render(<PairingPanel {...defaultProps()} />);
+
+    const header = screen.getByRole('button', { name: /Sensor Pairings/i });
+
+    expect(header.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(2);
+  });
+
   test('clicking the row label toggles the pairing', () => {
     const onToggle = vi.fn();
     render(<PairingPanel {...defaultProps({ onTogglePairing: onToggle })} />);

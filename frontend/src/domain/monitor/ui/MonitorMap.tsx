@@ -8,6 +8,7 @@ import {
   Marker,
   Polyline,
   Popup,
+  ScaleControl,
   TileLayer,
   useMap,
 } from 'react-leaflet';
@@ -33,6 +34,10 @@ const PIN_PADDING_X_PX = 8 * PIN_SIZE_SCALE;
 const PIN_FONT_SIZE_PX = 14;
 const PIN_ANCHOR_Y = 12 * PIN_SIZE_SCALE;
 const BETWEEN_THRESHOLD_WINDOW_MS = 10_000;
+const WEB_MERCATOR_EARTH_RADIUS_METERS = 6378137;
+const MIN_BASE_DISTANCE_METERS = 100;
+const MIN_SEMI_MAJOR_PADDING_METERS = 90;
+const MIN_SEMI_MINOR_AXIS_METERS = 170;
 dayjs.extend(relativeTime);
 
 type Props = {
@@ -289,21 +294,53 @@ function toYellowPairKeys(
   return yellowKeys;
 }
 
+function toWebMercatorPoint(
+  lat: number,
+  lng: number,
+): { x: number; y: number } {
+  const latRadians = (lat * Math.PI) / 180;
+  const lngRadians = (lng * Math.PI) / 180;
+  return {
+    x: WEB_MERCATOR_EARTH_RADIUS_METERS * lngRadians,
+    y:
+      WEB_MERCATOR_EARTH_RADIUS_METERS *
+      Math.log(Math.tan(Math.PI / 4 + latRadians / 2)),
+  };
+}
+
+function fromWebMercatorPoint(point: {
+  x: number;
+  y: number;
+}): [number, number] {
+  const lng = (point.x / WEB_MERCATOR_EARTH_RADIUS_METERS / Math.PI) * 180;
+  const lat =
+    ((2 * Math.atan(Math.exp(point.y / WEB_MERCATOR_EARTH_RADIUS_METERS)) -
+      Math.PI / 2) /
+      Math.PI) *
+    180;
+  return [lat, lng];
+}
+
 function toPairingEllipsePositions(
   side1: UnitPlacement,
   side2: UnitPlacement,
 ): [number, number][] {
-  const midpointLat = (side1.lat + side2.lat) / 2;
-  const midpointLng = (side1.lng + side2.lng) / 2;
-  const cosLat = Math.max(Math.cos((midpointLat * Math.PI) / 180), 0.00001);
-
-  const dx = (side2.lng - side1.lng) * cosLat;
-  const dy = side2.lat - side1.lat;
-  const baseDistance = Math.max(Math.hypot(dx, dy), 0.001);
+  const point1 = toWebMercatorPoint(side1.lat, side1.lng);
+  const point2 = toWebMercatorPoint(side2.lat, side2.lng);
+  const midpoint = {
+    x: (point1.x + point2.x) / 2,
+    y: (point1.y + point2.y) / 2,
+  };
+  const dx = point2.x - point1.x;
+  const dy = point2.y - point1.y;
+  const baseDistance = Math.max(Math.hypot(dx, dy), MIN_BASE_DISTANCE_METERS);
   const angle = Math.atan2(dy, dx);
 
   const focalDistance = baseDistance / 2;
-  const semiMajorAxis = Math.max(baseDistance * 0.72, focalDistance + 0.0008);
+  const semiMajorAxis = Math.max(
+    baseDistance * 0.72,
+    focalDistance + MIN_SEMI_MAJOR_PADDING_METERS,
+  );
   const semiMinorAxis = Math.max(
     Math.sqrt(
       Math.max(
@@ -311,7 +348,7 @@ function toPairingEllipsePositions(
         0,
       ),
     ),
-    0.0015,
+    MIN_SEMI_MINOR_AXIS_METERS,
   );
   const segments = 36;
 
@@ -323,7 +360,12 @@ function toPairingEllipsePositions(
     const rotatedX = localX * Math.cos(angle) - localY * Math.sin(angle);
     const rotatedY = localX * Math.sin(angle) + localY * Math.cos(angle);
 
-    ellipse.push([midpointLat + rotatedY, midpointLng + rotatedX / cosLat]);
+    ellipse.push(
+      fromWebMercatorPoint({
+        x: midpoint.x + rotatedX,
+        y: midpoint.y + rotatedY,
+      }),
+    );
   }
   return ellipse;
 }
@@ -487,6 +529,7 @@ export function MonitorMap({
             maxNativeZoom={ONLINE_TILE_NATIVE_MAX_ZOOM}
           />
         ) : null}
+        <ScaleControl position="bottomleft" imperial={false} />
         <MapUnitsViewportController units={units} />
         <MapFocusController focusPoint={focusPoint} />
         {pairingEllipses.map((ellipse) => (

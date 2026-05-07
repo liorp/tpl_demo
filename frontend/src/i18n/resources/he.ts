@@ -130,6 +130,8 @@ const heCommon = {
     toolPen: 'עט',
     toolText: 'טקסט',
     toolEraser: 'מחק',
+    undo: 'בטל',
+    redo: 'בצע שוב',
     clearAll: 'נקה הכל',
     confirmClear: 'להסיר את כל הסימונים?',
     color: 'צבע',

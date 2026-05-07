@@ -50,6 +50,10 @@ export function App() {
     updateAnnotation,
     removeAnnotation,
     clearAnnotations,
+    undoAnnotation,
+    redoAnnotation,
+    canUndoAnnotations,
+    canRedoAnnotations,
   } = useMonitorSocket();
   const [focusedAlertPoint, setFocusedAlertPoint] = useState<{
     lat: number;
@@ -147,7 +151,7 @@ export function App() {
       </ErrorBoundary>
       <ErrorBoundary section="Map">
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <div className="pointer-events-none absolute bottom-4 left-4 z-[1200]">
+          <div className="pointer-events-none absolute right-4 bottom-4 z-[1200]">
             <div className="pointer-events-auto flex flex-col gap-2 rounded-md border border-border-bright bg-card/90 p-2 backdrop-blur-sm">
               <Button
                 variant="outline"
@@ -175,7 +179,13 @@ export function App() {
               </Button>
             </div>
           </div>
-          <AnnotationToolbar onClearAll={clearAnnotations} />
+          <AnnotationToolbar
+            onClearAll={clearAnnotations}
+            onUndo={undoAnnotation}
+            onRedo={redoAnnotation}
+            canUndo={canUndoAnnotations}
+            canRedo={canRedoAnnotations}
+          />
           <div className="pointer-events-none absolute top-4 right-4 z-[1200] flex w-64 flex-col gap-2">
             <div className="pointer-events-auto">
               <PingLatencyWidget

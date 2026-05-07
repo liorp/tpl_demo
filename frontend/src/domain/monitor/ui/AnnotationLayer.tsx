@@ -1,5 +1,5 @@
 import { DomEvent, divIcon, type LeafletMouseEvent } from 'leaflet';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Marker, Polyline, Popup, useMapEvents } from 'react-leaflet';
 
@@ -14,6 +14,7 @@ import { useAnnotationTool } from '../service/annotationTool';
 const STROKE_THRESHOLD_PX_SQ = 9; // 3px threshold, squared
 const TEXT_DEFAULT_SIZE = 14;
 const PEN_DEFAULT_WIDTH = 3;
+const ERASER_HIT_WIDTH = 18;
 
 type DraftEditor = {
   id: string | null;
@@ -28,6 +29,45 @@ type Props = {
   onUpdate: (id: string, patch: Partial<Annotation>) => void;
   onRemove: (id: string) => void;
 };
+
+type MapMovementHandler = {
+  enable: () => void;
+  disable: () => void;
+};
+
+type MapMovementControls = {
+  dragging: MapMovementHandler;
+  doubleClickZoom: MapMovementHandler;
+  scrollWheelZoom: MapMovementHandler;
+  touchZoom: MapMovementHandler;
+  boxZoom: MapMovementHandler;
+  keyboard: MapMovementHandler;
+  tap?: MapMovementHandler;
+};
+
+function getMovementHandlers(map: MapMovementControls): MapMovementHandler[] {
+  return [
+    map.dragging,
+    map.doubleClickZoom,
+    map.scrollWheelZoom,
+    map.touchZoom,
+    map.boxZoom,
+    map.keyboard,
+    map.tap,
+  ].filter((handler): handler is MapMovementHandler => Boolean(handler));
+}
+
+function disableMapMovement(map: MapMovementControls): void {
+  for (const handler of getMovementHandlers(map)) {
+    handler.disable();
+  }
+}
+
+function enableMapMovement(map: MapMovementControls): void {
+  for (const handler of getMovementHandlers(map)) {
+    handler.enable();
+  }
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => {
@@ -76,6 +116,7 @@ export function AnnotationLayer({
   const { t } = useTranslation();
   const { tool, color } = useAnnotationTool();
   const [draftPoints, setDraftPoints] = useState<LatLng[]>([]);
+  const draftPointsRef = useRef<LatLng[]>([]);
   const drawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const [editor, setEditor] = useState<DraftEditor | null>(null);
@@ -94,9 +135,9 @@ export function AnnotationLayer({
         x: event.containerPoint.x,
         y: event.containerPoint.y,
       };
-      setDraftPoints([[event.latlng.lat, event.latlng.lng]]);
-      map.dragging.disable();
-      map.doubleClickZoom.disable();
+      const points: LatLng[] = [[event.latlng.lat, event.latlng.lng]];
+      draftPointsRef.current = points;
+      setDraftPoints(points);
     },
     mousemove(event: LeafletMouseEvent) {
       if (toolRef.current !== 'pen' || !drawingRef.current) return;
@@ -110,28 +151,30 @@ export function AnnotationLayer({
         x: event.containerPoint.x,
         y: event.containerPoint.y,
       };
-      setDraftPoints((prev) => [...prev, [event.latlng.lat, event.latlng.lng]]);
+      setDraftPoints((prev) => {
+        const next: LatLng[] = [...prev, [event.latlng.lat, event.latlng.lng]];
+        draftPointsRef.current = next;
+        return next;
+      });
     },
     mouseup() {
       if (toolRef.current !== 'pen' || !drawingRef.current) return;
       drawingRef.current = false;
       lastPointRef.current = null;
-      map.dragging.enable();
-      map.doubleClickZoom.enable();
-      setDraftPoints((prev) => {
-        if (prev.length >= 2) {
-          const stroke: PenAnnotation = {
-            type: 'pen',
-            id: makeId(),
-            points: prev,
-            color: colorRef.current,
-            width: PEN_DEFAULT_WIDTH,
-            createdAt: Date.now(),
-          };
-          onAdd(stroke);
-        }
-        return [];
-      });
+      const points = draftPointsRef.current;
+      draftPointsRef.current = [];
+      setDraftPoints([]);
+      if (points.length >= 2) {
+        const stroke: PenAnnotation = {
+          type: 'pen',
+          id: makeId(),
+          points,
+          color: colorRef.current,
+          width: PEN_DEFAULT_WIDTH,
+          createdAt: Date.now(),
+        };
+        onAdd(stroke);
+      }
     },
     click(event: LeafletMouseEvent) {
       if (toolRef.current !== 'text') return;
@@ -149,22 +192,25 @@ export function AnnotationLayer({
     if (tool !== 'pen' && drawingRef.current) {
       drawingRef.current = false;
       lastPointRef.current = null;
+      draftPointsRef.current = [];
       setDraftPoints([]);
-      map.dragging.enable();
-      map.doubleClickZoom.enable();
     }
     if (tool !== 'text' && editor) {
       setEditor(null);
     }
-  }, [tool, map, editor]);
+  }, [tool, editor]);
 
-  // Always re-enable map drag if this layer unmounts mid-stroke.
+  // Annotation tools own map gestures only while an editing tool is active.
   useEffect(() => {
+    if (tool === 'none') {
+      enableMapMovement(map);
+      return;
+    }
+    disableMapMovement(map);
     return () => {
-      map.dragging.enable();
-      map.doubleClickZoom.enable();
+      enableMapMovement(map);
     };
-  }, [map]);
+  }, [map, tool]);
 
   // Free-standing <Popup position={...}> auto-opens; just focus the input.
   useEffect(() => {
@@ -224,20 +270,36 @@ export function AnnotationLayer({
     <>
       {annotations.map((annotation) => {
         if (annotation.type === 'pen') {
+          const isErasable = tool === 'eraser';
           return (
-            <Polyline
-              key={annotation.id}
-              positions={annotation.points as [number, number][]}
-              pathOptions={{
-                color: annotation.color,
-                weight: annotation.width,
-                opacity: 0.95,
-              }}
-              interactive={tool !== 'none' && tool !== 'pen'}
-              eventHandlers={{
-                click: (event) => handleAnnotationClick(annotation, event),
-              }}
-            />
+            <Fragment key={annotation.id}>
+              <Polyline
+                positions={annotation.points as [number, number][]}
+                pathOptions={{
+                  color: annotation.color,
+                  weight: annotation.width,
+                  opacity: 0.95,
+                }}
+                interactive={tool !== 'none' && tool !== 'pen'}
+                eventHandlers={{
+                  click: (event) => handleAnnotationClick(annotation, event),
+                }}
+              />
+              {isErasable ? (
+                <Polyline
+                  positions={annotation.points as [number, number][]}
+                  pathOptions={{
+                    color: annotation.color,
+                    weight: Math.max(ERASER_HIT_WIDTH, annotation.width),
+                    opacity: 0,
+                  }}
+                  interactive={true}
+                  eventHandlers={{
+                    click: (event) => handleAnnotationClick(annotation, event),
+                  }}
+                />
+              ) : null}
+            </Fragment>
           );
         }
         return (

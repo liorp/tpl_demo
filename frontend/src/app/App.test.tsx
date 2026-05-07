@@ -114,6 +114,8 @@ const setAlarmSoundEnabled = vi.fn();
 const setOfflineModeEnabled = vi.fn();
 const placeUnit = vi.fn();
 const setUnitPairing = vi.fn();
+const undoAnnotation = vi.fn();
+const redoAnnotation = vi.fn();
 const monitorMapMock = vi.fn();
 const startAlarmSound = vi.fn();
 const stopAlarmSound = vi.fn();
@@ -141,6 +143,10 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
     updateAnnotation: vi.fn(),
     removeAnnotation: vi.fn(),
     clearAnnotations: vi.fn(),
+    undoAnnotation,
+    redoAnnotation,
+    canUndoAnnotations: false,
+    canRedoAnnotations: false,
   }),
 }));
 
@@ -216,6 +222,8 @@ describe('App', () => {
     setOfflineModeEnabled.mockClear();
     placeUnit.mockClear();
     setUnitPairing.mockClear();
+    undoAnnotation.mockClear();
+    redoAnnotation.mockClear();
     monitorMapMock.mockClear();
     startAlarmSound.mockClear();
     stopAlarmSound.mockClear();
@@ -261,6 +269,16 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'Place Unit' })).toBeNull();
     expect(screen.getByRole('button', { name: 'REFRESH MAP' })).not.toBeNull();
     expect(screen.queryByText('Live Feed')).toBeNull();
+  });
+
+  test('keeps refresh map HUD away from the lower-left map scale slot', () => {
+    renderApp();
+
+    const refreshButton = screen.getByRole('button', { name: 'REFRESH MAP' });
+    const hudPosition = refreshButton.parentElement?.parentElement;
+    expect(hudPosition?.className).toContain('bottom-4');
+    expect(hudPosition?.className).toContain('right-4');
+    expect(hudPosition?.className).not.toContain('left-4');
   });
 
   test('moves a unit when map drag callback is triggered', () => {

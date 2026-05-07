@@ -623,6 +623,10 @@ describe('monitor socket lifecycle', () => {
       updateAnnotation: (id: string, patch: unknown) => void;
       removeAnnotation: (id: string) => void;
       clearAnnotations: () => void;
+      undoAnnotation: () => void;
+      redoAnnotation: () => void;
+      canUndoAnnotations: boolean;
+      canRedoAnnotations: boolean;
     };
     const api = () => onApi.mock.calls.at(-1)?.[0] as AnnotationsApi;
     const lastAnnotations = () =>
@@ -678,6 +682,18 @@ describe('monitor socket lifecycle', () => {
       expect(lastAnnotations().map((a) => a.id)).toEqual(['a2']);
     });
     expect(persisted().annotations.map((a) => a.id)).toEqual(['a2']);
+
+    expect(api().canUndoAnnotations).toBe(true);
+    api().undoAnnotation();
+    await waitFor(() => {
+      expect(lastAnnotations().map((a) => a.id)).toEqual(['a1', 'a2']);
+    });
+    expect(api().canRedoAnnotations).toBe(true);
+
+    api().redoAnnotation();
+    await waitFor(() => {
+      expect(lastAnnotations().map((a) => a.id)).toEqual(['a2']);
+    });
 
     api().clearAnnotations();
     await waitFor(() => {

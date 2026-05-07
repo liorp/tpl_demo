@@ -65,6 +65,10 @@ type MonitorSocketApi = {
   updateAnnotation: (id: string, patch: Partial<Annotation>) => void;
   removeAnnotation: (id: string) => void;
   clearAnnotations: () => void;
+  undoAnnotation: () => void;
+  redoAnnotation: () => void;
+  canUndoAnnotations: boolean;
+  canRedoAnnotations: boolean;
 };
 
 export function useMonitorSocket(): MonitorSocketApi {
@@ -87,6 +91,11 @@ export function useMonitorSocket(): MonitorSocketApi {
       annotations: persisted.annotations,
     };
   });
+  const clientStateRef = useRef(clientState);
+  clientStateRef.current = clientState;
+  const annotationUndoStackRef = useRef<Annotation[][]>([]);
+  const annotationRedoStackRef = useRef<Annotation[][]>([]);
+  const [, setAnnotationHistoryVersion] = useState(0);
 
   // Transient state
   const [crossingAlerts, setCrossingAlerts] = useState<CrossingAlert[]>([]);
@@ -260,6 +269,42 @@ export function useMonitorSocket(): MonitorSocketApi {
     [],
   );
 
+  const bumpAnnotationHistoryVersion = useCallback(() => {
+    setAnnotationHistoryVersion((version) => version + 1);
+  }, []);
+
+  const setAnnotationsDirect = useCallback(
+    (annotations: Annotation[]) => {
+      clientStateRef.current = {
+        ...clientStateRef.current,
+        annotations,
+      };
+      setClientStateAndPersist((prev) => ({
+        ...prev,
+        annotations,
+      }));
+    },
+    [setClientStateAndPersist],
+  );
+
+  const setAnnotationsWithHistory = useCallback(
+    (updater: (prev: Annotation[]) => Annotation[]) => {
+      const previous = clientStateRef.current.annotations;
+      const next = updater(previous);
+      if (next === previous) {
+        return;
+      }
+      annotationUndoStackRef.current = [
+        ...annotationUndoStackRef.current,
+        previous,
+      ];
+      annotationRedoStackRef.current = [];
+      bumpAnnotationHistoryVersion();
+      setAnnotationsDirect(next);
+    },
+    [bumpAnnotationHistoryVersion, setAnnotationsDirect],
+  );
+
   const requestMap = useCallback(() => {
     sendCommand('map');
   }, [sendCommand]);
@@ -386,62 +431,100 @@ export function useMonitorSocket(): MonitorSocketApi {
 
   const resetAll = useCallback(() => {
     clearPersistedMonitorConfig();
-    setClientState({
+    annotationUndoStackRef.current = [];
+    annotationRedoStackRef.current = [];
+    bumpAnnotationHistoryVersion();
+    const next: ClientState = {
       units: [],
       pairings: [],
       globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
       annotations: [],
-    });
-  }, []);
+    };
+    clientStateRef.current = next;
+    setClientState(next);
+  }, [bumpAnnotationHistoryVersion]);
 
   const addAnnotation = useCallback(
     (annotation: Annotation) => {
-      setClientStateAndPersist((prev) => ({
-        ...prev,
-        annotations: [...prev.annotations, annotation],
-      }));
+      setAnnotationsWithHistory((prev) => [...prev, annotation]);
     },
-    [setClientStateAndPersist],
+    [setAnnotationsWithHistory],
   );
 
   const updateAnnotation = useCallback(
     (id: string, patch: Partial<Annotation>) => {
-      setClientStateAndPersist((prev) => {
-        const idx = prev.annotations.findIndex((a) => a.id === id);
+      setAnnotationsWithHistory((prev) => {
+        const idx = prev.findIndex((a) => a.id === id);
         if (idx === -1) {
           return prev;
         }
-        const current = prev.annotations[idx];
+        const current = prev[idx];
         const merged = { ...current, ...patch } as Annotation;
-        const annotations = [...prev.annotations];
+        const annotations = [...prev];
         annotations[idx] = merged;
-        return { ...prev, annotations };
+        return annotations;
       });
     },
-    [setClientStateAndPersist],
+    [setAnnotationsWithHistory],
   );
 
   const removeAnnotation = useCallback(
     (id: string) => {
-      setClientStateAndPersist((prev) => {
-        const next = prev.annotations.filter((a) => a.id !== id);
-        if (next.length === prev.annotations.length) {
+      setAnnotationsWithHistory((prev) => {
+        const next = prev.filter((a) => a.id !== id);
+        if (next.length === prev.length) {
           return prev;
         }
-        return { ...prev, annotations: next };
+        return next;
       });
     },
-    [setClientStateAndPersist],
+    [setAnnotationsWithHistory],
   );
 
   const clearAnnotations = useCallback(() => {
-    setClientStateAndPersist((prev) => {
-      if (prev.annotations.length === 0) {
+    setAnnotationsWithHistory((prev) => {
+      if (prev.length === 0) {
         return prev;
       }
-      return { ...prev, annotations: [] };
+      return [];
     });
-  }, [setClientStateAndPersist]);
+  }, [setAnnotationsWithHistory]);
+
+  const undoAnnotation = useCallback(() => {
+    const previous = annotationUndoStackRef.current.at(-1);
+    if (!previous) {
+      return;
+    }
+    const current = clientStateRef.current.annotations;
+    annotationUndoStackRef.current = annotationUndoStackRef.current.slice(
+      0,
+      -1,
+    );
+    annotationRedoStackRef.current = [
+      ...annotationRedoStackRef.current,
+      current,
+    ];
+    bumpAnnotationHistoryVersion();
+    setAnnotationsDirect(previous);
+  }, [bumpAnnotationHistoryVersion, setAnnotationsDirect]);
+
+  const redoAnnotation = useCallback(() => {
+    const next = annotationRedoStackRef.current.at(-1);
+    if (!next) {
+      return;
+    }
+    const current = clientStateRef.current.annotations;
+    annotationRedoStackRef.current = annotationRedoStackRef.current.slice(
+      0,
+      -1,
+    );
+    annotationUndoStackRef.current = [
+      ...annotationUndoStackRef.current,
+      current,
+    ];
+    bumpAnnotationHistoryVersion();
+    setAnnotationsDirect(next);
+  }, [bumpAnnotationHistoryVersion, setAnnotationsDirect]);
 
   const safeServerState = serverState ?? createInitialServerState();
   const state: MonitorState = useMemo(
@@ -455,6 +538,8 @@ export function useMonitorSocket(): MonitorSocketApi {
     }),
     [safeServerState, crossingAlerts, clientState],
   );
+  const canUndoAnnotations = annotationUndoStackRef.current.length > 0;
+  const canRedoAnnotations = annotationRedoStackRef.current.length > 0;
 
   return {
     state,
@@ -478,5 +563,9 @@ export function useMonitorSocket(): MonitorSocketApi {
     updateAnnotation,
     removeAnnotation,
     clearAnnotations,
+    undoAnnotation,
+    redoAnnotation,
+    canUndoAnnotations,
+    canRedoAnnotations,
   };
 }

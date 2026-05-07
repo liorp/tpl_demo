@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import '@/i18n/config';
@@ -16,6 +17,18 @@ type Handler = (event: unknown) => void;
 const mapEventHandlers: Record<string, Handler | undefined> = {};
 const mapDragging = { enable: vi.fn(), disable: vi.fn() };
 const mapDoubleClickZoom = { enable: vi.fn(), disable: vi.fn() };
+const mapScrollWheelZoom = { enable: vi.fn(), disable: vi.fn() };
+const mapTouchZoom = { enable: vi.fn(), disable: vi.fn() };
+const mapBoxZoom = { enable: vi.fn(), disable: vi.fn() };
+const mapKeyboard = { enable: vi.fn(), disable: vi.fn() };
+const mapControls = {
+  dragging: mapDragging,
+  doubleClickZoom: mapDoubleClickZoom,
+  scrollWheelZoom: mapScrollWheelZoom,
+  touchZoom: mapTouchZoom,
+  boxZoom: mapBoxZoom,
+  keyboard: mapKeyboard,
+};
 
 const polylines: Array<{
   positions: Array<[number, number]>;
@@ -77,10 +90,7 @@ vi.mock('react-leaflet', () => ({
   ),
   useMapEvents: (handlers: Record<string, Handler>) => {
     Object.assign(mapEventHandlers, handlers);
-    return {
-      dragging: mapDragging,
-      doubleClickZoom: mapDoubleClickZoom,
-    };
+    return mapControls;
   },
 }));
 
@@ -116,6 +126,14 @@ beforeEach(() => {
   mapDragging.disable.mockClear();
   mapDoubleClickZoom.enable.mockClear();
   mapDoubleClickZoom.disable.mockClear();
+  mapScrollWheelZoom.enable.mockClear();
+  mapScrollWheelZoom.disable.mockClear();
+  mapTouchZoom.enable.mockClear();
+  mapTouchZoom.disable.mockClear();
+  mapBoxZoom.enable.mockClear();
+  mapBoxZoom.disable.mockClear();
+  mapKeyboard.enable.mockClear();
+  mapKeyboard.disable.mockClear();
   resetAnnotationTool();
 });
 
@@ -125,6 +143,59 @@ afterEach(() => {
 });
 
 describe('AnnotationLayer rendering', () => {
+  test('disables map movement while a drawing tool is active', () => {
+    setAnnotationTool('pen');
+    const { unmount } = render(
+      <AnnotationLayer
+        annotations={[]}
+        onAdd={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    expect(mapDragging.disable).toHaveBeenCalled();
+    expect(mapDoubleClickZoom.disable).toHaveBeenCalled();
+    expect(mapScrollWheelZoom.disable).toHaveBeenCalled();
+    expect(mapTouchZoom.disable).toHaveBeenCalled();
+    expect(mapBoxZoom.disable).toHaveBeenCalled();
+    expect(mapKeyboard.disable).toHaveBeenCalled();
+
+    unmount();
+
+    expect(mapDragging.enable).toHaveBeenCalled();
+    expect(mapDoubleClickZoom.enable).toHaveBeenCalled();
+    expect(mapScrollWheelZoom.enable).toHaveBeenCalled();
+    expect(mapTouchZoom.enable).toHaveBeenCalled();
+    expect(mapBoxZoom.enable).toHaveBeenCalled();
+    expect(mapKeyboard.enable).toHaveBeenCalled();
+  });
+
+  test('reenables map movement when annotation tool is detoggled', () => {
+    setAnnotationTool('pen');
+    render(
+      <AnnotationLayer
+        annotations={[]}
+        onAdd={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    expect(mapDragging.disable).toHaveBeenCalled();
+
+    act(() => {
+      setAnnotationTool('none');
+    });
+
+    expect(mapDragging.enable).toHaveBeenCalled();
+    expect(mapDoubleClickZoom.enable).toHaveBeenCalled();
+    expect(mapScrollWheelZoom.enable).toHaveBeenCalled();
+    expect(mapTouchZoom.enable).toHaveBeenCalled();
+    expect(mapBoxZoom.enable).toHaveBeenCalled();
+    expect(mapKeyboard.enable).toHaveBeenCalled();
+  });
+
   test('renders one Polyline per pen annotation', () => {
     render(
       <AnnotationLayer
@@ -190,13 +261,46 @@ describe('AnnotationLayer pen tool', () => {
     });
 
     expect(mapDragging.disable).toHaveBeenCalled();
-    expect(mapDragging.enable).toHaveBeenCalled();
+    expect(mapDragging.enable).not.toHaveBeenCalled();
     expect(onAdd).toHaveBeenCalledTimes(1);
     const stroke = onAdd.mock.calls[0][0] as Annotation;
     expect(stroke.type).toBe('pen');
     if (stroke.type === 'pen') {
       expect(stroke.points.length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  test('commits a pen stroke once under React strict mode', () => {
+    const onAdd = vi.fn();
+    setAnnotationTool('pen');
+    render(
+      <StrictMode>
+        <AnnotationLayer
+          annotations={[]}
+          onAdd={onAdd}
+          onUpdate={vi.fn()}
+          onRemove={vi.fn()}
+        />
+      </StrictMode>,
+    );
+
+    act(() => {
+      mapEventHandlers.mousedown?.({
+        latlng: { lat: 33.3, lng: 35.7 },
+        containerPoint: { x: 100, y: 100 },
+      });
+    });
+    act(() => {
+      mapEventHandlers.mousemove?.({
+        latlng: { lat: 33.31, lng: 35.71 },
+        containerPoint: { x: 130, y: 130 },
+      });
+    });
+    act(() => {
+      mapEventHandlers.mouseup?.({} as unknown);
+    });
+
+    expect(onAdd).toHaveBeenCalledTimes(1);
   });
 
   test('a no-drag tap (single point) discards the stroke', () => {
@@ -280,6 +384,7 @@ describe('AnnotationLayer pen tool', () => {
         onRemove={vi.fn()}
       />,
     );
+    mapDragging.disable.mockClear();
     act(() => {
       mapEventHandlers.mousedown?.({
         latlng: { lat: 33.3, lng: 35.7 },
@@ -313,8 +418,31 @@ describe('AnnotationLayer eraser tool', () => {
         onRemove={onRemove}
       />,
     );
-    expect(polylines).toHaveLength(1);
+    expect(polylines).toHaveLength(2);
     polylines[0].onClick?.({
+      originalEvent: new MouseEvent('click'),
+    });
+    expect(onRemove).toHaveBeenCalledWith('p-1');
+  });
+
+  test('eraser mode renders a wide transparent hit target for pen strokes', () => {
+    const onRemove = vi.fn();
+    setAnnotationTool('eraser');
+    render(
+      <AnnotationLayer
+        annotations={[samplePen]}
+        onAdd={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={onRemove}
+      />,
+    );
+
+    expect(polylines).toHaveLength(2);
+    expect(polylines[1].interactive).toBe(true);
+    expect(polylines[1].pathOptions?.opacity).toBe(0);
+    expect(polylines[1].pathOptions?.weight).toBeGreaterThan(samplePen.width);
+
+    polylines[1].onClick?.({
       originalEvent: new MouseEvent('click'),
     });
     expect(onRemove).toHaveBeenCalledWith('p-1');

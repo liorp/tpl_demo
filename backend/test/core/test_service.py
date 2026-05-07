@@ -111,6 +111,26 @@ def test_handle_detection_updates_crossing_alert():
     assert state.crossing_alert["sensor_b"] == 2
 
 
+def test_handle_detection_uses_current_time_when_device_timestamp_missing(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_123.0)
+    state = SensorState()
+
+    changed = handle_event(
+        state,
+        {
+            "type": "detection",
+            "unit_a": 1,
+            "unit_b": 2,
+            "value": 549,
+            "threshold": 500,
+        },
+    )
+
+    assert changed is True
+    assert state.crossing_alert is not None
+    assert state.crossing_alert["timestamp"] == 1_700_000_123
+
+
 def test_handle_map_link_event_inserts_or_replaces_link(monkeypatch):
     monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_123.0)
     state = SensorState()
