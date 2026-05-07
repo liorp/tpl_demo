@@ -29,10 +29,18 @@ describe('monitor state model', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'alarm',
       events: [{ time: '20:00:00', msg: 'DETECTION x' }],
       links: [],
-      crossing_alert: null,
+      crossing_alert: {
+        sensor_a: 11,
+        sensor_b: 12,
+        timestamp: 1_739_742_000,
+        value: 860,
+        threshold: 500,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
       config: { gain: null },
     });
 
@@ -42,11 +50,51 @@ describe('monitor state model', () => {
     expect(shouldShowAck(state)).toBe(true);
   });
 
+  test('derives alarm state from frontend payload data', () => {
+    const clear = toServerStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { gain: null },
+    });
+    expect(clear.alarm).toBe('clear');
+
+    const alarm = toMonitorStateFromPayload({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      events: [],
+      links: [],
+      crossing_alert: {
+        sensor_a: 11,
+        sensor_b: 12,
+        timestamp: 1_739_742_000,
+        value: 860,
+        threshold: 500,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
+      config: { gain: null },
+    });
+    expect(alarm.alarm).toBe('alarm');
+
+    const disconnected = toServerStateFromPayload({
+      connected: false,
+      port: 'None',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { gain: null },
+    });
+    expect(disconnected.alarm).toBe('disconnected');
+  });
+
   test('normalizes link updatedAt from backend payload and provides fallback when missing', () => {
     const state = toServerStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [
         {
@@ -85,7 +133,6 @@ describe('monitor state model', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [
         { time: '21:55:44', msg: 'SYSTEM old' },
         { time: '21:55:46', msg: 'DETECTION same-second older' },
@@ -109,7 +156,6 @@ describe('monitor state model', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       crossing_alert: null,
@@ -178,7 +224,6 @@ describe('monitor state model', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       crossing_alert: null,
@@ -220,7 +265,6 @@ describe('monitor state model', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'alarm',
       events: [],
       links: [],
       crossing_alert: {
@@ -255,7 +299,6 @@ describe('monitor state model', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'alarm',
       events: [],
       links: [],
       crossing_alert: {
@@ -273,7 +316,6 @@ describe('monitor state model', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'alarm',
       events: [],
       links: [],
       crossing_alert: {
@@ -303,7 +345,6 @@ describe('monitor state model', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'alarm',
       events: [],
       links: [],
       crossing_alert: null,
@@ -495,7 +536,6 @@ describe('monitor state model', () => {
     const payload = {
       connected: true,
       port: '/dev/cu.usbserial-0001',
-      alarm: 'clear' as const,
       events: [
         { time: '21:55:46', msg: 'MAP from 11 ver=0.4c10 gain=32 v=2130' },
         { time: '21:55:46', msg: 'MAP from 12 ver=0.4c10 gain=32 v=2587' },
@@ -526,7 +566,6 @@ describe('monitor state model', () => {
     const payload = {
       connected: true,
       port: '/dev/cu.usbserial-0001',
-      alarm: 'clear' as const,
       events: [
         { time: '21:55:46', msg: 'MAP from 1 ver=0.4c10 gain=32 v=2130' },
       ],
@@ -559,7 +598,6 @@ describe('monitor state model', () => {
     const payload = {
       connected: true,
       port: '/dev/cu.usbserial-0001',
-      alarm: 'clear' as const,
       events: [
         { time: '21:55:46', msg: 'MAP from 2 ver=0.4c10 gain=32 v=2112' },
         { time: '21:55:46', msg: 'MAP from 11 ver=0.4c10 gain=32 v=2130' },
@@ -587,7 +625,6 @@ describe('monitor state model', () => {
     const payload = {
       connected: true,
       port: '/dev/cu.usbserial-0001',
-      alarm: 'clear' as const,
       events: [
         { time: '21:55:46', msg: 'MAP from 2 ver=0.4c10 gain=32 v=2112' },
       ],

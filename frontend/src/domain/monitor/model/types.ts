@@ -139,7 +139,6 @@ export type BackendCrossingAlert = {
 export type MonitorPayload = {
   connected: boolean;
   port: string;
-  alarm: AlarmState;
   events: MonitorEvent[];
   links: SignalLinkState[];
   crossing_alert: BackendCrossingAlert | null;

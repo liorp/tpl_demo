@@ -119,20 +119,14 @@ def _crossing_coordinates(
     return (None, None)
 
 
-def set_connection_state(
-    state: SensorState, connected: bool, port: str = "None", alarm: str | None = None
-) -> None:
+def set_connection_state(state: SensorState, connected: bool, port: str = "None") -> None:
     state.serial_connected = connected
     state.current_port = port
-    if alarm is not None:
-        state.alarm_state = alarm
 
 
 def acknowledge_alarm(state: SensorState) -> bool:
-    if state.alarm_state not in ("alarm", "comm_loss") and state.crossing_alert is None:
+    if state.crossing_alert is None:
         return False
-    if state.alarm_state in ("alarm", "comm_loss"):
-        set_connection_state(state, True, state.current_port, "clear")
     state.crossing_alert = None
     log_event(state, logger, "Alarm acknowledged")
     return True
@@ -153,7 +147,7 @@ def _handle_detection(state: SensorState, event: Event) -> bool:
     )
     state.last_detection_time = now_ts()
     device_ts = event.get("device_ts")
-    set_connection_state(state, True, state.current_port, "alarm")
+    set_connection_state(state, True, state.current_port)
     state.crossing_alert = CrossingAlert(
         sensor_a=event["unit_a"],
         sensor_b=event["unit_b"],
@@ -184,7 +178,7 @@ def _handle_comm_loss(state: SensorState, event: Event) -> bool:
         state, sensor_id=event["unit_b"], peer_id=event["unit_a"],
         connected=True, last_seen=last_seen,
     )
-    set_connection_state(state, True, state.current_port, "comm_loss")
+    set_connection_state(state, True, state.current_port)
     log_event(
         state,
         logger,
@@ -380,11 +374,10 @@ def handle_event(state: SensorState, event: Event) -> bool:
 
 def check_auto_reset(state: SensorState, now_ts_value: float, timeout_sec: float) -> bool:
     should_reset = (
-        state.alarm_state == "alarm"
+        state.crossing_alert is not None
         and (now_ts_value - state.last_detection_time > timeout_sec)
     )
     if should_reset:
-        set_connection_state(state, True, state.current_port, "clear")
         state.crossing_alert = None
         log_event(state, logger, "Alarm cleared (auto-reset)")
         return True
@@ -392,7 +385,7 @@ def check_auto_reset(state: SensorState, now_ts_value: float, timeout_sec: float
 
 
 def mark_disconnected(state: SensorState, reason: str | None = None) -> bool:
-    set_connection_state(state, False, "None", "disconnected")
+    set_connection_state(state, False, "None")
     if reason:
         log_event(state, logger, reason, level="warning")
     return True

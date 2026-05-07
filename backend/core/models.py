@@ -187,7 +187,6 @@ class SensorState:
     def __init__(self):
         self.serial_connected = False
         self.current_port = "None"
-        self.alarm_state = "disconnected"
         self.last_detection_time = 0.0
         self.logs: list[LogEntry] = []
         self.max_logs = 50
@@ -223,7 +222,6 @@ def snapshot(state: SensorState) -> dict:
     return {
         "connected": state.serial_connected,
         "port": state.current_port,
-        "alarm": state.alarm_state,
         "events": list(state.logs),
         "links": list(state.links),
         "crossing_alert": dict(state.crossing_alert) if state.crossing_alert else None,

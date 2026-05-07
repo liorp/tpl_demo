@@ -27,7 +27,6 @@ def test_handle_serial_message_connected_updates_state_and_event_log(monkeypatch
     queued_payloads: list[dict] = []
     prev_connected = state.serial_connected
     prev_port = state.current_port
-    prev_alarm = state.alarm_state
     prev_logs = list(state.logs)
 
     def fake_log_event(state_obj, logger_obj, message, level="info", fields=None):
@@ -46,7 +45,6 @@ def test_handle_serial_message_connected_updates_state_and_event_log(monkeypatch
 
     state.serial_connected = prev_connected
     state.current_port = prev_port
-    state.alarm_state = prev_alarm
     state.logs = prev_logs
 
 
@@ -55,7 +53,6 @@ def test_handle_serial_message_disconnect_marks_disconnected_and_logs_warning(mo
     queued_payloads: list[dict] = []
     prev_connected = state.serial_connected
     prev_port = state.current_port
-    prev_alarm = state.alarm_state
     prev_logs = list(state.logs)
 
     monkeypatch.setattr("backend.main.logger.warning", lambda message, *args: warnings.append(
@@ -68,14 +65,12 @@ def test_handle_serial_message_disconnect_marks_disconnected_and_logs_warning(mo
 
     assert state.serial_connected is False
     assert state.current_port == "None"
-    assert state.alarm_state == "disconnected"
     assert state.logs[0]["msg"] == "Disconnected from COM7"
     assert warnings == ["Disconnected from COM7"]
     assert queued_payloads
 
     state.serial_connected = prev_connected
     state.current_port = prev_port
-    state.alarm_state = prev_alarm
     state.logs = prev_logs
 
 

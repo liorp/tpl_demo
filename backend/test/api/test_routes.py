@@ -57,7 +57,6 @@ def _build_app(
         {
             "connected": False,
             "port": "None",
-            "alarm": "disconnected",
             "events": [],
             "links": [],
             "crossing_alert": None,

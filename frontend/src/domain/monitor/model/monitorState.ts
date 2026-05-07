@@ -1,4 +1,5 @@
 import type {
+  AlarmState,
   CrossingAckWindow,
   CrossingAlert,
   MonitorEvent,
@@ -114,9 +115,23 @@ export function createInitialMonitorState(): MonitorState {
   };
 }
 
+function deriveAlarmState(
+  connected: boolean,
+  crossingAlert: CrossingAlert | null,
+): AlarmState {
+  if (!connected) {
+    return 'disconnected';
+  }
+  if (crossingAlert) {
+    return 'alarm';
+  }
+  return 'clear';
+}
+
 export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
   const sensorStatus = parseSensorStatusMap(payload.sensor_status);
   const pingLatencies = parsePingLatencies(payload.ping_latencies);
+  const crossingAlert = toCrossingAlert(payload.crossing_alert);
   const noiseThreshold =
     typeof payload.config.noise_threshold === 'number' &&
     Number.isFinite(payload.config.noise_threshold)
@@ -130,7 +145,7 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     serverOnline: true,
     connected: payload.connected,
     port: payload.port,
-    alarm: payload.alarm,
+    alarm: deriveAlarmState(payload.connected, crossingAlert),
     events: sortEventsByTimestampDesc(payload.events).slice(0, MAX_EVENTS),
     links: parseSignalLinks(payload.links, Math.floor(Date.now() / 1000)),
     config: {

@@ -10,7 +10,7 @@ from backend.core.models import SensorState, snapshot
 from backend.core.service import handle_event
 
 
-def test_handle_detection_sets_alarm_and_log():
+def test_handle_detection_sets_crossing_alert_and_log():
     state = SensorState()
     event = {
         "type": "detection",
@@ -24,7 +24,7 @@ def test_handle_detection_sets_alarm_and_log():
     changed = handle_event(state, event)
 
     assert changed is True
-    assert state.alarm_state == "alarm"
+    assert state.crossing_alert is not None
     assert state.logs[0]["msg"].startswith("DETECTION")
 
 
@@ -42,7 +42,7 @@ def test_snapshot_includes_command_map_defaults():
 
     assert current["connected"] is False
     assert current["port"] == "None"
-    assert current["alarm"] == "disconnected"
+    assert "alarm" not in current
     assert isinstance(current["events"], list)
     assert current["links"] == []
     assert current["crossing_alert"] is None
@@ -290,7 +290,6 @@ def test_handle_detection_ignores_legacy_global_detection_threshold():
     changed = handle_event(state, event)
 
     assert changed is True
-    assert state.alarm_state == "alarm"
     assert state.crossing_alert == {
         "sensor_a": 1,
         "sensor_b": 2,

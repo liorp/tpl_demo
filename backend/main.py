@@ -92,7 +92,7 @@ def _handle_serial_message(msg: SerialMessage) -> None:
         if handle_event(state, msg.event):
             broadcaster.enqueue(snapshot(state))
     elif isinstance(msg, SerialConnected):
-        set_connection_state(state, True, msg.port, "clear")
+        set_connection_state(state, True, msg.port)
         log_event(state, logger, f"Connected to {msg.port}")
         broadcaster.enqueue(snapshot(state))
     elif isinstance(msg, SerialIdle):
