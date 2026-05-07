@@ -14,6 +14,7 @@ import {
   parseCrossingAlert,
   parseMapPolicy,
   parsePayloadUnits,
+  parsePingLatencies,
   parseSensorStatusMap,
   parseSignalLinks,
 } from './validation';
@@ -95,8 +96,10 @@ export function createInitialServerState(): ServerState {
       noise_threshold: null,
       detection_threshold: null,
       gain: null,
+      detection_mode: null,
     },
     sensorStatus: {},
+    pingLatencies: {},
     mapPolicy: parseMapPolicy(undefined),
   };
 }
@@ -114,6 +117,7 @@ export function createInitialMonitorState(): MonitorState {
 
 export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
   const sensorStatus = parseSensorStatusMap(payload.sensor_status);
+  const pingLatencies = parsePingLatencies(payload.ping_latencies);
   const noiseThreshold =
     typeof payload.config.noise_threshold === 'number' &&
     Number.isFinite(payload.config.noise_threshold)
@@ -123,6 +127,10 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     typeof payload.config.detection_threshold === 'number' &&
     Number.isFinite(payload.config.detection_threshold)
       ? payload.config.detection_threshold
+      : null;
+  const detectionMode =
+    payload.config.detection_mode === 1 || payload.config.detection_mode === 2
+      ? payload.config.detection_mode
       : null;
   return {
     serverOnline: true,
@@ -144,8 +152,10 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
         detectionThreshold < noiseThreshold
           ? noiseThreshold
           : detectionThreshold,
+      detection_mode: detectionMode,
     },
     sensorStatus,
+    pingLatencies,
     mapPolicy: parseMapPolicy(payload.map_policy),
   };
 }

@@ -149,8 +149,22 @@ describe('monitor state model', () => {
       },
     ]);
     expect(state.sensorStatus).toEqual({
-      '7': { lastSeen: 101, connectedPeers: [8] },
-      '8': { lastSeen: 99, connectedPeers: [] },
+      '7': {
+        lastSeen: 101,
+        connectedPeers: [8],
+        activeAntenna: null,
+        supportedAntennas: null,
+        voltage: null,
+        version: null,
+      },
+      '8': {
+        lastSeen: 99,
+        connectedPeers: [],
+        activeAntenna: null,
+        supportedAntennas: null,
+        voltage: null,
+        version: null,
+      },
     });
     expect(state.mapPolicy).toEqual({
       bounds: { north: 34.0, south: 33.0, west: 35.0, east: 36.0 },
@@ -191,7 +205,14 @@ describe('monitor state model', () => {
       },
     ]);
     expect(state.sensorStatus).toEqual({
-      '8': { lastSeen: null, connectedPeers: [9] },
+      '8': {
+        lastSeen: null,
+        connectedPeers: [9],
+        activeAntenna: null,
+        supportedAntennas: null,
+        voltage: null,
+        version: null,
+      },
     });
   });
 
@@ -475,6 +496,7 @@ describe('monitor state model', () => {
           side1: 11,
           side2: 12,
           threshold: 500,
+          gain: 64,
           rssi: -57,
           dt: 180,
           updatedAt: 1,

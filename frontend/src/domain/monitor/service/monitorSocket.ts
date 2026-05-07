@@ -22,8 +22,10 @@ import {
   savePersistedMonitorConfig,
 } from '../model/persistence';
 import type {
+  AntennaMode,
   CrossingAckWindow,
   CrossingAlert,
+  DetectionMode,
   GlobalSettings,
   MonitorState,
   PairLink,
@@ -41,13 +43,19 @@ type ClientState = {
   annotations: Annotation[];
 };
 
-export function useMonitorSocket(): {
+type MonitorSocketApi = {
   state: MonitorState;
   acknowledgeCrossing: (alert: CrossingAlert) => void;
   requestMap: () => void;
-  sendThreshold: (value: number) => boolean;
+  sendPairThreshold: (unitA: number, unitB: number, value: number) => boolean;
+  sendPairGain: (unitA: number, unitB: number, value: number) => boolean;
   sendDetectionThreshold: (value: number) => boolean;
-  sendGain: (value: number) => boolean;
+  sendPing: (unit?: number) => boolean;
+  sendSetActiveAntenna: (unit: number, antenna: AntennaMode) => boolean;
+  sendRequestActiveAntenna: (unit?: number) => boolean;
+  sendSetDetectionMode: (mode: DetectionMode) => boolean;
+  sendRequestDetectionMode: () => boolean;
+  sendReset: () => boolean;
   setAlarmSoundEnabled: (enabled: boolean) => void;
   setOfflineModeEnabled: (enabled: boolean) => void;
   resetAll: () => void;
@@ -57,7 +65,9 @@ export function useMonitorSocket(): {
   updateAnnotation: (id: string, patch: Partial<Annotation>) => void;
   removeAnnotation: (id: string) => void;
   clearAnnotations: () => void;
-} {
+};
+
+export function useMonitorSocket(): MonitorSocketApi {
   const queryClient = useQueryClient();
 
   // Server state lives in the React Query cache, fed by the WebSocket below.
@@ -254,24 +264,61 @@ export function useMonitorSocket(): {
     sendCommand('map');
   }, [sendCommand]);
 
-  const sendThreshold = useCallback(
-    (value: number): boolean => {
-      return sendCommand('set_threshold', { value });
-    },
+  const sendPairThreshold = useCallback(
+    (unitA: number, unitB: number, value: number): boolean =>
+      sendCommand('set_threshold', {
+        unit_a: unitA,
+        unit_b: unitB,
+        value,
+      }),
+    [sendCommand],
+  );
+
+  const sendPairGain = useCallback(
+    (unitA: number, unitB: number, value: number): boolean =>
+      sendCommand('set_gain', {
+        unit_a: unitA,
+        unit_b: unitB,
+        value,
+      }),
     [sendCommand],
   );
 
   const sendDetectionThreshold = useCallback(
-    (value: number): boolean => {
-      return sendCommand('set_detection_threshold', { value });
-    },
+    (value: number): boolean =>
+      sendCommand('set_detection_threshold', { value }),
     [sendCommand],
   );
 
-  const sendGain = useCallback(
-    (value: number): boolean => {
-      return sendCommand('set_gain', { value });
-    },
+  const sendPing = useCallback(
+    (unit = 0): boolean => sendCommand('ping', { unit }),
+    [sendCommand],
+  );
+
+  const sendSetActiveAntenna = useCallback(
+    (unit: number, antenna: AntennaMode): boolean =>
+      sendCommand('set_active_antenna', { unit, antenna }),
+    [sendCommand],
+  );
+
+  const sendRequestActiveAntenna = useCallback(
+    (unit = 0): boolean => sendCommand('request_active_antenna', { unit }),
+    [sendCommand],
+  );
+
+  const sendSetDetectionMode = useCallback(
+    (mode: DetectionMode): boolean =>
+      sendCommand('set_detection_mode', { mode }),
+    [sendCommand],
+  );
+
+  const sendRequestDetectionMode = useCallback(
+    (): boolean => sendCommand('request_detection_mode'),
+    [sendCommand],
+  );
+
+  const sendReset = useCallback(
+    (): boolean => sendCommand('reset'),
     [sendCommand],
   );
 
@@ -413,9 +460,15 @@ export function useMonitorSocket(): {
     state,
     acknowledgeCrossing,
     requestMap,
-    sendThreshold,
+    sendPairThreshold,
+    sendPairGain,
     sendDetectionThreshold,
-    sendGain,
+    sendPing,
+    sendSetActiveAntenna,
+    sendRequestActiveAntenna,
+    sendSetDetectionMode,
+    sendRequestDetectionMode,
+    sendReset,
     setAlarmSoundEnabled,
     setOfflineModeEnabled,
     resetAll,

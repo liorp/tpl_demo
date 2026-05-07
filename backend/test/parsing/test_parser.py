@@ -1,56 +1,182 @@
-from backend.parsing.parser import parse_line
+from backend.parsing.parser import ControlFrame, parse_line
 
 
-def test_parse_detection_event():
-    line = "[123] I CMD:DETECTION AA(1)-BB(2) th:99 val:101 c:5"
+def test_parse_detect_event():
+    result = parse_line("#EVTDETECT=11,12,555,500")
 
-    event = parse_line(line)
-
-    assert event is not None
-    assert event["type"] == "detection"
-    assert event["unit_a"] == 1
-    assert event["unit_b"] == 2
-    assert event["threshold"] == 99
-    assert event["value"] == 101
-    assert event["th"] == 99
-    assert event["val"] == 101
-    assert event["c"] == 5
+    assert isinstance(result, dict)
+    assert result["type"] == "detection"
+    assert result["unit_a"] == 11
+    assert result["unit_b"] == 12
+    assert result["value"] == 555
+    assert result["threshold"] == 500
 
 
-def test_parse_map_response_with_signal_links():
-    line = (
-        "[321] I CMD:MAP_RSP from 7 ver:v1 gain:30 voltage:2600 scan:3 adv:4:"
-        "  [2 th3:0 -57dBm dt:180] [12 th3:500 -31dBm dt:721]"
-    )
+def test_parse_detection_comm_event():
+    result = parse_line("#EVTDETCOM=10,11,2025,2000")
 
-    event = parse_line(line)
-
-    assert event is not None
-    assert event["type"] == "map"
-    assert event["unit_id"] == 7
-    assert event["ver"] == "v1"
-    assert event["scan"] == 3
-    assert event["adv"] == 4
-    assert event["links"] == [
-        {"side1": 7, "side2": 2, "th3": 0, "threshold": 0, "rssi": -57, "dt": 180},
-        {
-            "side1": 7,
-            "side2": 12,
-            "th3": 500,
-            "threshold": 500,
-            "rssi": -31,
-            "dt": 721,
-        },
-    ]
+    assert isinstance(result, dict)
+    assert result["type"] == "comm_loss"
+    assert result["unit_a"] == 10
+    assert result["unit_b"] == 11
+    assert result["no_comm_ms"] == 2025
+    assert result["no_comm_threshold"] == 2000
 
 
-def test_parse_config_response():
-    line = "[444] I CMD:CONFIG threshold:500 val:549"
+def test_parse_link_up_event():
+    result = parse_line("#EVTMESHLINKUP=10,11,-27,300,64,00000000")
 
-    event = parse_line(line)
+    assert isinstance(result, dict)
+    assert result["type"] == "link_up"
+    assert result["reporting_unit"] == 10
+    assert result["linked_unit"] == 11
+    assert result["rssi"] == -27
+    assert result["threshold_cfg"] == 300
+    assert result["gain_cfg"] == 64
 
-    assert event is not None
-    assert event["type"] == "config"
-    assert event["threshold"] == 500
-    assert event["value"] == 549
-    assert event["val"] == 549
+
+def test_parse_link_up_event_with_rssi_zero():
+    result = parse_line("#EVTMESHLINKUP=11,1,0,0,0")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "link_up"
+    assert result["rssi"] == 0
+    assert result["threshold_cfg"] == 0
+    assert result["gain_cfg"] == 0
+
+
+def test_parse_link_down_event():
+    result = parse_line("#EVTMESHLINKDOWN=10,11,-90,8")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "link_down"
+    assert result["reporting_unit"] == 10
+    assert result["linked_unit"] == 11
+    assert result["last_rssi"] == -90
+    assert result["reason"] == 8
+
+
+def test_parse_mesh_map_dev_event():
+    result = parse_line('#EVTMESHMAPDEV=10,"SG_0_10b19", 3015,00000000')
+
+    assert isinstance(result, dict)
+    assert result["type"] == "map_dev"
+    assert result["unit_id"] == 10
+    assert result["version"] == "SG_0_10b19"
+    assert result["voltage"] == 3015
+
+
+def test_parse_mesh_map_dev_link_event():
+    result = parse_line("#EVTMESHMAPDEVLINK=10,11,-27,300,64,00000000")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "map_link"
+    assert result["reporting_unit"] == 10
+    assert result["linked_unit"] == 11
+    assert result["rssi"] == -27
+    assert result["threshold"] == 300
+    assert result["gain"] == 64
+
+
+def test_parse_error_event_with_colon():
+    result = parse_line("#EVTERR: 7,channel busy")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "error"
+    assert result["error_number"] == 7
+    assert result["error_text"] == "channel busy"
+
+
+def test_parse_trace_event_with_colon():
+    result = parse_line("#EVTTRACE: state machine entered idle")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "trace"
+    assert result["text"] == "state machine entered idle"
+
+
+def test_parse_active_antenna_event():
+    result = parse_line("#EVTACTANT=11,2,3")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "antenna"
+    assert result["unit"] == 11
+    assert result["active_antenna"] == 2
+    assert result["supported_antennas"] == 3
+
+
+def test_parse_detection_mode_event():
+    result = parse_line("#EVTDETMODE=2,deadbeef")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "detection_mode"
+    assert result["mode"] == 2
+    assert result["internal_data"] == "deadbeef"
+
+
+def test_parse_ping_response():
+    result = parse_line("#PINGRSP=10,160")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "ping_response"
+    assert result["unit"] == 10
+    assert result["round_trip_ms"] == 160
+
+
+def test_parse_ping_response_evt_prefix():
+    # Firmware SG_0.10b220 emits #EVTPINGRSP=, not the spec's #PINGRSP=.
+    result = parse_line("#EVTPINGRSP=11,128")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "ping_response"
+    assert result["unit"] == 11
+    assert result["round_trip_ms"] == 128
+
+
+def test_parse_get_version_response():
+    result = parse_line("#GETVERSION:1.0b24")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "version"
+    assert result["version"] == "1.0b24"
+
+
+def test_parse_ok_token():
+    result = parse_line("OK")
+    assert result == ControlFrame(type="ok")
+
+
+def test_parse_error_token():
+    result = parse_line("ERROR")
+    assert result == ControlFrame(type="error")
+
+
+def test_parse_ready_token():
+    result = parse_line("ATCMD_CLI_READY")
+    assert result == ControlFrame(type="ready")
+
+
+def test_parse_strips_ansi_and_whitespace():
+    result = parse_line("\x1b[32m  #EVTDETECT=11,12,555,500  \x1b[0m\r\n")
+    assert isinstance(result, dict)
+    assert result["type"] == "detection"
+
+
+def test_parse_returns_none_for_unknown_tag():
+    assert parse_line("#EVTUNKNOWNFOO=1,2") is None
+
+
+def test_parse_returns_none_for_garbage():
+    assert parse_line("not an at line") is None
+
+
+def test_parse_returns_none_for_empty_line():
+    assert parse_line("") is None
+
+
+def test_parse_detect_event_rejects_bad_arity():
+    assert parse_line("#EVTDETECT=11,12") is None
+
+
+def test_parse_detect_event_rejects_non_numeric():
+    assert parse_line("#EVTDETECT=foo,12,555,500") is None

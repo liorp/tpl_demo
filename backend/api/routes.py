@@ -11,6 +11,18 @@ from fastapi.staticfiles import StaticFiles
 from backend.core.layout_store import ALLOWED_BOUNDS, save_layout_state
 from backend.core.models import SensorState, snapshot
 from backend.core.service import acknowledge_alarm, set_unit_position
+from backend.parsing.encoder import (
+    format_get_version,
+    format_ping,
+    format_request_active_antenna,
+    format_request_detection_mode,
+    format_request_map,
+    format_reset,
+    format_set_active_antenna,
+    format_set_detection_mode,
+    format_set_gain,
+    format_set_threshold,
+)
 from backend.realtime.broadcaster import Broadcaster
 
 
@@ -37,20 +49,63 @@ class AppDeps:
     save_layout: Callable[[str | Path, dict[str, Any]], dict[str, Any]] = save_layout_state
 
 
+def _has_pair_value(payload: dict[str, Any]) -> bool:
+    return (
+        _is_non_negative_int(payload.get("unit_a"))
+        and _is_non_negative_int(payload.get("unit_b"))
+        and _is_non_negative_int(payload.get("value"))
+        and payload["unit_a"] != payload["unit_b"]
+    )
+
+
 def _build_serial_command(payload: dict[str, Any]) -> str | None:
     cmd = payload.get("cmd")
-    if cmd == "set_threshold":
-        value = payload.get("value")
-        if _is_non_negative_int(value):
-            return f"threshold {value}"
+    try:
+        if cmd == "set_threshold":
+            if not _has_pair_value(payload):
+                return None
+            return format_set_threshold(
+                payload["unit_a"], payload["unit_b"], payload["value"]
+            )
+        if cmd == "set_gain":
+            if not _has_pair_value(payload):
+                return None
+            return format_set_gain(
+                payload["unit_a"], payload["unit_b"], payload["value"]
+            )
+        if cmd == "map":
+            unit = payload.get("unit", 0)
+            return format_request_map(unit if _is_non_negative_int(unit) else 0)
+        if cmd == "ping":
+            unit = payload.get("unit", 0)
+            return format_ping(unit if _is_non_negative_int(unit) else 0)
+        if cmd == "set_active_antenna":
+            unit = payload.get("unit")
+            antenna = payload.get("antenna")
+            if not _is_non_negative_int(unit) or not _is_strict_int(antenna):
+                return None
+            return format_set_active_antenna(unit, antenna)
+        if cmd == "request_active_antenna":
+            unit = payload.get("unit", 0)
+            return format_request_active_antenna(
+                unit if _is_non_negative_int(unit) else 0
+            )
+        if cmd == "set_detection_mode":
+            mode = payload.get("mode")
+            if not _is_strict_int(mode):
+                return None
+            internal = payload.get("internal_data", "")
+            if not isinstance(internal, str):
+                return None
+            return format_set_detection_mode(mode, internal)
+        if cmd == "request_detection_mode":
+            return format_request_detection_mode()
+        if cmd == "get_version":
+            return format_get_version()
+        if cmd == "reset":
+            return format_reset()
+    except ValueError:
         return None
-    if cmd == "set_gain":
-        value = payload.get("value")
-        if _is_non_negative_int(value):
-            return f"gain {value}"
-        return None
-    if cmd == "map":
-        return "map"
     return None
 
 
@@ -137,15 +192,6 @@ def register_routes(app: FastAPI, deps: AppDeps) -> None:
                     continue
                 if _handle_detection_threshold(deps, payload):
                     continue
-                if payload.get("cmd") == "set_threshold":
-                    value = payload.get("value")
-                    detection_threshold = deps.state.config.get("detection_threshold")
-                    if (
-                        _is_non_negative_int(value)
-                        and isinstance(detection_threshold, int)
-                        and value > detection_threshold
-                    ):
-                        continue
                 serial_cmd = _build_serial_command(payload)
                 if serial_cmd:
                     deps.send_serial(serial_cmd)

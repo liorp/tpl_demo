@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
 import type {
+  AntennaMode,
   CrossingAlert,
   MapPolicy,
   MonitorPayload,
+  PingLatencyMap,
   SensorStatusMap,
   SignalLinkState,
   UnitPlacement,
@@ -50,6 +52,17 @@ const sensorStatusEntrySchema = z
   .object({
     last_seen: z.unknown().optional(),
     connected_peers: z.unknown().optional(),
+    active_antenna: z.unknown().optional(),
+    supported_antennas: z.unknown().optional(),
+    voltage: z.unknown().optional(),
+    version: z.unknown().optional(),
+  })
+  .passthrough();
+
+const pingLatencyEntrySchema = z
+  .object({
+    round_trip_ms: z.unknown().optional(),
+    received_at: z.unknown().optional(),
   })
   .passthrough();
 
@@ -67,6 +80,7 @@ const signalLinkPayloadSchema = z
     side1: finiteNumberSchema.int(),
     side2: finiteNumberSchema.int(),
     threshold: finiteNumberSchema.int().optional(),
+    gain: finiteNumberSchema.int().optional(),
     rssi: finiteNumberSchema.int().optional(),
     dt: finiteNumberSchema.int().optional(),
     updatedAt: finiteNumberSchema.int().optional(),
@@ -85,6 +99,7 @@ const monitorPayloadEnvelopeSchema = z.object({
   config: z.object({ gain: z.unknown() }),
   units: z.array(z.unknown()).optional(),
   sensor_status: z.record(z.string(), z.unknown()).optional(),
+  ping_latencies: z.record(z.string(), z.unknown()).optional(),
   map_policy: z.unknown().optional(),
 });
 
@@ -144,6 +159,11 @@ export function parseMapPolicy(raw: unknown): MapPolicy {
   };
 }
 
+function asAntennaMode(raw: unknown): AntennaMode | null {
+  if (raw === 1 || raw === 2) return raw;
+  return null;
+}
+
 export function parseSensorStatusMap(raw: unknown): SensorStatusMap {
   const record = z.record(z.string(), z.unknown()).safeParse(raw);
   if (!record.success) {
@@ -164,12 +184,44 @@ export function parseSensorStatusMap(raw: unknown): SensorStatusMap {
         })
       : [];
     const lastSeen = finiteNumberSchema.safeParse(parsed.data.last_seen);
+    const supported = finiteNumberSchema
+      .int()
+      .safeParse(parsed.data.supported_antennas);
+    const voltage = finiteNumberSchema.safeParse(parsed.data.voltage);
+    const version = z.string().safeParse(parsed.data.version);
     next[sensorId] = {
       lastSeen: lastSeen.success ? lastSeen.data : null,
       connectedPeers,
+      activeAntenna: asAntennaMode(parsed.data.active_antenna),
+      supportedAntennas: supported.success ? supported.data : null,
+      voltage: voltage.success ? voltage.data : null,
+      version: version.success ? version.data : null,
     };
   }
 
+  return next;
+}
+
+export function parsePingLatencies(raw: unknown): PingLatencyMap {
+  const record = z.record(z.string(), z.unknown()).safeParse(raw);
+  if (!record.success) {
+    return {};
+  }
+  const next: PingLatencyMap = {};
+  for (const [unitId, entry] of Object.entries(record.data)) {
+    const parsed = pingLatencyEntrySchema.safeParse(entry);
+    if (!parsed.success) continue;
+    const rtt = finiteNumberSchema.safeParse(parsed.data.round_trip_ms);
+    const received = finiteNumberSchema.safeParse(parsed.data.received_at);
+    if (!rtt.success) continue;
+    const numericId = Number.parseInt(unitId, 10);
+    if (!Number.isInteger(numericId)) continue;
+    next[unitId] = {
+      unit: numericId,
+      roundTripMs: rtt.data,
+      receivedAt: received.success ? received.data : 0,
+    };
+  }
   return next;
 }
 
@@ -222,6 +274,7 @@ export function parseSignalLinks(
         side1: link.data.side1,
         side2: link.data.side2,
         threshold: link.data.threshold ?? 0,
+        gain: link.data.gain ?? 0,
         rssi: link.data.rssi ?? 0,
         dt: link.data.dt ?? 0,
         updatedAt,

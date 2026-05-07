@@ -22,7 +22,9 @@ import { CrossingAlertBanner } from '../domain/monitor/ui/CrossingAlertBanner';
 import { EventLog } from '../domain/monitor/ui/EventLog';
 import { MonitorMap } from '../domain/monitor/ui/MonitorMap';
 import { PairingPanel } from '../domain/monitor/ui/PairingPanel';
+import { PingLatencyWidget } from '../domain/monitor/ui/PingLatencyWidget';
 import { StatusStrip } from '../domain/monitor/ui/StatusStrip';
+import { UnitAntennaHud } from '../domain/monitor/ui/UnitAntennaHud';
 
 export function App() {
   const { t } = useTranslation();
@@ -30,9 +32,15 @@ export function App() {
     state,
     requestMap,
     acknowledgeCrossing,
-    sendThreshold,
     sendDetectionThreshold,
-    sendGain,
+    sendPairThreshold,
+    sendPairGain,
+    sendPing,
+    sendSetActiveAntenna,
+    sendRequestActiveAntenna,
+    sendSetDetectionMode,
+    sendRequestDetectionMode,
+    sendReset,
     setAlarmSoundEnabled,
     setOfflineModeEnabled,
     resetAll,
@@ -168,6 +176,22 @@ export function App() {
             </div>
           </div>
           <AnnotationToolbar onClearAll={clearAnnotations} />
+          <div className="pointer-events-none absolute top-4 right-4 z-[1200] flex w-64 flex-col gap-2">
+            <div className="pointer-events-auto">
+              <PingLatencyWidget
+                pingLatencies={state.pingLatencies}
+                onSendPing={sendPing}
+              />
+            </div>
+            <div className="pointer-events-auto">
+              <UnitAntennaHud
+                units={visibleUnits}
+                sensorStatus={state.sensorStatus}
+                onSendSetActiveAntenna={sendSetActiveAntenna}
+                onSendRequestActiveAntenna={sendRequestActiveAntenna}
+              />
+            </div>
+          </div>
           <MonitorMap
             units={visibleUnits}
             pairings={state.pairings}
@@ -193,7 +217,10 @@ export function App() {
         <PairingPanel
           units={visibleUnits}
           pairings={state.pairings}
+          links={state.links}
           onTogglePairing={setUnitPairing}
+          onSendPairThreshold={sendPairThreshold}
+          onSendPairGain={sendPairGain}
         />
       </ErrorBoundary>
       <ErrorBoundary section="Event Log">
@@ -203,11 +230,14 @@ export function App() {
         <footer className="flex h-12 items-center justify-between border-t border-border bg-card/80 px-4 backdrop-blur-sm">
           <ConfigMenu
             config={state.config}
+            sensorStatus={state.sensorStatus}
             alarmSoundEnabled={state.globalSettings.alarmSoundEnabled}
             offlineModeEnabled={state.globalSettings.offlineModeEnabled}
-            onSendThreshold={sendThreshold}
             onSendDetectionThreshold={sendDetectionThreshold}
-            onSendGain={sendGain}
+            onSendDetectionMode={sendSetDetectionMode}
+            onSendRequestDetectionMode={sendRequestDetectionMode}
+            onRefreshMap={requestMap}
+            onSendReset={sendReset}
             onAlarmSoundEnabledChange={setAlarmSoundEnabled}
             onOfflineModeEnabledChange={setOfflineModeEnabled}
             onResetAll={resetAll}

@@ -65,6 +65,7 @@ def _build_app(
             "units": [],
             "map_policy": dict(state.map_policy),
             "sensor_status": {},
+            "ping_latencies": {},
         }
     )
     deps = AppDeps(
@@ -80,19 +81,92 @@ def _build_app(
     return TestClient(app), layout_state_path, broadcaster
 
 
-def test_websocket_routes_command_messages(tmp_path: Path):
+def test_websocket_routes_at_command_messages(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, _ = _build_app(tmp_path, sent_cmds)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_threshold","unit_a":11,"unit_b":12,"value":500}')
+        ws.send_text('{"cmd":"set_detection_threshold","value":700}')
+        ws.send_text('{"cmd":"set_gain","unit_a":11,"unit_b":12,"value":64}')
+        ws.send_text('{"cmd":"map"}')
+        ws.send_text('{"cmd":"ping"}')
+        ws.send_text('{"cmd":"set_active_antenna","unit":11,"antenna":2}')
+        ws.send_text('{"cmd":"request_active_antenna","unit":0}')
+        ws.send_text('{"cmd":"set_detection_mode","mode":2}')
+        ws.send_text('{"cmd":"request_detection_mode"}')
+        ws.send_text('{"cmd":"reset"}')
+        ws.send_text('{"cmd":"unsupported"}')
+
+    assert sent_cmds == [
+        "AT#SETDETTHR=11,12,500",
+        "AT#SETDETGAIN=11,12,64",
+        "AT#REQMESHMAP=0",
+        "AT#PING=0",
+        "AT#SETACTANT=11,2",
+        "AT#REQACTANT=0",
+        "AT#SETDETMODE=2,",
+        "AT#REQDETMODE",
+        "AT#RESET",
+    ]
+
+
+def test_set_threshold_requires_pair(tmp_path: Path):
     sent_cmds: list[str] = []
     client, _, _ = _build_app(tmp_path, sent_cmds)
 
     with client.websocket_connect("/ws") as ws:
         _ = ws.receive_json()
         ws.send_text('{"cmd":"set_threshold","value":500}')
-        ws.send_text('{"cmd":"set_detection_threshold","value":700}')
-        ws.send_text('{"cmd":"set_gain","value":64}')
-        ws.send_text('{"cmd":"map"}')
-        ws.send_text('{"cmd":"unsupported"}')
+        ws.send_text('{"cmd":"set_threshold","unit_a":11,"unit_b":11,"value":500}')
 
-    assert sent_cmds == ["threshold 500", "gain 64", "map"]
+    assert sent_cmds == []
+
+
+def test_set_threshold_rejects_negative_or_boolean_value(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, _ = _build_app(tmp_path, sent_cmds)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_threshold","unit_a":11,"unit_b":12,"value":-1}')
+        ws.send_text('{"cmd":"set_threshold","unit_a":11,"unit_b":12,"value":true}')
+
+    assert sent_cmds == []
+
+
+def test_set_gain_rejects_negative_value(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, _ = _build_app(tmp_path, sent_cmds)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_gain","unit_a":11,"unit_b":12,"value":-1}')
+
+    assert sent_cmds == []
+
+
+def test_set_active_antenna_rejects_invalid_antenna(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, _ = _build_app(tmp_path, sent_cmds)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_active_antenna","unit":11,"antenna":0}')
+
+    assert sent_cmds == []
+
+
+def test_set_detection_mode_rejects_unsupported_mode(tmp_path: Path):
+    sent_cmds: list[str] = []
+    client, _, _ = _build_app(tmp_path, sent_cmds)
+
+    with client.websocket_connect("/ws") as ws:
+        _ = ws.receive_json()
+        ws.send_text('{"cmd":"set_detection_mode","mode":7}')
+
+    assert sent_cmds == []
 
 
 def test_set_detection_threshold_rejects_values_below_known_noise_threshold(tmp_path: Path):
@@ -109,43 +183,6 @@ def test_set_detection_threshold_rejects_values_below_known_noise_threshold(tmp_
 
     assert sent_cmds == []
     assert broadcaster.payload["config"]["detection_threshold"] is None
-
-
-def test_set_threshold_rejects_values_above_known_detection_threshold(tmp_path: Path):
-    sent_cmds: list[str] = []
-    client, _, _ = _build_app(
-        tmp_path,
-        sent_cmds,
-        initial_config={"noise_threshold": 500, "detection_threshold": 700},
-    )
-
-    with client.websocket_connect("/ws") as ws:
-        _ = ws.receive_json()
-        ws.send_text('{"cmd":"set_threshold","value":701}')
-
-    assert sent_cmds == []
-
-
-def test_set_threshold_rejects_boolean_value(tmp_path: Path):
-    sent_cmds: list[str] = []
-    client, _, _ = _build_app(tmp_path, sent_cmds)
-
-    with client.websocket_connect("/ws") as ws:
-        _ = ws.receive_json()
-        ws.send_text('{"cmd":"set_threshold","value":true}')
-
-    assert sent_cmds == []
-
-
-def test_set_gain_rejects_negative_value(tmp_path: Path):
-    sent_cmds: list[str] = []
-    client, _, _ = _build_app(tmp_path, sent_cmds)
-
-    with client.websocket_connect("/ws") as ws:
-        _ = ws.receive_json()
-        ws.send_text('{"cmd":"set_gain","value":-1}')
-
-    assert sent_cmds == []
 
 
 def test_set_detection_threshold_rejects_boolean_value(tmp_path: Path):

@@ -32,6 +32,7 @@ const state: MonitorState = {
       side1: 1,
       side2: 2,
       threshold: 500,
+      gain: 64,
       rssi: -57,
       dt: 180,
       updatedAt: 1_700_000,
@@ -40,6 +41,7 @@ const state: MonitorState = {
       side1: 3,
       side2: 1,
       threshold: 500,
+      gain: 64,
       rssi: -65,
       dt: 200,
       updatedAt: 1_700_001,
@@ -87,6 +89,7 @@ const state: MonitorState = {
     '2': { lastSeen: null, connectedPeers: [] },
     '3': { lastSeen: 1_700_003, connectedPeers: [1] },
   },
+  pingLatencies: {},
   mapPolicy: {
     bounds: null,
     bufferKm: null,
@@ -97,9 +100,15 @@ const state: MonitorState = {
 
 const acknowledgeCrossing = vi.fn();
 const requestMap = vi.fn();
-const sendThreshold = vi.fn().mockReturnValue(true);
 const sendDetectionThreshold = vi.fn().mockReturnValue(true);
-const sendGain = vi.fn().mockReturnValue(true);
+const sendPairThreshold = vi.fn().mockReturnValue(true);
+const sendPairGain = vi.fn().mockReturnValue(true);
+const sendPing = vi.fn().mockReturnValue(true);
+const sendSetActiveAntenna = vi.fn().mockReturnValue(true);
+const sendRequestActiveAntenna = vi.fn().mockReturnValue(true);
+const sendSetDetectionMode = vi.fn().mockReturnValue(true);
+const sendRequestDetectionMode = vi.fn().mockReturnValue(true);
+const sendReset = vi.fn().mockReturnValue(true);
 const resetAll = vi.fn();
 const setAlarmSoundEnabled = vi.fn();
 const setOfflineModeEnabled = vi.fn();
@@ -114,9 +123,15 @@ vi.mock('../domain/monitor/service/monitorSocket', () => ({
     state,
     acknowledgeCrossing,
     requestMap,
-    sendThreshold,
     sendDetectionThreshold,
-    sendGain,
+    sendPairThreshold,
+    sendPairGain,
+    sendPing,
+    sendSetActiveAntenna,
+    sendRequestActiveAntenna,
+    sendSetDetectionMode,
+    sendRequestDetectionMode,
+    sendReset,
     setAlarmSoundEnabled,
     setOfflineModeEnabled,
     resetAll,
@@ -187,9 +202,15 @@ describe('App', () => {
     cleanup();
     acknowledgeCrossing.mockClear();
     requestMap.mockClear();
-    sendThreshold.mockClear();
+    sendPairThreshold.mockClear();
     sendDetectionThreshold.mockClear();
-    sendGain.mockClear();
+    sendPairGain.mockClear();
+    sendPing.mockClear();
+    sendSetActiveAntenna.mockClear();
+    sendRequestActiveAntenna.mockClear();
+    sendSetDetectionMode.mockClear();
+    sendRequestDetectionMode.mockClear();
+    sendReset.mockClear();
     resetAll.mockClear();
     setAlarmSoundEnabled.mockClear();
     setOfflineModeEnabled.mockClear();
