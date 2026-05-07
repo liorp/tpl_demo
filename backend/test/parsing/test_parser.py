@@ -123,6 +123,16 @@ def test_parse_ping_response():
     assert result["round_trip_ms"] == 160
 
 
+def test_parse_ping_response_evt_prefix():
+    # Firmware SG_0.10b220 emits #EVTPINGRSP=, not the spec's #PINGRSP=.
+    result = parse_line("#EVTPINGRSP=11,128")
+
+    assert isinstance(result, dict)
+    assert result["type"] == "ping_response"
+    assert result["unit"] == 11
+    assert result["round_trip_ms"] == 128
+
+
 def test_parse_get_version_response():
     result = parse_line("#GETVERSION:1.0b24")
 

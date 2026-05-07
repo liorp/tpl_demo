@@ -205,7 +205,10 @@ _TAG_HANDLERS = {
     "EVTTRACE": _parse_trace,
     "EVTACTANT": _parse_antenna,
     "EVTDETMODE": _parse_detection_mode,
+    # Manual spec says #PINGRSP=, but firmware (SG_0.10b220) emits #EVTPINGRSP=
+    # consistent with other EVT-prefixed unsolicited events. Accept both.
     "PINGRSP": _parse_ping_response,
+    "EVTPINGRSP": _parse_ping_response,
     "GETVERSION": _parse_version,
 }
 
