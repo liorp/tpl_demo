@@ -209,6 +209,19 @@
 }
 
 @layer components {
+  .leaflet-control-scale {
+    width: 96px;
+  }
+
+  .leaflet-control-scale-line {
+    box-sizing: border-box;
+    /* biome-ignore lint/complexity/noImportantStyles: Leaflet mutates scale width inline on each zoom. */
+    width: 100% !important;
+    min-width: 100%;
+    max-width: 100%;
+    text-align: center;
+  }
+
   .leaflet-popup.sensor-popup .leaflet-popup-content-wrapper {
     @apply rounded-md border border-border-bright bg-card text-foreground shadow-lg;
     padding: 0;

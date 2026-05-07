@@ -131,6 +131,8 @@ const enCommon = {
     toolPen: 'Pen',
     toolText: 'Text',
     toolEraser: 'Eraser',
+    undo: 'Undo',
+    redo: 'Redo',
     clearAll: 'Clear all',
     confirmClear: 'Remove all annotations?',
     color: 'Color',

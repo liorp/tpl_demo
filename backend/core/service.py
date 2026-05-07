@@ -158,11 +158,12 @@ def _handle_detection(state: SensorState, event: Event) -> bool:
         or event["value"] >= detection_threshold
     )
     if should_trigger_alert:
+        device_ts = event.get("device_ts")
         set_connection_state(state, True, state.current_port, "alarm")
         state.crossing_alert = CrossingAlert(
             sensor_a=event["unit_a"],
             sensor_b=event["unit_b"],
-            timestamp=event.get("device_ts"),
+            timestamp=device_ts if device_ts is not None else last_seen,
             lat=crossing_lat,
             lng=crossing_lng,
             acknowledged=False,

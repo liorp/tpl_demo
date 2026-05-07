@@ -1,3 +1,4 @@
+import { Link2Icon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -88,6 +89,13 @@ export function PairingPanel({
         >
           <path d="m6 9 6 6 6-6" />
         </svg>
+        <Link2Icon
+          aria-hidden="true"
+          focusable="false"
+          width={12}
+          height={12}
+          className="text-primary/60"
+        />
         <span className="font-display text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
           {t('pairings.title')}
         </span>

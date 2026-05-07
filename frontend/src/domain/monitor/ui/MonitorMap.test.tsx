@@ -79,6 +79,22 @@ vi.mock('react-leaflet', () => ({
       data-max-native-zoom={maxNativeZoom}
     />
   ),
+  ScaleControl: ({
+    position,
+    imperial,
+    maxWidth,
+  }: {
+    position?: string;
+    imperial?: boolean;
+    maxWidth?: number;
+  }) => (
+    <div
+      data-testid="scale-control"
+      data-position={position}
+      data-imperial={String(imperial)}
+      data-max-width={maxWidth}
+    />
+  ),
   Marker: ({
     position,
     icon,
@@ -168,6 +184,47 @@ describe('MonitorMap', () => {
       JSON.stringify([33.31, 35.78]),
     );
     expect(mapContainer.getAttribute('data-zoom')).toBe('12');
+  });
+
+  test('shows a metric map scale control in the bottom left corner', () => {
+    render(
+      <MonitorMap
+        units={[]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    const scaleControl = screen.getByTestId('scale-control');
+    expect(scaleControl.getAttribute('data-position')).toBe('bottomleft');
+    expect(scaleControl.getAttribute('data-imperial')).toBe('false');
+    expect(scaleControl.getAttribute('data-max-width')).toBe('96');
+  });
+
+  test('configures the default Leaflet scale with the fixed scale width', () => {
+    render(
+      <MonitorMap
+        units={[]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId('scale-control').getAttribute('data-max-width'),
+    ).toBe('96');
   });
 
   test('passes explicit map bounds to leaflet container', () => {
@@ -782,6 +839,66 @@ describe('MonitorMap', () => {
     const minSum = Math.min(...focalSums);
     const maxSum = Math.max(...focalSums);
     expect(maxSum - minSum).toBeLessThan(0.0005);
+  });
+
+  test('drawn pairing ellipse keeps paired units as foci in Leaflet projection space', () => {
+    const side1 = { lat: 29.5, lng: 34.3 };
+    const side2 = { lat: 33.7, lng: 35.8 };
+
+    render(
+      <MonitorMap
+        units={[
+          {
+            id: 1,
+            label: 'Sensor 1',
+            lat: side1.lat,
+            lng: side1.lng,
+            status: 'active',
+          },
+          {
+            id: 2,
+            label: 'Sensor 2',
+            lat: side2.lat,
+            lng: side2.lng,
+            status: 'active',
+          },
+        ]}
+        pairings={[{ side1Id: 1, side2Id: 2, enabled: true }]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    const ellipse = polylineSegments[0]?.positions ?? [];
+    expect(ellipse.length).toBeGreaterThan(10);
+
+    const earthRadiusMeters = 6378137;
+    const toProjected = (lat: number, lng: number) => {
+      const latRadians = (lat * Math.PI) / 180;
+      const lngRadians = (lng * Math.PI) / 180;
+      return {
+        x: earthRadiusMeters * lngRadians,
+        y: earthRadiusMeters * Math.log(Math.tan(Math.PI / 4 + latRadians / 2)),
+      };
+    };
+    const focus1 = toProjected(side1.lat, side1.lng);
+    const focus2 = toProjected(side2.lat, side2.lng);
+    const focalSums = ellipse.map(([lat, lng]) => {
+      const point = toProjected(lat, lng);
+      const d1 = Math.hypot(point.x - focus1.x, point.y - focus1.y);
+      const d2 = Math.hypot(point.x - focus2.x, point.y - focus2.y);
+      return d1 + d2;
+    });
+
+    const minSum = Math.min(...focalSums);
+    const maxSum = Math.max(...focalSums);
+    expect(maxSum - minSum).toBeLessThan(1);
   });
 
   test('shows status header, heartbeat, and full raw details for each sensor link in popup', () => {
