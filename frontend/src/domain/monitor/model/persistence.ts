@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { type Annotation, annotationSchema } from './annotations';
 import type { PairLink, UnitPlacement } from './types';
 
 const KEY = 'monitor:persisted:v1';
@@ -11,12 +12,14 @@ type PersistedMonitorConfig = {
     alarmSoundEnabled: boolean;
     offlineModeEnabled: boolean;
   };
+  annotations: Annotation[];
 };
 
 const EMPTY: PersistedMonitorConfig = {
   units: [],
   pairings: [],
   globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
+  annotations: [],
 };
 
 const finiteNumberSchema = z.number().refine(Number.isFinite);
@@ -48,6 +51,7 @@ const persistedRootSchema = z
     units: z.array(z.unknown()),
     pairings: z.array(z.unknown()).optional(),
     globalSettings: z.unknown().optional(),
+    annotations: z.array(z.unknown()).optional(),
   })
   .passthrough();
 
@@ -86,6 +90,18 @@ function normalizeUnits(value: unknown): UnitPlacement[] {
   });
 }
 
+function normalizeAnnotations(value: unknown): Annotation[] {
+  const rawAnnotations = z.array(z.unknown()).safeParse(value);
+  if (!rawAnnotations.success) {
+    return [];
+  }
+
+  return rawAnnotations.data.flatMap((entry) => {
+    const parsed = annotationSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
 function normalizeGlobalSettings(
   value: unknown,
 ): PersistedMonitorConfig['globalSettings'] {
@@ -115,6 +131,7 @@ export function loadPersistedMonitorConfig(): PersistedMonitorConfig {
       units: normalizeUnits(parsed.data.units),
       pairings: normalizePairings(parsed.data.pairings),
       globalSettings: normalizeGlobalSettings(parsed.data.globalSettings),
+      annotations: normalizeAnnotations(parsed.data.annotations),
     };
   } catch {
     return EMPTY;

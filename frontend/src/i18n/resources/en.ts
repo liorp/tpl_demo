@@ -79,6 +79,18 @@ const enCommon = {
     updatedAt: 'Updated at: {{value}}',
     offlineMissing: 'Offline map tiles are unavailable.',
   },
+  annotations: {
+    title: 'Annotations',
+    toolNone: 'Select',
+    toolPen: 'Pen',
+    toolText: 'Text',
+    toolEraser: 'Eraser',
+    clearAll: 'Clear all',
+    confirmClear: 'Remove all annotations?',
+    color: 'Color',
+    textPlaceholder: 'Type a label…',
+    ariaColorSwatch: 'Color {{color}}',
+  },
 } as const;
 
 export default enCommon;

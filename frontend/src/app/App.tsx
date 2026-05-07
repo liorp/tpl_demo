@@ -15,6 +15,7 @@ import {
   stopAlarmSound,
 } from '../domain/monitor/service/alarmSound';
 import { useMonitorSocket } from '../domain/monitor/service/monitorSocket';
+import { AnnotationToolbar } from '../domain/monitor/ui/AnnotationToolbar';
 import { ConfigMenu } from '../domain/monitor/ui/ConfigMenu';
 import { ConnectionIndicator } from '../domain/monitor/ui/ConnectionIndicator';
 import { CrossingAlertBanner } from '../domain/monitor/ui/CrossingAlertBanner';
@@ -37,6 +38,10 @@ export function App() {
     resetAll,
     placeUnit,
     setUnitPairing,
+    addAnnotation,
+    updateAnnotation,
+    removeAnnotation,
+    clearAnnotations,
   } = useMonitorSocket();
   const [focusedAlertPoint, setFocusedAlertPoint] = useState<{
     lat: number;
@@ -162,6 +167,7 @@ export function App() {
               </Button>
             </div>
           </div>
+          <AnnotationToolbar onClearAll={clearAnnotations} />
           <MonitorMap
             units={visibleUnits}
             pairings={state.pairings}
@@ -176,6 +182,10 @@ export function App() {
             mapBounds={mapBounds}
             onMoveUnit={handleMoveUnit}
             onSelectUnit={() => {}}
+            annotations={state.annotations}
+            onAddAnnotation={addAnnotation}
+            onUpdateAnnotation={updateAnnotation}
+            onRemoveAnnotation={removeAnnotation}
           />
         </div>
       </ErrorBoundary>

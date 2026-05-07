@@ -1,3 +1,5 @@
+import type { Annotation } from './annotations';
+
 export const ALARM_STATES = [
   'clear',
   'alarm',
@@ -141,6 +143,7 @@ export type MonitorState = {
   globalSettings: GlobalSettings;
   units: UnitPlacement[];
   pairings: PairLink[];
+  annotations: Annotation[];
   sensorStatus: SensorStatusMap;
   mapPolicy: MapPolicy;
 };

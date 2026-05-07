@@ -77,6 +77,18 @@ const heCommon = {
     updatedAt: 'עודכן ב: {{value}}',
     offlineMissing: 'אריחי מפה לא מקוונים אינם זמינים.',
   },
+  annotations: {
+    title: 'סימונים',
+    toolNone: 'בחירה',
+    toolPen: 'עט',
+    toolText: 'טקסט',
+    toolEraser: 'מחק',
+    clearAll: 'נקה הכל',
+    confirmClear: 'להסיר את כל הסימונים?',
+    color: 'צבע',
+    textPlaceholder: 'הקלד תווית…',
+    ariaColorSwatch: 'צבע {{color}}',
+  },
 } as const;
 
 export default heCommon;
