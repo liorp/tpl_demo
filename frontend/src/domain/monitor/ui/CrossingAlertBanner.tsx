@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/component/ui/button';
 
@@ -20,6 +21,26 @@ function formatLocation(alert: CrossingAlert): string | null {
   return `${alert.lat?.toFixed(5)}, ${alert.lng?.toFixed(5)}`;
 }
 
+function formatAlertTime(timestamp: number): string {
+  if (!Number.isFinite(timestamp)) {
+    return '--';
+  }
+  if (timestamp >= 1_000_000_000_000) {
+    return dayjs(timestamp).format('HH:mm:ss');
+  }
+  if (timestamp >= 1_000_000_000) {
+    return dayjs.unix(timestamp).format('HH:mm:ss');
+  }
+
+  const totalSeconds = Math.max(0, Math.floor(timestamp)) % 86_400;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((part) => part.toString().padStart(2, '0'))
+    .join(':');
+}
+
 export function CrossingAlertBanner({ alerts, onAcknowledge, onFocus }: Props) {
   const { t } = useTranslation();
   if (!alerts.length) {
@@ -27,7 +48,7 @@ export function CrossingAlertBanner({ alerts, onAcknowledge, onFocus }: Props) {
   }
 
   return (
-    <section className="space-y-1 border-b border-red-800/60 bg-gradient-to-r from-red-950/80 via-red-900/50 to-red-950/80 px-6 py-2 shadow-[inset_0_0_30px_oklch(0.45_0.2_25/0.15)]">
+    <section className="alert-list-flash space-y-1 border-b border-red-800/60 bg-gradient-to-r from-red-950/80 via-red-900/50 to-red-950/80 px-6 py-2 shadow-[inset_0_0_30px_oklch(0.45_0.2_25/0.15)]">
       {alerts.map((alert) => {
         const location = formatLocation(alert);
         return (
@@ -45,6 +66,9 @@ export function CrossingAlertBanner({ alerts, onAcknowledge, onFocus }: Props) {
                 </span>
                 <span className="self-baseline font-display text-sm font-medium tracking-wide text-red-200">
                   S{alert.sensorA} &times; S{alert.sensorB}
+                </span>
+                <span className="self-baseline font-body text-xs tabular-nums tracking-wide text-red-200/80">
+                  {formatAlertTime(alert.at)}
                 </span>
               </div>
               {location ? (

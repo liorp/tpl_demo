@@ -17,7 +17,7 @@ describe('CrossingAlertBanner', () => {
           {
             sensorA: 2,
             sensorB: 11,
-            at: Date.now(),
+            at: 1_739_742_645,
             lat: 33.3,
             lng: 35.7,
             acknowledged: false,
@@ -36,7 +36,11 @@ describe('CrossingAlertBanner', () => {
     );
 
     expect(screen.getByText('S2 × S11')).not.toBeNull();
+    expect(
+      screen.getByText('S2 × S11').closest('section')?.className,
+    ).toContain('alert-list-flash');
     expect(screen.getByText('S3 × S8')).not.toBeNull();
+    expect(screen.getAllByText(/\d{2}:\d{2}:\d{2}/)).toHaveLength(2);
     expect(screen.getByText('33.30000, 35.70000')).not.toBeNull();
     expect(screen.queryByText('Unknown location')).toBeNull();
   });

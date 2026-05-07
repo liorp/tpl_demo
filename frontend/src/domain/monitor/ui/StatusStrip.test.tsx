@@ -12,22 +12,16 @@ afterEach(async () => {
 });
 
 describe('StatusStrip', () => {
-  test('does not render acknowledge button in alarm state', () => {
+  test('renders only product name on the left and fullscreen on the right', () => {
     render(<StatusStrip alarm="alarm" serverOnline={true} />);
 
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
     const productName = screen.getByText('TPL SIGNUM');
     expect(productName).not.toBeNull();
-    const productClusterClassName = productName.parentElement?.className ?? '';
-    expect(productClusterClassName).toContain('ms-auto');
-    expect(productClusterClassName).not.toContain('ml-auto');
-  });
-
-  test('renders translated status label in hebrew', async () => {
-    await i18n.changeLanguage('he');
-    render(<StatusStrip alarm="alarm" serverOnline={true} />);
-
-    expect(screen.getAllByText('אזעקה').length).toBeGreaterThan(0);
+    expect(productName.parentElement?.className).toContain('me-auto');
+    expect(screen.getByRole('button', { name: 'Fullscreen' })).not.toBeNull();
+    expect(screen.queryByText('ALARM')).toBeNull();
+    expect(screen.queryByText('ALL CLEAR')).toBeNull();
   });
 
   test('renders fullscreen button and toggles fullscreen mode', () => {

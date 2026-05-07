@@ -5,9 +5,8 @@ const enCommon = {
   settings: {
     title: 'Settings',
     description:
-      'Configure detection threshold, mode, and mesh. Per-pair thresholds and gain live in the pairings panel.',
+      'Configure detection mode and mesh. Per-pair thresholds and gain live in the pairings panel.',
     noiseThreshold: 'Noise Threshold',
-    detectionThreshold: 'Detection Threshold',
     gain: 'Gain',
     send: 'Send',
     refresh: 'Refresh',
@@ -41,8 +40,6 @@ const enCommon = {
   configFeedback: {
     noiseSet: 'Noise threshold set to {{value}}',
     noiseNotConnected: 'Not connected — noise threshold not sent',
-    detectionSet: 'Detection threshold set to {{value}}',
-    detectionNotConnected: 'Not connected — detection threshold not sent',
     gainSet: 'Gain set to {{value}}',
     gainNotConnected: 'Not connected — gain not sent',
     detectionModeSet: 'Detection mode set to {{value}}',

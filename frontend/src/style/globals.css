@@ -59,6 +59,16 @@
     }
   }
 
+  @keyframes alert-list-flash {
+    0%,
+    100% {
+      filter: brightness(1);
+    }
+    50% {
+      filter: brightness(1.28) saturate(1.15);
+    }
+  }
+
   @keyframes glow-pulse {
     0%,
     100% {
@@ -183,6 +193,10 @@
 
 @utility alarm-pulse {
   animation: alarm-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@utility alert-list-flash {
+  animation: alert-list-flash 1.1s ease-in-out infinite;
 }
 
 @utility glow-pulse {

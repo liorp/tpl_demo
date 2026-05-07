@@ -94,7 +94,6 @@ export function createInitialServerState(): ServerState {
     links: [],
     config: {
       noise_threshold: null,
-      detection_threshold: null,
       gain: null,
       detection_mode: null,
     },
@@ -123,11 +122,6 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     Number.isFinite(payload.config.noise_threshold)
       ? payload.config.noise_threshold
       : null;
-  const detectionThreshold =
-    typeof payload.config.detection_threshold === 'number' &&
-    Number.isFinite(payload.config.detection_threshold)
-      ? payload.config.detection_threshold
-      : null;
   const detectionMode =
     payload.config.detection_mode === 1 || payload.config.detection_mode === 2
       ? payload.config.detection_mode
@@ -146,12 +140,6 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
           ? payload.config.gain
           : null,
       noise_threshold: noiseThreshold,
-      detection_threshold:
-        detectionThreshold !== null &&
-        noiseThreshold !== null &&
-        detectionThreshold < noiseThreshold
-          ? noiseThreshold
-          : detectionThreshold,
       detection_mode: detectionMode,
     },
     sensorStatus,
@@ -251,10 +239,18 @@ export function mergeCrossingAlerts(
   );
 
   if (existingIndex >= 0) {
+    const existing = previous[existingIndex];
+    const refreshed =
+      existing === undefined
+        ? normalized
+        : {
+            ...normalized,
+            at: existing.at,
+          };
     const withoutDuplicate = previous.filter(
       (_, index) => index !== existingIndex,
     );
-    return [normalized, ...withoutDuplicate].slice(0, maxAlerts);
+    return [refreshed, ...withoutDuplicate].slice(0, maxAlerts);
   }
 
   return [normalized, ...previous].slice(0, maxAlerts);

@@ -768,8 +768,7 @@ describe('monitor socket lifecycle', () => {
 
     const latestApi = onApi.mock.calls.at(-1)?.[0] as {
       sendPairThreshold: (a: number, b: number, value: number) => boolean;
-      sendDetectionThreshold: (value: number) => boolean;
-    };
+    } & Record<string, unknown>;
     expect(latestApi.sendPairThreshold(11, 12, 600)).toBe(true);
     expect(secondSocket?.send).toHaveBeenCalledWith(
       JSON.stringify({
@@ -779,10 +778,7 @@ describe('monitor socket lifecycle', () => {
         value: 600,
       }),
     );
-    expect(latestApi.sendDetectionThreshold(700)).toBe(true);
-    expect(secondSocket?.send).toHaveBeenCalledWith(
-      JSON.stringify({ cmd: 'set_detection_threshold', value: 700 }),
-    );
+    expect('sendDetectionThreshold' in latestApi).toBe(false);
   });
 
   test('exposes new AT commands: ping, antenna, detection mode, reset', async () => {

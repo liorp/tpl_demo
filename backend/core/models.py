@@ -149,6 +149,8 @@ class CrossingAlert(TypedDict):
     sensor_a: int
     sensor_b: int
     timestamp: int | None
+    value: int
+    threshold: int
     lat: float | None
     lng: float | None
     acknowledged: bool
@@ -156,7 +158,6 @@ class CrossingAlert(TypedDict):
 
 class SensorConfig(TypedDict):
     noise_threshold: int | None
-    detection_threshold: int | None
     gain: int | None
     detection_mode: int | None
 
@@ -194,7 +195,6 @@ class SensorState:
         self.crossing_alert: CrossingAlert | None = None
         self.config: SensorConfig = {
             "noise_threshold": None,
-            "detection_threshold": None,
             "gain": None,
             "detection_mode": None,
         }

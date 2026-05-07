@@ -48,7 +48,6 @@ def test_snapshot_includes_command_map_defaults():
     assert current["crossing_alert"] is None
     assert current["config"] == {
         "noise_threshold": None,
-        "detection_threshold": None,
         "gain": None,
         "detection_mode": None,
     }
@@ -109,6 +108,8 @@ def test_handle_detection_updates_crossing_alert():
     assert state.crossing_alert is not None
     assert state.crossing_alert["sensor_a"] == 1
     assert state.crossing_alert["sensor_b"] == 2
+    assert state.crossing_alert["value"] == 549
+    assert state.crossing_alert["threshold"] == 500
 
 
 def test_handle_detection_uses_current_time_when_device_timestamp_missing(monkeypatch):
@@ -274,7 +275,7 @@ def test_handle_link_down_removes_link_and_marks_peers_disconnected(monkeypatch)
     assert state.sensor_status["11"]["connected_peers"] == []
 
 
-def test_handle_detection_between_noise_and_detection_logs_without_alert():
+def test_handle_detection_ignores_legacy_global_detection_threshold():
     state = SensorState()
     state.config["detection_threshold"] = 700
     event = {
@@ -289,8 +290,17 @@ def test_handle_detection_between_noise_and_detection_logs_without_alert():
     changed = handle_event(state, event)
 
     assert changed is True
-    assert state.alarm_state == "disconnected"
-    assert state.crossing_alert is None
+    assert state.alarm_state == "alarm"
+    assert state.crossing_alert == {
+        "sensor_a": 1,
+        "sensor_b": 2,
+        "timestamp": 321,
+        "value": 650,
+        "threshold": 500,
+        "lat": None,
+        "lng": None,
+        "acknowledged": False,
+    }
     assert state.logs[0]["msg"].startswith("DETECTION")
 
 

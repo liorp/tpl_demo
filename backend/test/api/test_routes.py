@@ -169,36 +169,21 @@ def test_set_detection_mode_rejects_unsupported_mode(tmp_path: Path):
     assert sent_cmds == []
 
 
-def test_set_detection_threshold_rejects_values_below_known_noise_threshold(tmp_path: Path):
+def test_set_detection_threshold_command_is_ignored(tmp_path: Path):
     sent_cmds: list[str] = []
     client, _, broadcaster = _build_app(
         tmp_path,
         sent_cmds,
-        initial_config={"noise_threshold": 600, "detection_threshold": None},
+        initial_config={"noise_threshold": 600},
     )
+    initial_payload = broadcaster.payload
 
     with client.websocket_connect("/ws") as ws:
         _ = ws.receive_json()
-        ws.send_text('{"cmd":"set_detection_threshold","value":500}')
+        ws.send_text('{"cmd":"set_detection_threshold","value":700}')
 
     assert sent_cmds == []
-    assert broadcaster.payload["config"]["detection_threshold"] is None
-
-
-def test_set_detection_threshold_rejects_boolean_value(tmp_path: Path):
-    sent_cmds: list[str] = []
-    client, _, broadcaster = _build_app(
-        tmp_path,
-        sent_cmds,
-        initial_config={"noise_threshold": 600, "detection_threshold": None},
-    )
-
-    with client.websocket_connect("/ws") as ws:
-        _ = ws.receive_json()
-        ws.send_text('{"cmd":"set_detection_threshold","value":true}')
-
-    assert sent_cmds == []
-    assert broadcaster.payload["config"]["detection_threshold"] is None
+    assert broadcaster.payload is initial_payload
 
 
 def test_serves_favicon_without_404(tmp_path: Path):

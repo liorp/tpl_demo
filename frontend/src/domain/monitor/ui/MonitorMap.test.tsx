@@ -25,6 +25,9 @@ const polylineSegments: Array<{
   pathOptions?: {
     color?: string;
     dashArray?: string;
+    fill?: boolean;
+    fillColor?: string;
+    fillOpacity?: number;
     weight?: number;
     opacity?: number;
   };
@@ -123,6 +126,27 @@ vi.mock('react-leaflet', () => ({
     pathOptions?: {
       color?: string;
       dashArray?: string;
+      fill?: boolean;
+      fillColor?: string;
+      fillOpacity?: number;
+      weight?: number;
+      opacity?: number;
+    };
+  }) => {
+    polylineSegments.push({ positions, pathOptions });
+    return null;
+  },
+  Polygon: ({
+    positions,
+    pathOptions,
+  }: {
+    positions: [number, number][];
+    pathOptions?: {
+      color?: string;
+      dashArray?: string;
+      fill?: boolean;
+      fillColor?: string;
+      fillOpacity?: number;
       weight?: number;
       opacity?: number;
     };
@@ -400,6 +424,30 @@ describe('MonitorMap', () => {
     expect(mapFitBounds).toHaveBeenCalledTimes(1);
   });
 
+  test('auto-fits multiple units up to zoom 17 for high-resolution placement', () => {
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.4, lng: 35.9, status: 'active' },
+        ]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(mapFitBounds).toHaveBeenCalledWith(expect.any(Array), {
+      padding: [40, 40],
+      maxZoom: 17,
+    });
+  });
+
   test('calls move callback when marker drag ends', () => {
     const onMoveUnit = vi.fn();
     render(
@@ -500,7 +548,7 @@ describe('MonitorMap', () => {
     });
   });
 
-  test('adds an online fallback layer above offline native max zoom', async () => {
+  test('uses zoom 17 offline tiles before adding the online fallback layer', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -508,7 +556,7 @@ describe('MonitorMap', () => {
         json: async () => ({
           format: 'xyz',
           min_zoom: 7,
-          max_zoom: 14,
+          max_zoom: 17,
         }),
       }),
     );
@@ -534,14 +582,14 @@ describe('MonitorMap', () => {
       expect(offlineLayer?.getAttribute('data-url')).toBe(
         '/tiles/{z}/{x}/{y}.png',
       );
-      expect(offlineLayer?.getAttribute('data-max-native-zoom')).toBe('14');
-      expect(offlineLayer?.getAttribute('data-max-zoom')).toBe('14');
+      expect(offlineLayer?.getAttribute('data-max-native-zoom')).toBe('17');
+      expect(offlineLayer?.getAttribute('data-max-zoom')).toBe('17');
 
       const onlineFallbackLayer = tileLayers[1];
       expect(onlineFallbackLayer?.getAttribute('data-url')).toBe(
         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       );
-      expect(onlineFallbackLayer?.getAttribute('data-min-zoom')).toBe('15');
+      expect(onlineFallbackLayer?.getAttribute('data-min-zoom')).toBe('18');
       expect(onlineFallbackLayer?.getAttribute('data-max-native-zoom')).toBe(
         '19',
       );
@@ -588,6 +636,42 @@ describe('MonitorMap', () => {
     expect(icon3.options.html).toContain('Sensor 3');
     expect(polylineSegments).toHaveLength(1);
     expect(polylineSegments[0]?.pathOptions?.color).toBe('#ef4444');
+  });
+
+  test('fills alerting pairing ellipse with green-to-blue detection strength', () => {
+    render(
+      <MonitorMap
+        units={[
+          { id: 1, label: 'Sensor 1', lat: 33.2, lng: 35.7, status: 'active' },
+          { id: 2, label: 'Sensor 2', lat: 33.3, lng: 35.8, status: 'active' },
+        ]}
+        focusPoint={null}
+        tileRoot={null}
+        offlineRequired={false}
+        offlineModeEnabled={false}
+        mapBounds={null}
+        crossingAlerts={[
+          {
+            sensorA: 1,
+            sensorB: 2,
+            at: 1_700_000,
+            value: 1_500,
+            threshold: 500,
+            lat: 33.25,
+            lng: 35.75,
+            acknowledged: false,
+          } as never,
+        ]}
+        pairings={[{ side1Id: 1, side2Id: 2, enabled: true }]}
+        onMoveUnit={vi.fn()}
+        onSelectUnit={vi.fn()}
+      />,
+    );
+
+    expect(polylineSegments).toHaveLength(1);
+    expect(polylineSegments[0]?.pathOptions?.fill).toBe(true);
+    expect(polylineSegments[0]?.pathOptions?.fillColor).toBe('#2563eb');
+    expect(polylineSegments[0]?.pathOptions?.fillOpacity).toBeGreaterThan(0);
   });
 
   test('uses neutral ellipse color for acknowledged crossing alerts', () => {
@@ -648,11 +732,11 @@ describe('MonitorMap', () => {
             type: 'detection',
             unit_a: 1,
             unit_b: 2,
-            threshold: 500,
+            threshold: 700,
             value: 650,
           },
         ]}
-        config={{ gain: null, noise_threshold: 500, detection_threshold: 700 }}
+        config={{ gain: null, noise_threshold: 500 }}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}
@@ -687,11 +771,11 @@ describe('MonitorMap', () => {
             type: 'detection',
             unit_a: 1,
             unit_b: 2,
-            threshold: 500,
+            threshold: 700,
             value: 650,
           },
         ]}
-        config={{ gain: null, noise_threshold: 500, detection_threshold: 700 }}
+        config={{ gain: null, noise_threshold: 500 }}
         focusPoint={null}
         tileRoot={null}
         offlineRequired={false}

@@ -43,6 +43,8 @@ export type CrossingAlert = {
   sensorA: number;
   sensorB: number;
   at: number;
+  value?: number;
+  threshold?: number;
   lat: number | null;
   lng: number | null;
   acknowledged: boolean;
@@ -58,7 +60,6 @@ export type DetectionMode = 1 | 2;
 
 export type MonitorConfig = {
   noise_threshold?: number | null;
-  detection_threshold?: number | null;
   gain: number | null;
   detection_mode?: DetectionMode | null;
 };
@@ -128,6 +129,8 @@ export type BackendCrossingAlert = {
   sensor_a?: unknown;
   sensor_b?: unknown;
   timestamp?: unknown;
+  value?: unknown;
+  threshold?: unknown;
   lat?: unknown;
   lng?: unknown;
   acknowledged?: unknown;

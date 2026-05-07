@@ -42,7 +42,6 @@ Supported WebSocket command payloads and their device effect:
 - `{"cmd":"get_version"}` -> `AT#GETVERSION?`.
 - `{"cmd":"reset"}` -> `AT#RESET`.
 - `ack` as plain text acknowledges/clears the app alarm and is not sent to serial.
-- `{"cmd":"set_detection_threshold","value":N}` updates the backend/app alarm threshold only; it is not an AT command. It is rejected when below the current noise threshold.
 - `{"cmd":"set_unit_position","unit_id":U,"lat":LAT,"lng":LNG}` persists the map position only; it is not an AT command and must stay inside allowed map bounds.
 
 The parser currently understands these device response/event lines: `OK`, `ERROR`, `ATCMD_CLI_READY`, `#GETVERSION:...`, `#EVTDETECT=A,B,value,threshold`, `#EVTDETCOM=A,B,no_comm_ms,no_comm_threshold`, `#EVTMESHLINKUP=reporting,linked,rssi,threshold_cfg,gain_cfg,...`, `#EVTMESHLINKDOWN=reporting,linked,last_rssi,reason`, `#EVTMESHMAPDEV=unit,"version",voltage,...`, `#EVTMESHMAPDEVLINK=reporting,linked,rssi,threshold,gain,...`, `#EVTACTANT=unit,active,supported`, `#EVTDETMODE=mode,internal_data`, `#PINGRSP=unit,ms`, `#EVTPINGRSP=unit,ms`, `#EVTERR: number,text`, and `#EVTTRACE: text`.
