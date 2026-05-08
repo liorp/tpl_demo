@@ -224,7 +224,6 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [
         { time: '21:55:46', msg: 'MAP from 99 ver=0.4c10 gain=32 v=2112' },
       ],
@@ -287,7 +286,6 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       config: 'not-an-object',
@@ -303,7 +301,7 @@ describe('monitor socket lifecycle', () => {
     });
   });
 
-  test('ignores websocket payloads with unknown alarm values', async () => {
+  test('derives alarm state from websocket payload data', async () => {
     const onState = vi.fn();
     render(
       <TestWrapper>
@@ -316,10 +314,18 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'panic',
       events: [],
       links: [],
-      crossing_alert: null,
+      crossing_alert: {
+        sensor_a: 11,
+        sensor_b: 12,
+        timestamp: 1_739_742_000,
+        value: 860,
+        threshold: 500,
+        lat: null,
+        lng: null,
+        acknowledged: false,
+      },
       config: { gain: null },
       units: [],
       sensor_status: {},
@@ -336,8 +342,8 @@ describe('monitor socket lifecycle', () => {
         connected: boolean;
         alarm: string;
       };
-      expect(latestState.connected).toBe(false);
-      expect(latestState.alarm).toBe('disconnected');
+      expect(latestState.connected).toBe(true);
+      expect(latestState.alarm).toBe('alarm');
     });
   });
 
@@ -357,7 +363,6 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       crossing_alert: null,
@@ -405,7 +410,6 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       crossing_alert: null,
@@ -456,7 +460,6 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       crossing_alert: null,
@@ -495,7 +498,6 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       crossing_alert: null,
@@ -532,7 +534,6 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       crossing_alert: null,
@@ -583,7 +584,6 @@ describe('monitor socket lifecycle', () => {
     socket.emitMessage({
       connected: true,
       port: '/dev/ttyUSB0',
-      alarm: 'clear',
       events: [],
       links: [],
       crossing_alert: null,

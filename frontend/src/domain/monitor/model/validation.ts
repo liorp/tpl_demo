@@ -10,10 +10,8 @@ import type {
   SignalLinkState,
   UnitPlacement,
 } from './types';
-import { ALARM_STATES } from './types';
 
 const finiteNumberSchema = z.number().refine(Number.isFinite);
-const alarmStateSchema = z.enum(ALARM_STATES);
 const monitorEventSchema = z
   .object({
     time: z.string(),
@@ -94,7 +92,6 @@ const signalLinkPayloadSchema = z
 const monitorPayloadEnvelopeSchema = z.object({
   connected: z.boolean(),
   port: z.string(),
-  alarm: alarmStateSchema,
   events: z.array(monitorEventSchema),
   links: z.array(z.unknown()),
   crossing_alert: z.unknown().nullable().optional(),
