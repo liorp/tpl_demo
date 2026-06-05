@@ -57,7 +57,8 @@ def test_format_request_active_antenna_default_zero():
 
 
 def test_format_set_detection_mode_without_hex():
-    assert format_set_detection_mode(2) == "AT#SETDETMODE=2,"
+    # No trailing comma: the device ERRORs on `AT#SETDETMODE=2,`.
+    assert format_set_detection_mode(2) == "AT#SETDETMODE=2"
 
 
 def test_format_set_detection_mode_with_hex():

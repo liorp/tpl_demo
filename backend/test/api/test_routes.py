@@ -105,7 +105,7 @@ def test_websocket_routes_at_command_messages(tmp_path: Path):
         "AT#PING=0",
         "AT#SETACTANT=11,2",
         "AT#REQACTANT=0",
-        "AT#SETDETMODE=2,",
+        "AT#SETDETMODE=2",
         "AT#REQDETMODE",
         "AT#RESET",
     ]

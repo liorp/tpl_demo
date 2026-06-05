@@ -4,6 +4,7 @@ import {
   addCrossingAckWindow,
   createInitialMonitorState,
   isCrossingAlertSuppressed,
+  isDetectionEvent,
   isPairEnabled,
   isSignalFresh,
   mergeCrossingAlerts,
@@ -129,15 +130,24 @@ describe('monitor state model', () => {
     expect(Number.isFinite(state.links[1]?.updatedAt)).toBe(true);
   });
 
+  test('classifies only real detection alarms as detection events', () => {
+    expect(isDetectionEvent('DETECTION 11-12 th=300 val=512')).toBe(true);
+    // Config events must not be flagged as alarms (no red styling).
+    expect(isDetectionEvent('DETECTION_MODE mode=2')).toBe(false);
+    expect(isDetectionEvent('ANTENNA u=11 active=1 supported=3')).toBe(false);
+    expect(isDetectionEvent('MAP_DEV 11 ver=SG v=2926')).toBe(false);
+  });
+
   test('sorts events by timestamp descending so newest entries render on top', () => {
     const state = toMonitorStateFromPayload({
       connected: true,
       port: '/dev/ttyUSB0',
+      // Server emits newest-first (add_log inserts at index 0).
       events: [
-        { time: '21:55:44', msg: 'SYSTEM old' },
-        { time: '21:55:46', msg: 'DETECTION same-second older' },
         { time: '21:55:46', msg: 'DETECTION same-second newer' },
+        { time: '21:55:46', msg: 'DETECTION same-second older' },
         { time: '21:55:45', msg: 'SYSTEM mid' },
+        { time: '21:55:44', msg: 'SYSTEM old' },
       ],
       links: [],
       crossing_alert: null,

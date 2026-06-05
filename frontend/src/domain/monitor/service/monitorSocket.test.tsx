@@ -829,4 +829,70 @@ describe('monitor socket lifecycle', () => {
       JSON.stringify({ cmd: 'set_gain', unit_a: 11, unit_b: 12, value: 64 }),
     );
   });
+
+  test('antenna selection updates optimistically and survives snapshots that omit antenna state', async () => {
+    const onState = vi.fn();
+    const onApi = vi.fn();
+    render(
+      <TestWrapper>
+        <StateHarness onState={onState} onApi={onApi} />
+      </TestWrapper>,
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    socket.emitOpen();
+
+    const snapshot = (lastSeen: number, activeAntenna?: 1 | 2) => ({
+      connected: true,
+      port: '/dev/ttyUSB0',
+      events: [],
+      links: [],
+      crossing_alert: null,
+      config: { gain: null },
+      units: [{ id: 11, label: 'S11', lat: 33.31, lng: 35.78 }],
+      sensor_status: {
+        '11': {
+          last_seen: lastSeen,
+          connected_peers: [12],
+          ...(activeAntenna ? { active_antenna: activeAntenna } : {}),
+        },
+      },
+      map_policy: {
+        bounds: null,
+        buffer_km: null,
+        tile_root: '/tiles',
+        offline_required: false,
+      },
+    });
+
+    // Device reports the unit but never an active antenna.
+    socket.emitMessage(snapshot(100));
+    const antennaOf = () =>
+      (
+        onState.mock.calls.at(-1)?.[0] as {
+          sensorStatus: Record<string, { activeAntenna: 1 | 2 | null }>;
+        }
+      ).sensorStatus['11']?.activeAntenna;
+    await waitFor(() => expect(antennaOf()).toBeNull());
+
+    // User picks External (2): command is sent and the UI reflects it at once.
+    const api = onApi.mock.calls.at(-1)?.[0] as {
+      sendSetActiveAntenna: (unit: number, antenna: 1 | 2) => boolean;
+    };
+    expect(api.sendSetActiveAntenna(11, 2)).toBe(true);
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({ cmd: 'set_active_antenna', unit: 11, antenna: 2 }),
+    );
+    await waitFor(() => expect(antennaOf()).toBe(2));
+
+    // A later snapshot that still omits the antenna must NOT clear the choice.
+    socket.emitMessage(snapshot(101));
+    await waitFor(() => {
+      const latest = onState.mock.calls.at(-1)?.[0] as {
+        sensorStatus: Record<string, { lastSeen: number | null }>;
+      };
+      expect(latest.sensorStatus['11']?.lastSeen).toBe(101);
+    });
+    expect(antennaOf()).toBe(2);
+  });
 });

@@ -212,7 +212,12 @@ function sortEventsByTimestampDesc(events: MonitorEvent[]): MonitorEvent[] {
       if (a.timestampMs !== b.timestampMs) {
         return b.timestampMs - a.timestampMs;
       }
-      return b.index - a.index;
+      // Timestamps are second-resolution, so same-second events can't be
+      // distinguished by `time`. The server already emits newest-first
+      // (add_log inserts at index 0), so preserve that arrival order on ties
+      // — a fresh event keeps flowing to the top instead of sinking below
+      // its same-second neighbours.
+      return a.index - b.index;
     })
     .map((entry) => entry.event);
 }
@@ -408,7 +413,9 @@ export function shouldShowAck(state: MonitorState): boolean {
 }
 
 export function isDetectionEvent(msg: string): boolean {
-  return msg.includes('DETECTION');
+  // Only real detection alarms ("DETECTION 11-12 th=.. val=..") are alarms.
+  // Must NOT match "DETECTION_MODE mode=2", which is a normal config event.
+  return /^DETECTION\s/.test(msg);
 }
 
 export function upsertUnitInList(
