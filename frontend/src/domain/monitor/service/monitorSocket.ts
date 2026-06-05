@@ -106,6 +106,10 @@ export function useMonitorSocket(): MonitorSocketApi {
   const pendingPositionsRef = useRef(
     new Map<number, { lat: number; lng: number }>(),
   );
+  // Optimistic antenna selections, reconciled against device reports on each
+  // snapshot. The SG firmware acks AT#SETACTANT but does not echo #EVTACTANT,
+  // so without this the toggle would never reflect the user's choice.
+  const antennaOverridesRef = useRef(new Map<number, AntennaMode>());
 
   useEffect(() => {
     let disposed = false;
@@ -136,6 +140,24 @@ export function useMonitorSocket(): MonitorSocketApi {
             return;
           }
           const nextServer = toServerStateFromPayload(payload);
+
+          // Reconcile optimistic antenna selections with what the device
+          // reports. Confirmed or contradicted -> drop the override; not
+          // reported at all -> keep showing the user's pending choice.
+          const antennaOverrides = antennaOverridesRef.current;
+          for (const [unitId, mode] of [...antennaOverrides.entries()]) {
+            const key = String(unitId);
+            const entry = nextServer.sensorStatus[key];
+            const reported = entry?.activeAntenna ?? null;
+            if (reported === mode) {
+              antennaOverrides.delete(unitId);
+            } else if (reported !== null) {
+              antennaOverrides.delete(unitId);
+            } else if (entry) {
+              nextServer.sensorStatus[key] = { ...entry, activeAntenna: mode };
+            }
+          }
+
           queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, nextServer);
 
           const incomingAlert = toCrossingAlert(payload.crossing_alert);
@@ -198,6 +220,7 @@ export function useMonitorSocket(): MonitorSocketApi {
         }
         socketRef.current = null;
         pendingPositionsRef.current.clear();
+        antennaOverridesRef.current.clear();
         queryClient.setQueryData<ServerState>(
           SERVER_QUERY_KEY,
           createInitialServerState(),
@@ -334,9 +357,30 @@ export function useMonitorSocket(): MonitorSocketApi {
   );
 
   const sendSetActiveAntenna = useCallback(
-    (unit: number, antenna: AntennaMode): boolean =>
-      sendCommand('set_active_antenna', { unit, antenna }),
-    [sendCommand],
+    (unit: number, antenna: AntennaMode): boolean => {
+      const ok = sendCommand('set_active_antenna', { unit, antenna });
+      if (!ok) {
+        return false;
+      }
+      // Reflect the choice immediately; reconciled on the next snapshot.
+      antennaOverridesRef.current.set(unit, antenna);
+      queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, (prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const key = String(unit);
+        const existing = prev.sensorStatus[key];
+        const entry = existing
+          ? { ...existing, activeAntenna: antenna }
+          : { lastSeen: null, connectedPeers: [], activeAntenna: antenna };
+        return {
+          ...prev,
+          sensorStatus: { ...prev.sensorStatus, [key]: entry },
+        };
+      });
+      return true;
+    },
+    [sendCommand, queryClient],
   );
 
   const sendRequestActiveAntenna = useCallback(

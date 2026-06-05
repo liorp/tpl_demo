@@ -60,7 +60,12 @@ def format_request_active_antenna(unit: int = 0) -> str:
 def format_set_detection_mode(mode: int, internal_hex: str = "") -> str:
     if mode not in SUPPORTED_DETECTION_MODES:
         raise ValueError(f"detection mode must be 1 or 2, got {mode!r}")
-    return f"AT#SETDETMODE={mode},{internal_hex}"
+    # The firmware (SG_0.10b220) rejects a trailing comma with empty data
+    # (`AT#SETDETMODE=2,` -> ERROR). Only append the internal_data field when
+    # one is actually provided.
+    if internal_hex:
+        return f"AT#SETDETMODE={mode},{internal_hex}"
+    return f"AT#SETDETMODE={mode}"
 
 
 def format_request_detection_mode() -> str:
