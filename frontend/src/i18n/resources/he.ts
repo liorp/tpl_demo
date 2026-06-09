@@ -119,6 +119,7 @@ const heCommon = {
     pingAll: 'פינג כללי',
     pingUnit: 'פינג {{unit}}',
     rttLabel: 'RTT {{value}}ms',
+    receivedLabel: 'בשעה {{time}}',
     noData: 'אין נתוני פינג עדיין',
   },
   annotations: {

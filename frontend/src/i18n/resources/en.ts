@@ -120,6 +120,7 @@ const enCommon = {
     pingAll: 'Ping all',
     pingUnit: 'Ping {{unit}}',
     rttLabel: 'RTT {{value}}ms',
+    receivedLabel: 'at {{time}}',
     noData: 'No ping data yet',
   },
   annotations: {
