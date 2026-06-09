@@ -10,7 +10,9 @@ from backend.core.models import SensorState, snapshot
 from backend.core.service import handle_event
 
 
-def test_handle_detection_sets_crossing_alert_and_log():
+def test_handle_detection_logs_event_with_structured_fields():
+    # Alerting is frontend-owned: the backend only forwards the detection as a
+    # logged event carrying the structured fields the UI derives alarms from.
     state = SensorState()
     event = {
         "type": "detection",
@@ -24,8 +26,13 @@ def test_handle_detection_sets_crossing_alert_and_log():
     changed = handle_event(state, event)
 
     assert changed is True
-    assert state.crossing_alert is not None
-    assert state.logs[0]["msg"].startswith("DETECTION")
+    entry = state.logs[0]
+    assert entry["msg"].startswith("DETECTION")
+    assert entry["type"] == "detection"
+    assert entry["unit_a"] == 1
+    assert entry["unit_b"] == 2
+    assert entry["value"] == 70
+    assert entry["threshold"] == 50
 
 
 def test_add_log_without_fields_keeps_time_and_message_shape():
@@ -45,7 +52,7 @@ def test_snapshot_includes_command_map_defaults():
     assert "alarm" not in current
     assert isinstance(current["events"], list)
     assert current["links"] == []
-    assert current["crossing_alert"] is None
+    assert "crossing_alert" not in current
     assert current["config"] == {
         "noise_threshold": None,
         "gain": None,
@@ -89,7 +96,7 @@ def test_snapshot_includes_mutated_runtime_fields():
     }
 
 
-def test_handle_detection_updates_crossing_alert():
+def test_handle_detection_does_not_set_backend_alarm_state():
     state = SensorState()
 
     changed = handle_event(
@@ -105,15 +112,12 @@ def test_handle_detection_updates_crossing_alert():
     )
 
     assert changed is True
-    assert state.crossing_alert is not None
-    assert state.crossing_alert["sensor_a"] == 1
-    assert state.crossing_alert["sensor_b"] == 2
-    assert state.crossing_alert["value"] == 549
-    assert state.crossing_alert["threshold"] == 500
+    # The backend no longer tracks alarm/crossing state.
+    assert not hasattr(state, "crossing_alert")
+    assert "crossing_alert" not in snapshot(state)
 
 
-def test_handle_detection_uses_current_time_when_device_timestamp_missing(monkeypatch):
-    monkeypatch.setattr(service, "now_ts", lambda: 1_700_000_123.0)
+def test_handle_detection_without_device_timestamp_still_forwards():
     state = SensorState()
 
     changed = handle_event(
@@ -128,8 +132,9 @@ def test_handle_detection_uses_current_time_when_device_timestamp_missing(monkey
     )
 
     assert changed is True
-    assert state.crossing_alert is not None
-    assert state.crossing_alert["timestamp"] == 1_700_000_123
+    entry = state.logs[0]
+    assert entry["msg"].startswith("DETECTION")
+    assert "device_ts" not in entry
 
 
 def test_handle_map_link_event_inserts_or_replaces_link(monkeypatch):
@@ -275,7 +280,7 @@ def test_handle_link_down_removes_link_and_marks_peers_disconnected(monkeypatch)
     assert state.sensor_status["11"]["connected_peers"] == []
 
 
-def test_handle_detection_ignores_legacy_global_detection_threshold():
+def test_handle_detection_with_legacy_config_key_still_only_logs():
     state = SensorState()
     state.config["detection_threshold"] = 700
     event = {
@@ -290,17 +295,11 @@ def test_handle_detection_ignores_legacy_global_detection_threshold():
     changed = handle_event(state, event)
 
     assert changed is True
-    assert state.crossing_alert == {
-        "sensor_a": 1,
-        "sensor_b": 2,
-        "timestamp": 321,
-        "value": 650,
-        "threshold": 500,
-        "lat": None,
-        "lng": None,
-        "acknowledged": False,
-    }
-    assert state.logs[0]["msg"].startswith("DETECTION")
+    assert "crossing_alert" not in snapshot(state)
+    entry = state.logs[0]
+    assert entry["msg"].startswith("DETECTION")
+    assert entry["value"] == 650
+    assert entry["threshold"] == 500
 
 
 def test_handle_ping_response_records_latency(monkeypatch):
@@ -376,62 +375,6 @@ def test_handle_trace_event_logs_at_debug_level():
 
     assert changed is True
     assert state.logs[0]["msg"].startswith("TRACE")
-
-
-def test_handle_detection_sets_crossing_midpoint_when_both_positions_known():
-    state = SensorState()
-    state.units = [
-        {"id": 1, "label": "S1", "lat": 10.0, "lng": 20.0},
-        {"id": 2, "label": "S2", "lat": 30.0, "lng": 40.0},
-    ]
-
-    changed = handle_event(
-        state,
-        {
-            "type": "detection",
-            "unit_a": 1,
-            "unit_b": 2,
-            "value": 549,
-            "threshold": 500,
-            "device_ts": 321,
-        },
-    )
-
-    assert changed is True
-    assert state.crossing_alert is not None
-    assert state.crossing_alert["lat"] == 20.0
-    assert state.crossing_alert["lng"] == 30.0
-
-
-@pytest.mark.parametrize(
-    ('units', 'expected_lat', 'expected_lng'),
-    [
-        ([{"id": 1, "label": "S1", "lat": 10.0, "lng": 20.0}], 10.0, 20.0),
-        ([], None, None),
-    ],
-)
-def test_handle_detection_sets_crossing_coordinates_with_missing_positions(
-    units, expected_lat, expected_lng
-):
-    state = SensorState()
-    state.units = units
-
-    changed = handle_event(
-        state,
-        {
-            "type": "detection",
-            "unit_a": 1,
-            "unit_b": 2,
-            "value": 549,
-            "threshold": 500,
-            "device_ts": 321,
-        },
-    )
-
-    assert changed is True
-    assert state.crossing_alert is not None
-    assert state.crossing_alert["lat"] == expected_lat
-    assert state.crossing_alert["lng"] == expected_lng
 
 
 def test_layout_store_load_missing_file_returns_safe_defaults(tmp_path):

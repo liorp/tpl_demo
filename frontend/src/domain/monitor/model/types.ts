@@ -110,23 +110,11 @@ export type BackendMapPolicy = {
   offline_required?: unknown;
 };
 
-export type BackendCrossingAlert = {
-  sensor_a?: unknown;
-  sensor_b?: unknown;
-  timestamp?: unknown;
-  value?: unknown;
-  threshold?: unknown;
-  lat?: unknown;
-  lng?: unknown;
-  acknowledged?: unknown;
-};
-
 export type MonitorPayload = {
   connected: boolean;
   port: string;
   events: MonitorEvent[];
   links: SignalLinkState[];
-  crossing_alert: BackendCrossingAlert | null;
   config: MonitorConfig;
   units?: UnitPlacement[];
   sensor_status?: Record<string, BackendSensorStatus>;

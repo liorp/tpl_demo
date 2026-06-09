@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import type {
   AntennaMode,
-  CrossingAlert,
   MapPolicy,
   MonitorPayload,
   PingLatencyMap,
@@ -16,19 +15,6 @@ const monitorEventSchema = z
   .object({
     time: z.string(),
     msg: z.string(),
-  })
-  .passthrough();
-
-const crossingAlertInputSchema = z
-  .object({
-    sensor_a: finiteNumberSchema.optional(),
-    sensor_b: finiteNumberSchema.optional(),
-    timestamp: finiteNumberSchema.optional(),
-    value: finiteNumberSchema.optional(),
-    threshold: finiteNumberSchema.optional(),
-    lat: finiteNumberSchema.nullable().optional(),
-    lng: finiteNumberSchema.nullable().optional(),
-    acknowledged: z.boolean().optional(),
   })
   .passthrough();
 
@@ -94,7 +80,6 @@ const monitorPayloadEnvelopeSchema = z.object({
   port: z.string(),
   events: z.array(monitorEventSchema),
   links: z.array(z.unknown()),
-  crossing_alert: z.unknown().nullable().optional(),
   config: z.object({ gain: z.unknown() }),
   units: z.array(z.unknown()).optional(),
   sensor_status: z.record(z.string(), z.unknown()).optional(),
@@ -104,36 +89,6 @@ const monitorPayloadEnvelopeSchema = z.object({
 
 export function isMonitorPayload(value: unknown): value is MonitorPayload {
   return monitorPayloadEnvelopeSchema.safeParse(value).success;
-}
-
-export function parseCrossingAlert(raw: unknown): CrossingAlert | null {
-  const parsed = crossingAlertInputSchema.safeParse(raw);
-  if (!parsed.success) {
-    return null;
-  }
-
-  const alert = parsed.data;
-  const sensorA = alert.sensor_a ?? null;
-  const sensorB = alert.sensor_b ?? null;
-  const at = alert.timestamp ?? null;
-
-  if (sensorA === null || sensorB === null || at === null) {
-    return null;
-  }
-
-  const side1 = Math.min(sensorA, sensorB);
-  const side2 = Math.max(sensorA, sensorB);
-
-  return {
-    sensorA: side1,
-    sensorB: side2,
-    at,
-    ...(alert.value !== undefined ? { value: alert.value } : {}),
-    ...(alert.threshold !== undefined ? { threshold: alert.threshold } : {}),
-    lat: alert.lat ?? null,
-    lng: alert.lng ?? null,
-    acknowledged: alert.acknowledged === true,
-  };
 }
 
 function toDefaultMapPolicy(): MapPolicy {

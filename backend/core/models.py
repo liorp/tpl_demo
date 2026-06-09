@@ -145,17 +145,6 @@ class SideLink(TypedDict):
     dt: NotRequired[int]
 
 
-class CrossingAlert(TypedDict):
-    sensor_a: int
-    sensor_b: int
-    timestamp: int | None
-    value: int
-    threshold: int
-    lat: float | None
-    lng: float | None
-    acknowledged: bool
-
-
 class SensorConfig(TypedDict):
     noise_threshold: int | None
     gain: int | None
@@ -187,11 +176,9 @@ class SensorState:
     def __init__(self):
         self.serial_connected = False
         self.current_port = "None"
-        self.last_detection_time = 0.0
         self.logs: list[LogEntry] = []
         self.max_logs = 50
         self.links: list[SideLink] = []
-        self.crossing_alert: CrossingAlert | None = None
         self.config: SensorConfig = {
             "noise_threshold": None,
             "gain": None,
@@ -224,7 +211,6 @@ def snapshot(state: SensorState) -> dict:
         "port": state.current_port,
         "events": list(state.logs),
         "links": list(state.links),
-        "crossing_alert": dict(state.crossing_alert) if state.crossing_alert else None,
         "config": dict(state.config),
         "units": list(state.units),
         "sensor_status": dict(state.sensor_status),

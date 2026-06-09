@@ -2,13 +2,16 @@ import { describe, expect, test } from 'vitest';
 import {
   acknowledgeCrossingAlert,
   createInitialMonitorState,
+  crossingCoordinates,
   crossingPairKey,
+  expiredPairKeys,
   isDetectionEvent,
   isPairEnabled,
   isSignalFresh,
+  latestDetectionsByPair,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
-  pruneAcknowledgedPairs,
+  parseDetectionEvent,
   setPairing,
   toMonitorStateFromPayload,
   toServerStateFromPayload,
@@ -30,16 +33,6 @@ describe('monitor state model', () => {
       port: '/dev/ttyUSB0',
       events: [{ time: '20:00:00', msg: 'DETECTION x' }],
       links: [],
-      crossing_alert: {
-        sensor_a: 11,
-        sensor_b: 12,
-        timestamp: 1_739_742_000,
-        value: 860,
-        threshold: 500,
-        lat: null,
-        lng: null,
-        acknowledged: false,
-      },
       config: { gain: null },
     });
 
@@ -105,7 +98,6 @@ describe('monitor state model', () => {
         { time: '21:55:44', msg: 'SYSTEM old' },
       ],
       links: [],
-      crossing_alert: null,
       config: { gain: null },
     });
 
@@ -226,84 +218,92 @@ describe('monitor state model', () => {
     });
   });
 
-  test('maps snake_case crossing alert fields from backend payload', () => {
-    const state = toMonitorStateFromPayload({
-      connected: true,
-      port: '/dev/ttyUSB0',
-      events: [],
-      links: [],
-      crossing_alert: {
-        // Backend payload shape.
-        sensor_a: 11,
-        sensor_b: 12,
-        timestamp: 1_739_742_000,
-        value: 860,
-        threshold: 500,
-        lat: null,
-        lng: null,
-        acknowledged: false,
-      } as unknown as never,
-      config: { gain: null },
+  test('parses a detection event into a normalized signal with canonical pair order', () => {
+    const detection = parseDetectionEvent({
+      time: '20:00:00',
+      msg: 'DETECTION 12-2 th=500 val=860',
+      type: 'detection',
+      unit_a: 12,
+      unit_b: 2,
+      value: 860,
+      threshold: 500,
+      device_ts: 321,
     });
 
-    expect(state.crossingAlerts).toEqual([
-      {
-        sensorA: 11,
-        sensorB: 12,
-        at: 1_739_742_000,
-        value: 860,
-        threshold: 500,
-        lat: null,
-        lng: null,
-        acknowledged: false,
-      },
-    ]);
+    expect(detection).toEqual({
+      sensorA: 2,
+      sensorB: 12,
+      value: 860,
+      threshold: 500,
+      signature: '2-12|20:00:00|DETECTION 12-2 th=500 val=860|321',
+    });
   });
 
-  test('ignores camelCase crossing alert aliases to keep a single wire format', () => {
-    const state = toMonitorStateFromPayload({
-      connected: true,
-      port: '/dev/ttyUSB0',
-      events: [],
-      links: [],
-      crossing_alert: {
-        sensorA: 11,
-        sensorB: 12,
-        at: 1_739_742_000,
-      } as unknown as never,
-      config: { gain: null },
-    });
-
-    expect(state.crossingAlerts).toEqual([]);
+  test('ignores non-detection and malformed events', () => {
+    expect(
+      parseDetectionEvent({ time: '20:00:00', msg: 'DETECTION_MODE mode=2' }),
+    ).toBeNull();
+    expect(
+      parseDetectionEvent({
+        time: '20:00:00',
+        msg: 'DETECTION self',
+        type: 'detection',
+        unit_a: 5,
+        unit_b: 5,
+      }),
+    ).toBeNull();
   });
 
-  test('normalizes crossing pair order to ascending ids', () => {
-    const state = toMonitorStateFromPayload({
-      connected: true,
-      port: '/dev/ttyUSB0',
-      events: [],
-      links: [],
-      crossing_alert: {
-        sensor_a: 12,
-        sensor_b: 2,
-        timestamp: 1_739_742_000,
-        lat: null,
-        lng: null,
-        acknowledged: false,
-      } as unknown as never,
-      config: { gain: null },
-    });
-
-    expect(state.crossingAlerts).toEqual([
+  test('keeps only the newest detection per pair from a newest-first event log', () => {
+    const detections = latestDetectionsByPair([
       {
-        sensorA: 2,
-        sensorB: 12,
-        at: 1_739_742_000,
-        lat: null,
-        lng: null,
-        acknowledged: false,
+        time: '20:00:02',
+        msg: 'DETECTION 11-12 th=500 val=900',
+        type: 'detection',
+        unit_a: 11,
+        unit_b: 12,
+        value: 900,
+        threshold: 500,
       },
+      {
+        time: '20:00:01',
+        msg: 'DETECTION 11-12 th=500 val=860',
+        type: 'detection',
+        unit_a: 11,
+        unit_b: 12,
+        value: 860,
+        threshold: 500,
+      },
+      { time: '20:00:00', msg: 'MAP_DEV 11 ver=SG v=2926' },
     ]);
+
+    expect([...detections.keys()]).toEqual(['11-12']);
+    expect(detections.get('11-12')?.value).toBe(900);
+  });
+
+  test('computes crossing coordinates as the midpoint of the paired units', () => {
+    const units = [
+      { id: 11, label: 'S11', lat: 10, lng: 20 },
+      { id: 12, label: 'S12', lat: 30, lng: 40 },
+    ];
+    expect(crossingCoordinates(units, 11, 12)).toEqual({ lat: 20, lng: 30 });
+    // Single known unit falls back to that unit's position.
+    expect(crossingCoordinates(units, 11, 99)).toEqual({ lat: 10, lng: 20 });
+    // Neither known -> no coordinates.
+    expect(crossingCoordinates(units, 98, 99)).toEqual({
+      lat: null,
+      lng: null,
+    });
+  });
+
+  test('reports pair keys whose latest detection has aged past the clear window', () => {
+    const expiries = new Map([
+      ['2-12', 1_000],
+      ['3-8', 9_000],
+    ]);
+    // now=10_000, clear window 4_000: only 2-12 (9s stale) has expired.
+    expect(expiredPairKeys(expiries, 10_000, 4_000)).toEqual(['2-12']);
+    expect(expiredPairKeys(expiries, 10_000, 20_000)).toEqual([]);
   });
 
   test('keeps legacy payload compatibility when new fields are omitted', () => {
@@ -312,7 +312,6 @@ describe('monitor state model', () => {
       port: '/dev/ttyUSB0',
       events: [],
       links: [],
-      crossing_alert: null,
       config: { gain: null },
     });
 
@@ -435,21 +434,6 @@ describe('monitor state model', () => {
   test('builds a canonical crossing pair key regardless of sensor order', () => {
     expect(crossingPairKey(12, 2)).toBe('2-12');
     expect(crossingPairKey(2, 12)).toBe('2-12');
-  });
-
-  test('keeps a dismissed pair acknowledged while it keeps crossing', () => {
-    const acknowledged = new Set(['2-12']);
-    // The device still reports this pair, so the dismissal must persist and the
-    // banner stays hidden for the ongoing crossing.
-    expect([...pruneAcknowledgedPairs(acknowledged, '2-12')]).toEqual(['2-12']);
-  });
-
-  test('clears a dismissed pair once its crossing ends so it can re-alarm', () => {
-    const acknowledged = new Set(['2-12']);
-    // Backend auto-reset -> no active crossing -> dismissal dropped.
-    expect([...pruneAcknowledgedPairs(acknowledged, null)]).toEqual([]);
-    // A different pair now crossing also means the old pair's crossing ended.
-    expect([...pruneAcknowledgedPairs(acknowledged, '3-8')]).toEqual([]);
   });
 
   test('detects stale signal links', () => {

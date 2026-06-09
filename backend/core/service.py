@@ -6,7 +6,6 @@ from pathlib import Path
 from backend.core.event_logging import log_event
 from backend.core.layout_store import ALLOWED_BOUNDS
 from backend.core.models import (
-    CrossingAlert,
     Event,
     GeoBounds,
     SensorState,
@@ -98,27 +97,6 @@ def _remove_link(state: SensorState, side_a: int, side_b: int) -> None:
     ]
 
 
-def _unit_coordinates(state: SensorState, unit_id: int) -> tuple[float, float] | None:
-    for unit in state.units:
-        if unit["id"] == unit_id:
-            return (float(unit["lat"]), float(unit["lng"]))
-    return None
-
-
-def _crossing_coordinates(
-    state: SensorState, sensor_a: int, sensor_b: int
-) -> tuple[float | None, float | None]:
-    coords_a = _unit_coordinates(state, sensor_a)
-    coords_b = _unit_coordinates(state, sensor_b)
-    if coords_a and coords_b:
-        return ((coords_a[0] + coords_b[0]) / 2.0, (coords_a[1] + coords_b[1]) / 2.0)
-    if coords_a:
-        return coords_a
-    if coords_b:
-        return coords_b
-    return (None, None)
-
-
 def set_connection_state(state: SensorState, connected: bool, port: str = "None") -> None:
     state.serial_connected = connected
     state.current_port = port
@@ -134,22 +112,9 @@ def _handle_detection(state: SensorState, event: Event) -> bool:
         state, sensor_id=event["unit_b"], peer_id=event["unit_a"],
         connected=True, last_seen=last_seen,
     )
-    crossing_lat, crossing_lng = _crossing_coordinates(
-        state, event["unit_a"], event["unit_b"]
-    )
-    state.last_detection_time = now_ts()
-    device_ts = event.get("device_ts")
     set_connection_state(state, True, state.current_port)
-    state.crossing_alert = CrossingAlert(
-        sensor_a=event["unit_a"],
-        sensor_b=event["unit_b"],
-        timestamp=device_ts if device_ts is not None else last_seen,
-        value=event["value"],
-        threshold=event["threshold"],
-        lat=crossing_lat,
-        lng=crossing_lng,
-        acknowledged=False,
-    )
+    # Alerting is frontend-owned: the backend only forwards the detection as a
+    # logged event carrying the structured fields the UI derives alarms from.
     log_event(
         state,
         logger,
@@ -362,18 +327,6 @@ def handle_event(state: SensorState, event: Event) -> bool:
     if handler is None:
         return False
     return handler(state, event)
-
-
-def check_auto_reset(state: SensorState, now_ts_value: float, timeout_sec: float) -> bool:
-    should_reset = (
-        state.crossing_alert is not None
-        and (now_ts_value - state.last_detection_time > timeout_sec)
-    )
-    if should_reset:
-        state.crossing_alert = None
-        log_event(state, logger, "Alarm cleared (auto-reset)")
-        return True
-    return False
 
 
 def mark_disconnected(state: SensorState, reason: str | None = None) -> bool:

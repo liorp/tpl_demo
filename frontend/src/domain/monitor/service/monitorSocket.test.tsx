@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { type ReactNode, StrictMode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -338,108 +338,138 @@ describe('monitor socket lifecycle', () => {
     });
   });
 
-  test('re-alarms a fresh crossing of a dismissed pair only after the crossing ends', async () => {
-    const onState = vi.fn();
-    const onApi = vi.fn();
-    render(
-      <TestWrapper>
-        <StateHarness onState={onState} onApi={onApi} />
-      </TestWrapper>,
-    );
+  test('derives alarms from detection events, then clears and re-arms a dismissed pair only after the crossing ends', async () => {
+    vi.useFakeTimers();
+    try {
+      const onState = vi.fn();
+      const onApi = vi.fn();
+      render(
+        <TestWrapper>
+          <StateHarness onState={onState} onApi={onApi} />
+        </TestWrapper>,
+      );
 
-    const socket = FakeWebSocket.instances[0];
-    socket.emitOpen();
+      const socket = FakeWebSocket.instances[0];
+      await act(async () => {
+        socket.emitOpen();
+      });
 
-    const snapshot = (crossing_alert: unknown, port = '/dev/ttyUSB0') => ({
-      connected: true,
-      port,
-      events: [],
-      links: [],
-      crossing_alert,
-      config: { gain: null },
-      units: [
-        { id: 11, label: 'S11', lat: 33.31, lng: 35.78 },
-        { id: 12, label: 'S12', lat: 33.32, lng: 35.79 },
-      ],
-      sensor_status: {},
-      map_policy: {
-        bounds: null,
-        buffer_km: null,
-        tile_root: '/tiles',
-        offline_required: false,
-      },
-    });
-    const crossing = {
-      sensor_a: 11,
-      sensor_b: 12,
-      timestamp: 1_739_742_000,
-      value: 860,
-      threshold: 500,
-      lat: null,
-      lng: null,
-      acknowledged: false,
-    };
-    const latestState = () =>
-      onState.mock.calls.at(-1)?.[0] as {
-        crossingAlerts: unknown[];
-        pairings: unknown[];
-        units: Array<{ id: number }>;
-        port: string;
-      };
-    const latestApi = () =>
-      onApi.mock.calls.at(-1)?.[0] as {
-        acknowledgeCrossing: (alert: {
-          sensorA: number;
-          sensorB: number;
-          at: number;
-        }) => void;
-        setUnitPairing: (a: number, b: number, enabled: boolean) => void;
-      };
+      // A snapshot whose event log optionally carries one 11-12 detection.
+      const snapshot = (
+        detection: { time: string; value: number; deviceTs: number } | null,
+        port = '/dev/ttyUSB0',
+      ) => ({
+        connected: true,
+        port,
+        events: detection
+          ? [
+              {
+                time: detection.time,
+                msg: `DETECTION 11-12 th=500 val=${detection.value}`,
+                type: 'detection',
+                unit_a: 11,
+                unit_b: 12,
+                value: detection.value,
+                threshold: 500,
+                device_ts: detection.deviceTs,
+              },
+            ]
+          : [],
+        links: [],
+        config: { gain: null },
+        units: [
+          { id: 11, label: 'S11', lat: 33.31, lng: 35.78 },
+          { id: 12, label: 'S12', lat: 33.32, lng: 35.79 },
+        ],
+        sensor_status: {},
+        map_policy: {
+          bounds: null,
+          buffer_km: null,
+          tile_root: '/tiles',
+          offline_required: false,
+        },
+      });
 
-    // Register units, then enable the 11-12 pair so its crossings reach the banner.
-    socket.emitMessage(snapshot(null));
-    await waitFor(() => {
+      const latestState = () =>
+        onState.mock.calls.at(-1)?.[0] as {
+          crossingAlerts: Array<{
+            sensorA: number;
+            sensorB: number;
+            at: number;
+          }>;
+          pairings: unknown[];
+          units: Array<{ id: number }>;
+          port: string;
+        };
+      const latestApi = () =>
+        onApi.mock.calls.at(-1)?.[0] as {
+          acknowledgeCrossing: (alert: {
+            sensorA: number;
+            sensorB: number;
+            at: number;
+          }) => void;
+          setUnitPairing: (a: number, b: number, enabled: boolean) => void;
+        };
+
+      // Baseline snapshot (no detection): registers units and seeds signatures.
+      await act(async () => {
+        socket.emitMessage(snapshot(null));
+      });
       expect(latestState().units.map((u) => u.id)).toContain(11);
-    });
-    latestApi().setUnitPairing(11, 12, true);
-    await waitFor(() => {
+
+      // Enable the 11-12 pair so its crossings reach the banner.
+      await act(async () => {
+        latestApi().setUnitPairing(11, 12, true);
+      });
       expect(latestState().pairings).toHaveLength(1);
-    });
 
-    // 1) Crossing detected -> banner shows.
-    socket.emitMessage(snapshot(crossing));
-    await waitFor(() => {
+      // 1) A detection event for the enabled pair -> banner shows.
+      await act(async () => {
+        socket.emitMessage(
+          snapshot({ time: '20:00:01', value: 860, deviceTs: 1 }),
+        );
+      });
       expect(latestState().crossingAlerts).toHaveLength(1);
-    });
 
-    // 2) Operator dismisses -> banner hidden.
-    latestApi().acknowledgeCrossing({
-      sensorA: 11,
-      sensorB: 12,
-      at: 1_739_742_000,
-    });
-    await waitFor(() => {
+      // 2) Operator dismisses -> banner hidden.
+      const active = latestState().crossingAlerts[0];
+      await act(async () => {
+        latestApi().acknowledgeCrossing(active);
+      });
       expect(latestState().crossingAlerts).toHaveLength(0);
-    });
 
-    // 3) Same crossing still being reported -> stays hidden. Bump the port to
-    //    prove the snapshot was processed without the banner reappearing.
-    socket.emitMessage(snapshot(crossing, '/dev/ttyUSB1'));
-    await waitFor(() => {
+      // 3) Same detection re-sent in a later snapshot -> stays hidden. Bump the
+      //    port to prove the snapshot was processed without re-alarming.
+      await act(async () => {
+        socket.emitMessage(
+          snapshot(
+            { time: '20:00:01', value: 860, deviceTs: 1 },
+            '/dev/ttyUSB1',
+          ),
+        );
+      });
       expect(latestState().port).toBe('/dev/ttyUSB1');
-    });
-    expect(latestState().crossingAlerts).toHaveLength(0);
+      expect(latestState().crossingAlerts).toHaveLength(0);
 
-    // 4) Crossing ends — backend auto-reset clears crossing_alert.
-    socket.emitMessage(snapshot(null, '/dev/ttyUSB1'));
+      // 4) Crossing goes quiet past the clear window -> the timer clears the
+      //    alarm state and drops the dismissal.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_500);
+      });
 
-    // 5) A genuinely fresh crossing of the same pair must alarm again.
-    socket.emitMessage(
-      snapshot({ ...crossing, timestamp: 1_739_742_120 }, '/dev/ttyUSB1'),
-    );
-    await waitFor(() => {
+      // 5) A genuinely fresh detection (new signature) for the same pair alarms.
+      await act(async () => {
+        socket.emitMessage(
+          snapshot(
+            { time: '20:00:10', value: 900, deviceTs: 2 },
+            '/dev/ttyUSB1',
+          ),
+        );
+      });
       expect(latestState().crossingAlerts).toHaveLength(1);
-    });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('broadcast with old position does not overwrite optimistic placeUnit update', async () => {
