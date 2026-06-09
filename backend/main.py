@@ -1,6 +1,5 @@
 import asyncio
 import threading
-import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -12,7 +11,6 @@ from backend.config import (
     APP_LOG_FILE,
     APP_LOG_LEVEL,
     APP_LOG_MAX_BYTES,
-    AUTO_RESET_TIMEOUT,
     BACKEND_PORT,
     LAYOUT_STATE_PATH,
     SERIAL_PORT,
@@ -22,14 +20,12 @@ from backend.core.events import (
     SerialConnected,
     SerialDisconnect,
     SerialEvent,
-    SerialIdle,
     SerialMessage,
 )
 from backend.core.layout_store import load_layout_state, save_layout_state
 from backend.core.logging_setup import configure_logging
 from backend.core.models import SensorState, snapshot
 from backend.core.service import (
-    check_auto_reset,
     handle_event,
     mark_disconnected,
     set_connection_state,
@@ -95,9 +91,6 @@ def _handle_serial_message(msg: SerialMessage) -> None:
         set_connection_state(state, True, msg.port)
         log_event(state, logger, f"Connected to {msg.port}")
         broadcaster.enqueue(snapshot(state))
-    elif isinstance(msg, SerialIdle):
-        if check_auto_reset(state, time.time(), AUTO_RESET_TIMEOUT):
-            broadcaster.enqueue(snapshot(state))
     elif isinstance(msg, SerialDisconnect):
         serial_manager.close_connection()
         mark_disconnected(state, msg.reason)

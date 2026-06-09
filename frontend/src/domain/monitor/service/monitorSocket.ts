@@ -5,13 +5,14 @@ import type { Annotation } from '../model/annotations';
 import {
   acknowledgeCrossingAlert,
   createInitialServerState,
+  crossingCoordinates,
   crossingPairKey,
+  expiredPairKeys,
   isPairEnabled,
+  latestDetectionsByPair,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
-  pruneAcknowledgedPairs,
   setPairingInList,
-  toCrossingAlert,
   toPayloadUnits,
   toServerStateFromPayload,
   upsertUnitInList,
@@ -95,12 +96,22 @@ export function useMonitorSocket(): MonitorSocketApi {
   const annotationRedoStackRef = useRef<Annotation[][]>([]);
   const [, setAnnotationHistoryVersion] = useState(0);
 
-  // Transient state
+  // Transient state. Alerting is fully frontend-owned: alarms are derived from
+  // detection events in each snapshot and cleared by a wall-clock timer.
   const [crossingAlerts, setCrossingAlerts] = useState<CrossingAlert[]>([]);
+  // Last detection signature processed per pair, so a snapshot that re-sends the
+  // same detection doesn't re-trigger. Kept even after an alarm clears, so the
+  // same detection can't re-alarm — only a genuinely new one does.
+  const lastSignatureRef = useRef<Map<string, string>>(new Map());
+  // When the latest detection for a pair arrived (wall clock). The pair's alarm
+  // clears once this ages past the clear window.
+  const alarmExpiryRef = useRef<Map<string, number>>(new Map());
   // Pairs the operator has dismissed for the *current* crossing. Held until the
-  // backend stops reporting that pair (auto-reset = crossing ended), after
-  // which a fresh crossing of the same pair alarms again.
+  // crossing ends (its alarm clears), after which a fresh crossing re-alarms.
   const acknowledgedPairsRef = useRef<Set<string>>(new Set());
+  // On (re)connect, seed signatures from the first snapshot without alarming, so
+  // pre-existing detections in the log don't fire a stale alarm.
+  const pendingBaselineRef = useRef(true);
 
   const socketRef = useRef<WebSocket | null>(null);
   const pairingsRef = useRef(clientState.pairings);
@@ -128,6 +139,7 @@ export function useMonitorSocket(): MonitorSocketApi {
           socket.close();
           return;
         }
+        pendingBaselineRef.current = true;
         queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, (prev) =>
           prev
             ? { ...prev, serverOnline: true }
@@ -162,31 +174,58 @@ export function useMonitorSocket(): MonitorSocketApi {
 
           queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, nextServer);
 
-          const incomingAlert = toCrossingAlert(payload.crossing_alert);
-          const activePairKey = incomingAlert
-            ? crossingPairKey(incomingAlert.sensorA, incomingAlert.sensorB)
-            : null;
-          // Drop dismissals for any pair the device no longer reports as
-          // crossing, so its next crossing alarms again.
-          acknowledgedPairsRef.current = pruneAcknowledgedPairs(
-            acknowledgedPairsRef.current,
-            activePairKey,
-          );
-          const pairedAlert =
-            incomingAlert &&
-            isPairEnabled(
-              pairingsRef.current,
-              incomingAlert.sensorA,
-              incomingAlert.sensorB,
-            )
-              ? incomingAlert
-              : null;
-          if (
-            pairedAlert &&
-            activePairKey !== null &&
-            !acknowledgedPairsRef.current.has(activePairKey)
-          ) {
-            setCrossingAlerts((prev) => mergeCrossingAlerts(prev, pairedAlert));
+          // Derive crossing alarms from detection events (alerting is
+          // frontend-owned). A new detection for an enabled pair raises/refreshes
+          // its alarm and resets its clear timer; the same detection re-sent in a
+          // later snapshot is ignored.
+          const detections = latestDetectionsByPair(nextServer.events);
+          const now = Date.now();
+          const isBaseline = pendingBaselineRef.current;
+          pendingBaselineRef.current = false;
+          for (const [pairKey, detection] of detections) {
+            if (lastSignatureRef.current.get(pairKey) === detection.signature) {
+              continue;
+            }
+            lastSignatureRef.current.set(pairKey, detection.signature);
+            if (isBaseline) {
+              // Seed signatures on (re)connect without alarming for old logs.
+              continue;
+            }
+            if (
+              !isPairEnabled(
+                pairingsRef.current,
+                detection.sensorA,
+                detection.sensorB,
+              )
+            ) {
+              continue;
+            }
+            // A fresh detection keeps the crossing alive (resets the clear timer)
+            // even while dismissed, so it won't prematurely re-alarm.
+            alarmExpiryRef.current.set(pairKey, now);
+            if (acknowledgedPairsRef.current.has(pairKey)) {
+              continue;
+            }
+            const { lat, lng } = crossingCoordinates(
+              clientStateRef.current.units,
+              detection.sensorA,
+              detection.sensorB,
+            );
+            const alert: CrossingAlert = {
+              sensorA: detection.sensorA,
+              sensorB: detection.sensorB,
+              at: Math.floor(now / 1000),
+              ...(detection.value !== undefined
+                ? { value: detection.value }
+                : {}),
+              ...(detection.threshold !== undefined
+                ? { threshold: detection.threshold }
+                : {}),
+              lat,
+              lng,
+              acknowledged: false,
+            };
+            setCrossingAlerts((prev) => mergeCrossingAlerts(prev, alert));
           }
 
           const hasServerUnits = Array.isArray(payload.units);
@@ -232,6 +271,12 @@ export function useMonitorSocket(): MonitorSocketApi {
         socketRef.current = null;
         pendingPositionsRef.current.clear();
         antennaOverridesRef.current.clear();
+        // Drop transient alarm state; a reconnect re-derives it from snapshots.
+        lastSignatureRef.current.clear();
+        alarmExpiryRef.current.clear();
+        acknowledgedPairsRef.current.clear();
+        pendingBaselineRef.current = true;
+        setCrossingAlerts([]);
         queryClient.setQueryData<ServerState>(
           SERVER_QUERY_KEY,
           createInitialServerState(),
@@ -259,11 +304,34 @@ export function useMonitorSocket(): MonitorSocketApi {
     };
   }, [queryClient]);
 
+  // Clear alarms whose latest detection has aged past the window, and re-arm the
+  // pair (drop its dismissal) so its next crossing alarms again.
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const expired = expiredPairKeys(alarmExpiryRef.current, Date.now());
+      if (expired.length === 0) {
+        return;
+      }
+      for (const pairKey of expired) {
+        alarmExpiryRef.current.delete(pairKey);
+        acknowledgedPairsRef.current.delete(pairKey);
+      }
+      setCrossingAlerts((prev) =>
+        prev.filter(
+          (alert) =>
+            !expired.includes(crossingPairKey(alert.sensorA, alert.sensorB)),
+        ),
+      );
+    }, 1_000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   const acknowledgeCrossing = useCallback((alert: CrossingAlert) => {
     // Dismissal is purely a frontend concern: hide the banner and remember the
-    // pair so the ongoing crossing stays dismissed. The backend is dumb here —
-    // its `crossing_alert` keeps reflecting the live device state until the
-    // crossing ends, at which point we re-arm in the snapshot handler.
+    // pair so the ongoing crossing stays dismissed. The clear timer drops the
+    // dismissal once the crossing ends, so a fresh crossing re-alarms.
     setCrossingAlerts((prev) => acknowledgeCrossingAlert(prev, alert));
     const next = new Set(acknowledgedPairsRef.current);
     next.add(crossingPairKey(alert.sensorA, alert.sensorB));

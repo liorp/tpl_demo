@@ -5,7 +5,6 @@ SERIAL_PORT = os.getenv("SERIAL_PORT", "").strip()
 LAYOUT_STATE_PATH = os.getenv("LAYOUT_STATE_PATH", "").strip()
 BACKEND_PORT = int(os.getenv("TPL_BACKEND_PORT", "8181"))
 BAUD_RATE = 57600
-AUTO_RESET_TIMEOUT = 4.0
 
 # Detection defaults applied to the device on each connect ("boot"). Mode is
 # global; gain/threshold are per-pair and only applied to links the device

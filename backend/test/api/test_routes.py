@@ -59,7 +59,6 @@ def _build_app(
             "port": "None",
             "events": [],
             "links": [],
-            "crossing_alert": None,
             "config": dict(state.config),
             "units": [],
             "map_policy": dict(state.map_policy),

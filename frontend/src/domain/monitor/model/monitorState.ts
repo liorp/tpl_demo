@@ -10,7 +10,6 @@ import type {
   UnitPlacement,
 } from './types';
 import {
-  parseCrossingAlert,
   parseMapPolicy,
   parsePayloadUnits,
   parsePingLatencies,
@@ -26,13 +25,102 @@ const MAX_CROSSING_ALERTS = 8;
 // intentionally wide: while a pair's alarm is active, repeated detections
 // refresh the single banner entry instead of stacking new ones.
 const CROSSING_ALERT_DEDUP_WINDOW_SEC = 10_000;
+// Alerting is frontend-owned: a crossing alarm clears this long after the last
+// detection for its pair. Mirrors the cadence detections arrive at (the value
+// the backend previously used for its auto-reset).
+export const CROSSING_ALERT_CLEAR_MS = 4_000;
 const MAP_FROM_RE = /MAP from (\d+)/;
 const CLOCK_TIME_RE = /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/;
 
-export function toCrossingAlert(
-  raw: MonitorPayload['crossing_alert'],
-): CrossingAlert | null {
-  return parseCrossingAlert(raw);
+export type DetectionSignal = {
+  sensorA: number;
+  sensorB: number;
+  value?: number;
+  threshold?: number;
+  // Stable identity for one detection log entry; changes for a fresh detection
+  // so the UI can tell a new crossing from a re-sent snapshot of the same one.
+  signature: string;
+};
+
+function asFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+export function parseDetectionEvent(
+  event: MonitorEvent,
+): DetectionSignal | null {
+  if (event.type !== 'detection') {
+    return null;
+  }
+  const a = asFiniteNumber(event.unit_a);
+  const b = asFiniteNumber(event.unit_b);
+  if (a === null || b === null || a === b) {
+    return null;
+  }
+  const sensorA = Math.min(a, b);
+  const sensorB = Math.max(a, b);
+  const value = asFiniteNumber(event.value);
+  const threshold = asFiniteNumber(event.threshold);
+  const deviceTs = asFiniteNumber(event.device_ts);
+  return {
+    sensorA,
+    sensorB,
+    ...(value !== null ? { value } : {}),
+    ...(threshold !== null ? { threshold } : {}),
+    signature: `${sensorA}-${sensorB}|${event.time}|${event.msg}|${deviceTs ?? ''}`,
+  };
+}
+
+// Events arrive newest-first; keep the most recent detection per pair.
+export function latestDetectionsByPair(
+  events: MonitorEvent[],
+): Map<string, DetectionSignal> {
+  const byPair = new Map<string, DetectionSignal>();
+  for (const event of events) {
+    const detection = parseDetectionEvent(event);
+    if (!detection) {
+      continue;
+    }
+    const key = crossingPairKey(detection.sensorA, detection.sensorB);
+    if (!byPair.has(key)) {
+      byPair.set(key, detection);
+    }
+  }
+  return byPair;
+}
+
+export function crossingCoordinates(
+  units: UnitPlacement[],
+  sensorA: number,
+  sensorB: number,
+): { lat: number | null; lng: number | null } {
+  const a = units.find((unit) => unit.id === sensorA);
+  const b = units.find((unit) => unit.id === sensorB);
+  if (a && b) {
+    return { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 };
+  }
+  if (a) {
+    return { lat: a.lat, lng: a.lng };
+  }
+  if (b) {
+    return { lat: b.lat, lng: b.lng };
+  }
+  return { lat: null, lng: null };
+}
+
+// Pair keys whose latest detection is older than the clear window.
+export function expiredPairKeys(
+  expiries: ReadonlyMap<string, number>,
+  now: number,
+  clearMs = CROSSING_ALERT_CLEAR_MS,
+): string[] {
+  const expired: string[] = [];
+  for (const [key, lastDetectionAtMs] of expiries) {
+    if (now - lastDetectionAtMs > clearMs) {
+      expired.push(key);
+    }
+  }
+  return expired;
 }
 
 export function toPayloadUnits(
@@ -209,11 +297,12 @@ function sortEventsByTimestampDesc(events: MonitorEvent[]): MonitorEvent[] {
 export function toMonitorStateFromPayload(
   payload: MonitorPayload,
 ): MonitorState {
-  const crossingAlert = toCrossingAlert(payload.crossing_alert);
   const serverState = toServerStateFromPayload(payload);
   return {
     ...serverState,
-    crossingAlerts: crossingAlert ? [crossingAlert] : [],
+    // Alarms are derived from detection events in the socket layer (which holds
+    // the wall-clock arrival timers), not from a single snapshot.
+    crossingAlerts: [],
     globalSettings: { alarmSoundEnabled: true, offlineModeEnabled: true },
     units: toPayloadUnits(payload.units, serverState.sensorStatus),
     pairings: [],
@@ -278,22 +367,6 @@ export function crossingPairKey(sensorA: number, sensorB: number): string {
   const side1 = Math.min(sensorA, sensorB);
   const side2 = Math.max(sensorA, sensorB);
   return `${side1}-${side2}`;
-}
-
-// Keep an acknowledgement only while the device still reports that pair as
-// crossing. When the backend stops reporting it — its auto-reset clears
-// `crossing_alert`, which is our "crossing ended" signal — the ack is dropped
-// so the next crossing of that pair re-alarms. The backend tracks a single
-// crossing at a time, so `activePairKey` is one key (or null when idle).
-export function pruneAcknowledgedPairs(
-  acknowledged: ReadonlySet<string>,
-  activePairKey: string | null,
-): Set<string> {
-  const next = new Set<string>();
-  if (activePairKey !== null && acknowledged.has(activePairKey)) {
-    next.add(activePairKey);
-  }
-  return next;
 }
 
 export function isPairEnabled(
