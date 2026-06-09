@@ -124,14 +124,6 @@ def set_connection_state(state: SensorState, connected: bool, port: str = "None"
     state.current_port = port
 
 
-def acknowledge_alarm(state: SensorState) -> bool:
-    if state.crossing_alert is None:
-        return False
-    state.crossing_alert = None
-    log_event(state, logger, "Alarm acknowledged")
-    return True
-
-
 def _handle_detection(state: SensorState, event: Event) -> bool:
     last_seen = _event_last_seen()
     _update_sensor_link_status(

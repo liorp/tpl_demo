@@ -4,12 +4,12 @@ import { createAppWebSocketUrl } from '@/config';
 import type { Annotation } from '../model/annotations';
 import {
   acknowledgeCrossingAlert,
-  addCrossingAckWindow,
   createInitialServerState,
-  isCrossingAlertSuppressed,
+  crossingPairKey,
   isPairEnabled,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
+  pruneAcknowledgedPairs,
   setPairingInList,
   toCrossingAlert,
   toPayloadUnits,
@@ -23,7 +23,6 @@ import {
 } from '../model/persistence';
 import type {
   AntennaMode,
-  CrossingAckWindow,
   CrossingAlert,
   DetectionMode,
   GlobalSettings,
@@ -98,7 +97,10 @@ export function useMonitorSocket(): MonitorSocketApi {
 
   // Transient state
   const [crossingAlerts, setCrossingAlerts] = useState<CrossingAlert[]>([]);
-  const crossingAckWindowsRef = useRef<CrossingAckWindow[]>([]);
+  // Pairs the operator has dismissed for the *current* crossing. Held until the
+  // backend stops reporting that pair (auto-reset = crossing ended), after
+  // which a fresh crossing of the same pair alarms again.
+  const acknowledgedPairsRef = useRef<Set<string>>(new Set());
 
   const socketRef = useRef<WebSocket | null>(null);
   const pairingsRef = useRef(clientState.pairings);
@@ -161,6 +163,15 @@ export function useMonitorSocket(): MonitorSocketApi {
           queryClient.setQueryData<ServerState>(SERVER_QUERY_KEY, nextServer);
 
           const incomingAlert = toCrossingAlert(payload.crossing_alert);
+          const activePairKey = incomingAlert
+            ? crossingPairKey(incomingAlert.sensorA, incomingAlert.sensorB)
+            : null;
+          // Drop dismissals for any pair the device no longer reports as
+          // crossing, so its next crossing alarms again.
+          acknowledgedPairsRef.current = pruneAcknowledgedPairs(
+            acknowledgedPairsRef.current,
+            activePairKey,
+          );
           const pairedAlert =
             incomingAlert &&
             isPairEnabled(
@@ -170,13 +181,13 @@ export function useMonitorSocket(): MonitorSocketApi {
             )
               ? incomingAlert
               : null;
-          const allowedAlert = isCrossingAlertSuppressed(
-            pairedAlert,
-            crossingAckWindowsRef.current,
-          )
-            ? null
-            : pairedAlert;
-          setCrossingAlerts((prev) => mergeCrossingAlerts(prev, allowedAlert));
+          if (
+            pairedAlert &&
+            activePairKey !== null &&
+            !acknowledgedPairsRef.current.has(activePairKey)
+          ) {
+            setCrossingAlerts((prev) => mergeCrossingAlerts(prev, pairedAlert));
+          }
 
           const hasServerUnits = Array.isArray(payload.units);
           if (hasServerUnits) {
@@ -249,15 +260,14 @@ export function useMonitorSocket(): MonitorSocketApi {
   }, [queryClient]);
 
   const acknowledgeCrossing = useCallback((alert: CrossingAlert) => {
+    // Dismissal is purely a frontend concern: hide the banner and remember the
+    // pair so the ongoing crossing stays dismissed. The backend is dumb here —
+    // its `crossing_alert` keeps reflecting the live device state until the
+    // crossing ends, at which point we re-arm in the snapshot handler.
     setCrossingAlerts((prev) => acknowledgeCrossingAlert(prev, alert));
-    crossingAckWindowsRef.current = addCrossingAckWindow(
-      crossingAckWindowsRef.current,
-      alert,
-    );
-    const socket = socketRef.current;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send('ack');
-    }
+    const next = new Set(acknowledgedPairsRef.current);
+    next.add(crossingPairKey(alert.sensorA, alert.sensorB));
+    acknowledgedPairsRef.current = next;
   }, []);
 
   const sendCommand = useCallback(

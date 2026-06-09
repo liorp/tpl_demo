@@ -50,12 +50,6 @@ export type CrossingAlert = {
   acknowledged: boolean;
 };
 
-export type CrossingAckWindow = {
-  sensorA: number;
-  sensorB: number;
-  at: number;
-};
-
 export type DetectionMode = 1 | 2;
 
 export type MonitorConfig = {
