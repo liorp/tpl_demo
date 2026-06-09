@@ -10,7 +10,6 @@ import {
   mergeTelemetryUnits,
   pruneAcknowledgedPairs,
   setPairing,
-  shouldShowAck,
   toMonitorStateFromPayload,
   toServerStateFromPayload,
   upsertUnit,
@@ -21,7 +20,6 @@ describe('monitor state model', () => {
   test('creates disconnected initial state', () => {
     const state = createInitialMonitorState();
 
-    expect(state.alarm).toBe('disconnected');
     expect(state.connected).toBe(false);
     expect(state.events).toHaveLength(0);
   });
@@ -47,49 +45,6 @@ describe('monitor state model', () => {
 
     expect(state.connected).toBe(true);
     expect(state.port).toBe('/dev/ttyUSB0');
-    expect(state.alarm).toBe('alarm');
-    expect(shouldShowAck(state)).toBe(true);
-  });
-
-  test('derives alarm state from frontend payload data', () => {
-    const clear = toServerStateFromPayload({
-      connected: true,
-      port: '/dev/ttyUSB0',
-      events: [],
-      links: [],
-      crossing_alert: null,
-      config: { gain: null },
-    });
-    expect(clear.alarm).toBe('clear');
-
-    const alarm = toMonitorStateFromPayload({
-      connected: true,
-      port: '/dev/ttyUSB0',
-      events: [],
-      links: [],
-      crossing_alert: {
-        sensor_a: 11,
-        sensor_b: 12,
-        timestamp: 1_739_742_000,
-        value: 860,
-        threshold: 500,
-        lat: null,
-        lng: null,
-        acknowledged: false,
-      },
-      config: { gain: null },
-    });
-    expect(alarm.alarm).toBe('alarm');
-
-    const disconnected = toServerStateFromPayload({
-      connected: false,
-      port: 'None',
-      events: [],
-      links: [],
-      crossing_alert: null,
-      config: { gain: null },
-    });
-    expect(disconnected.alarm).toBe('disconnected');
   });
 
   test('normalizes link updatedAt from backend payload and provides fallback when missing', () => {

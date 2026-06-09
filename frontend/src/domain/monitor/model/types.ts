@@ -1,14 +1,5 @@
 import type { Annotation } from './annotations';
 
-export const ALARM_STATES = [
-  'clear',
-  'alarm',
-  'comm_loss',
-  'disconnected',
-] as const;
-
-export type AlarmState = (typeof ALARM_STATES)[number];
-
 export type MonitorEvent = {
   time: string;
   msg: string;
@@ -147,7 +138,6 @@ export type ServerState = {
   serverOnline: boolean;
   connected: boolean;
   port: string;
-  alarm: AlarmState;
   events: MonitorEvent[];
   links: SignalLinkState[];
   config: MonitorConfig;
@@ -160,7 +150,6 @@ export type MonitorState = {
   serverOnline: boolean;
   connected: boolean;
   port: string;
-  alarm: AlarmState;
   events: MonitorEvent[];
   links: SignalLinkState[];
   crossingAlerts: CrossingAlert[];

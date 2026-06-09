@@ -301,7 +301,7 @@ describe('monitor socket lifecycle', () => {
     });
   });
 
-  test('derives alarm state from websocket payload data', async () => {
+  test('reflects connection state from websocket payload data', async () => {
     const onState = vi.fn();
     render(
       <TestWrapper>
@@ -316,16 +316,7 @@ describe('monitor socket lifecycle', () => {
       port: '/dev/ttyUSB0',
       events: [],
       links: [],
-      crossing_alert: {
-        sensor_a: 11,
-        sensor_b: 12,
-        timestamp: 1_739_742_000,
-        value: 860,
-        threshold: 500,
-        lat: null,
-        lng: null,
-        acknowledged: false,
-      },
+      crossing_alert: null,
       config: { gain: null },
       units: [],
       sensor_status: {},
@@ -340,10 +331,10 @@ describe('monitor socket lifecycle', () => {
     await waitFor(() => {
       const latestState = onState.mock.calls.at(-1)?.[0] as {
         connected: boolean;
-        alarm: string;
+        port: string;
       };
       expect(latestState.connected).toBe(true);
-      expect(latestState.alarm).toBe('alarm');
+      expect(latestState.port).toBe('/dev/ttyUSB0');
     });
   });
 

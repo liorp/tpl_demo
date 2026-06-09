@@ -140,7 +140,7 @@ export function App() {
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      <StatusStrip alarm={state.alarm} serverOnline={state.serverOnline} />
+      <StatusStrip />
       <ErrorBoundary section="Alerts">
         <CrossingAlertBanner
           alerts={state.crossingAlerts}

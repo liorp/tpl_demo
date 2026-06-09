@@ -1,5 +1,4 @@
 import type {
-  AlarmState,
   CrossingAlert,
   MonitorEvent,
   MonitorPayload,
@@ -91,7 +90,6 @@ export function createInitialServerState(): ServerState {
     serverOnline: false,
     connected: false,
     port: 'None',
-    alarm: 'disconnected',
     events: [],
     links: [],
     config: {
@@ -116,23 +114,9 @@ export function createInitialMonitorState(): MonitorState {
   };
 }
 
-function deriveAlarmState(
-  connected: boolean,
-  crossingAlert: CrossingAlert | null,
-): AlarmState {
-  if (!connected) {
-    return 'disconnected';
-  }
-  if (crossingAlert) {
-    return 'alarm';
-  }
-  return 'clear';
-}
-
 export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
   const sensorStatus = parseSensorStatusMap(payload.sensor_status);
   const pingLatencies = parsePingLatencies(payload.ping_latencies);
-  const crossingAlert = toCrossingAlert(payload.crossing_alert);
   const noiseThreshold =
     typeof payload.config.noise_threshold === 'number' &&
     Number.isFinite(payload.config.noise_threshold)
@@ -146,7 +130,6 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     serverOnline: true,
     connected: payload.connected,
     port: payload.port,
-    alarm: deriveAlarmState(payload.connected, crossingAlert),
     events: sortEventsByTimestampDesc(payload.events).slice(0, MAX_EVENTS),
     links: parseSignalLinks(payload.links, Math.floor(Date.now() / 1000)),
     config: {
@@ -399,10 +382,6 @@ export function mergeTelemetryUnits(
   }
 
   return nextUnits.sort((a, b) => a.id - b.id).slice(0, MAX_UNITS);
-}
-
-export function shouldShowAck(state: MonitorState): boolean {
-  return state.alarm === 'alarm';
 }
 
 export function isDetectionEvent(msg: string): boolean {
