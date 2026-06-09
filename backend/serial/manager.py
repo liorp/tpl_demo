@@ -22,6 +22,7 @@ from backend.core.events import (
 )
 from backend.parsing.encoder import format_get_version, format_request_map
 from backend.parsing.parser import ControlFrame, parse_line
+from backend.serial.boot_defaults import detection_mode_command, link_default_commands
 
 logger = logging.getLogger("tpl-signum")
 PROTOCOL_VALIDATION_TIMEOUT_SEC = 8.0
@@ -60,10 +61,17 @@ class SerialManager:
         self._serial_lock = threading.Lock()
         self._serial_conn: serial.Serial | None = None
         self._pending_commands: deque[str] = deque()
+        self._configured_pairs: set[tuple[int, int]] = set()
 
     def send_serial(self, cmd: str) -> None:
         with self._serial_lock:
             self._pending_commands.append(cmd)
+
+    def _enqueue(self, *commands: str) -> None:
+        if not commands:
+            return
+        with self._serial_lock:
+            self._pending_commands.extend(commands)
 
     def close_connection(self) -> None:
         with self._serial_lock:
@@ -148,6 +156,7 @@ class SerialManager:
         time.sleep(0.5)
         ser.reset_input_buffer()
 
+        self._configured_pairs = set()
         with self._serial_lock:
             self._pending_commands.appendleft(format_get_version())
 
@@ -238,6 +247,9 @@ class SerialManager:
         if not validated_protocol and event_type in _PROTOCOL_VALIDATING_EVENT_TYPES:
             validated_protocol = True
             sink.put_nowait(SerialConnected(port))
+            self._enqueue(detection_mode_command())
+        if event_type == "map_link":
+            self._enqueue(*link_default_commands(event, self._configured_pairs))
         if event_type == "version":
             return awaiting_ack, validated_protocol
         sink.put_nowait(SerialEvent(event))
