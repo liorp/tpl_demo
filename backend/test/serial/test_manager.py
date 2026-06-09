@@ -220,10 +220,109 @@ def test_disconnects_when_port_disappears(monkeypatch):
     assert any(isinstance(m, SerialDisconnect) for m in sink.messages)
 
 
+def test_boot_sets_detection_mode_after_validation(monkeypatch):
+    port = "/dev/cu.usbmodem1101"
+    scripted = _ScriptedSerial(
+        deque([b"#GETVERSION:1.0b24\r\nOK\r\n", b"OK\r\n", b""])
+    )
+    _attach_serial(monkeypatch, scripted, port)
+
+    manager = SerialManager(forced_port="")
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
+
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
+
+    assert "AT#SETDETMODE=1\r" in scripted.writes
+
+
+def test_boot_applies_gain_and_threshold_defaults_to_unconfigured_link(monkeypatch):
+    port = "/dev/cu.usbmodem1101"
+    scripted = _ScriptedSerial(
+        deque(
+            [
+                b"#GETVERSION:1.0b24\r\nOK\r\n",
+                b"#EVTMESHMAPDEVLINK=10,11,-16,0,0,00000000\r\n",
+                b"OK\r\n",  # ack get_version
+                b"OK\r\n",  # ack set_detection_mode
+                b"OK\r\n",  # ack set_gain
+                b"OK\r\n",  # ack set_threshold
+            ]
+        )
+    )
+    _attach_serial(monkeypatch, scripted, port)
+
+    manager = SerialManager(forced_port="")
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
+
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
+
+    assert "AT#SETDETGAIN=10,11,32\r" in scripted.writes
+    assert "AT#SETDETTHR=10,11,300\r" in scripted.writes
+
+
+def test_boot_preserves_configured_threshold_and_only_sets_gain(monkeypatch):
+    port = "/dev/cu.usbmodem1101"
+    scripted = _ScriptedSerial(
+        deque(
+            [
+                b"#GETVERSION:1.0b24\r\nOK\r\n",
+                b"#EVTMESHMAPDEVLINK=10,11,-16,300,0,00000000\r\n",
+                b"OK\r\n",
+                b"OK\r\n",
+                b"OK\r\n",
+            ]
+        )
+    )
+    _attach_serial(monkeypatch, scripted, port)
+
+    manager = SerialManager(forced_port="")
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
+
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
+
+    assert "AT#SETDETGAIN=10,11,32\r" in scripted.writes
+    assert not any(w.startswith("AT#SETDETTHR=") for w in scripted.writes)
+
+
+def test_boot_skips_fully_configured_link(monkeypatch):
+    port = "/dev/cu.usbmodem1101"
+    scripted = _ScriptedSerial(
+        deque(
+            [
+                b"#GETVERSION:1.0b24\r\nOK\r\n",
+                b"#EVTMESHMAPDEVLINK=10,11,-16,300,64,00000000\r\n",
+                b"OK\r\n",
+                b"OK\r\n",
+            ]
+        )
+    )
+    _attach_serial(monkeypatch, scripted, port)
+
+    manager = SerialManager(forced_port="")
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
+
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
+
+    assert not any(w.startswith("AT#SETDETGAIN=") for w in scripted.writes)
+    assert not any(w.startswith("AT#SETDETTHR=") for w in scripted.writes)
+
+
 def test_at_cmd_ready_token_queues_a_map_refresh(monkeypatch):
     port = "/dev/cu.usbmodem1101"
     scripted = _ScriptedSerial(
-        deque([b"#GETVERSION:1.0b24\r\nOK\r\nATCMD_CLI_READY\r\n", b"OK\r\n", b""])
+        deque(
+            [
+                b"#GETVERSION:1.0b24\r\nOK\r\nATCMD_CLI_READY\r\n",
+                b"OK\r\n",  # ack get_version
+                b"OK\r\n",  # ack boot set_detection_mode
+                b"OK\r\n",  # ack map refresh
+                b"",
+            ]
+        )
     )
     _attach_serial(monkeypatch, scripted, port)
 
