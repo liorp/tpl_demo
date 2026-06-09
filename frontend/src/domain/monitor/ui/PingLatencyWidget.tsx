@@ -9,6 +9,14 @@ type Props = {
   onSendPing: (unit?: number) => boolean;
 };
 
+function formatReceivedTime(value: number): string | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const seconds = value > 1e12 ? Math.floor(value / 1000) : Math.floor(value);
+  const date = new Date(seconds * 1000);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString();
+}
+
 export function PingLatencyWidget({ pingLatencies, onSendPing }: Props) {
   const { t } = useTranslation();
   const entries = Object.values(pingLatencies)
@@ -42,17 +50,27 @@ export function PingLatencyWidget({ pingLatencies, onSendPing }: Props) {
         </p>
       ) : (
         <ul className="grid gap-0.5 font-mono text-xs tabular-nums">
-          {entries.map((entry) => (
-            <li
-              key={entry.unit}
-              className="flex items-center justify-between text-foreground/80"
-            >
-              <span>S{entry.unit}</span>
-              <span className="text-muted-foreground">
-                {t('ping.rttLabel', { value: entry.roundTripMs })}
-              </span>
-            </li>
-          ))}
+          {entries.map((entry) => {
+            const receivedTime = formatReceivedTime(entry.receivedAt);
+            return (
+              <li
+                key={entry.unit}
+                className="flex items-center justify-between text-foreground/80"
+              >
+                <span>S{entry.unit}</span>
+                <span className="flex items-baseline gap-2 text-muted-foreground">
+                  <span>
+                    {t('ping.rttLabel', { value: entry.roundTripMs })}
+                  </span>
+                  {receivedTime ? (
+                    <span className="text-[0.7rem] text-muted-foreground/70">
+                      {t('ping.receivedLabel', { time: receivedTime })}
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
