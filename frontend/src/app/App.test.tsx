@@ -25,7 +25,6 @@ const state: MonitorState = {
   serverOnline: true,
   connected: true,
   port: '/dev/cu.usbserial-0001',
-  alarm: 'clear',
   events: [],
   links: [
     {
@@ -228,7 +227,6 @@ describe('App', () => {
       alarmSoundEnabled: true,
       offlineModeEnabled: true,
     };
-    state.alarm = 'clear';
     const nowSec = Math.floor(Date.now() / 1000);
     state.units = [
       {

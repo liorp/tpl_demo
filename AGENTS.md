@@ -41,7 +41,7 @@ Supported WebSocket command payloads and their device effect:
 - `{"cmd":"request_detection_mode"}` -> `AT#REQDETMODE`.
 - `{"cmd":"get_version"}` -> `AT#GETVERSION?`.
 - `{"cmd":"reset"}` -> `AT#RESET`.
-- `ack` as plain text acknowledges/clears the app alarm and is not sent to serial.
+- Alarm dismissal is frontend-only: the UI hides the banner and remembers the dismissed pair until the device stops reporting that crossing (backend auto-reset clears `crossing_alert`), after which a fresh crossing of the same pair alarms again. The backend does not track acknowledgement and no `ack` message is sent over the WebSocket.
 - `{"cmd":"set_unit_position","unit_id":U,"lat":LAT,"lng":LNG}` persists the map position only; it is not an AT command and must stay inside allowed map bounds.
 
 The parser currently understands these device response/event lines: `OK`, `ERROR`, `ATCMD_CLI_READY`, `#GETVERSION:...`, `#EVTDETECT=A,B,value,threshold`, `#EVTDETCOM=A,B,no_comm_ms,no_comm_threshold`, `#EVTMESHLINKUP=reporting,linked,rssi,threshold_cfg,gain_cfg,...`, `#EVTMESHLINKDOWN=reporting,linked,last_rssi,reason`, `#EVTMESHMAPDEV=unit,"version",voltage,...`, `#EVTMESHMAPDEVLINK=reporting,linked,rssi,threshold,gain,...`, `#EVTACTANT=unit,active,supported`, `#EVTDETMODE=mode,internal_data`, `#PINGRSP=unit,ms`, `#EVTPINGRSP=unit,ms`, `#EVTERR: number,text`, and `#EVTTRACE: text`.

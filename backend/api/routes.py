@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.core.layout_store import ALLOWED_BOUNDS, save_layout_state
 from backend.core.models import SensorState, snapshot
-from backend.core.service import acknowledge_alarm, set_unit_position
+from backend.core.service import set_unit_position
 from backend.parsing.encoder import (
     format_get_version,
     format_ping,
@@ -165,9 +165,6 @@ def register_routes(app: FastAPI, deps: AppDeps) -> None:
         try:
             while True:
                 message = (await ws.receive_text()).strip()
-                if message.lower() == "ack" and acknowledge_alarm(deps.state):
-                    deps.broadcaster.enqueue(snapshot(deps.state))
-                    continue
                 try:
                     payload = json.loads(message)
                 except json.JSONDecodeError:

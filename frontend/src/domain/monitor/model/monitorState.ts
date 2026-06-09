@@ -1,6 +1,4 @@
 import type {
-  AlarmState,
-  CrossingAckWindow,
   CrossingAlert,
   MonitorEvent,
   MonitorPayload,
@@ -23,9 +21,11 @@ import {
 const MAX_EVENTS = 50;
 const MAX_UNITS = 32;
 const MAX_CROSSING_ALERTS = 8;
-const MAX_CROSSING_ACK_WINDOWS = 40;
-const CROSSING_ALERT_DEDUP_WINDOW_MS = 10_000;
-const CROSSING_ACK_SUPPRESSION_WINDOW_MS = 2_000;
+// Crossing-alert timestamps (`at`) arrive from the backend as Unix epoch
+// *seconds*, so this dedup window is expressed in seconds too. It is
+// intentionally wide: while a pair's alarm is active, repeated detections
+// refresh the single banner entry instead of stacking new ones.
+const CROSSING_ALERT_DEDUP_WINDOW_SEC = 10_000;
 const MAP_FROM_RE = /MAP from (\d+)/;
 const CLOCK_TIME_RE = /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/;
 
@@ -90,7 +90,6 @@ export function createInitialServerState(): ServerState {
     serverOnline: false,
     connected: false,
     port: 'None',
-    alarm: 'disconnected',
     events: [],
     links: [],
     config: {
@@ -115,23 +114,9 @@ export function createInitialMonitorState(): MonitorState {
   };
 }
 
-function deriveAlarmState(
-  connected: boolean,
-  crossingAlert: CrossingAlert | null,
-): AlarmState {
-  if (!connected) {
-    return 'disconnected';
-  }
-  if (crossingAlert) {
-    return 'alarm';
-  }
-  return 'clear';
-}
-
 export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
   const sensorStatus = parseSensorStatusMap(payload.sensor_status);
   const pingLatencies = parsePingLatencies(payload.ping_latencies);
-  const crossingAlert = toCrossingAlert(payload.crossing_alert);
   const noiseThreshold =
     typeof payload.config.noise_threshold === 'number' &&
     Number.isFinite(payload.config.noise_threshold)
@@ -145,7 +130,6 @@ export function toServerStateFromPayload(payload: MonitorPayload): ServerState {
     serverOnline: true,
     connected: payload.connected,
     port: payload.port,
-    alarm: deriveAlarmState(payload.connected, crossingAlert),
     events: sortEventsByTimestampDesc(payload.events).slice(0, MAX_EVENTS),
     links: parseSignalLinks(payload.links, Math.floor(Date.now() / 1000)),
     config: {
@@ -240,7 +224,7 @@ export function toMonitorStateFromPayload(
 export function mergeCrossingAlerts(
   previous: CrossingAlert[],
   next: CrossingAlert | null,
-  dedupWindowMs = CROSSING_ALERT_DEDUP_WINDOW_MS,
+  dedupWindowSec = CROSSING_ALERT_DEDUP_WINDOW_SEC,
   maxAlerts = MAX_CROSSING_ALERTS,
 ): CrossingAlert[] {
   if (!next) {
@@ -255,7 +239,7 @@ export function mergeCrossingAlerts(
     (alert) =>
       alert.sensorA === sensorA &&
       alert.sensorB === sensorB &&
-      Math.abs(normalized.at - alert.at) <= dedupWindowMs,
+      Math.abs(normalized.at - alert.at) <= dedupWindowSec,
   );
 
   if (existingIndex >= 0) {
@@ -290,15 +274,26 @@ export function acknowledgeCrossingAlert(
   );
 }
 
-export function addCrossingAckWindow(
-  windows: CrossingAckWindow[],
-  alert: CrossingAlert,
-  maxWindows = MAX_CROSSING_ACK_WINDOWS,
-): CrossingAckWindow[] {
-  const sensorA = Math.min(alert.sensorA, alert.sensorB);
-  const sensorB = Math.max(alert.sensorA, alert.sensorB);
-  const nextWindow: CrossingAckWindow = { sensorA, sensorB, at: alert.at };
-  return [nextWindow, ...windows].slice(0, maxWindows);
+export function crossingPairKey(sensorA: number, sensorB: number): string {
+  const side1 = Math.min(sensorA, sensorB);
+  const side2 = Math.max(sensorA, sensorB);
+  return `${side1}-${side2}`;
+}
+
+// Keep an acknowledgement only while the device still reports that pair as
+// crossing. When the backend stops reporting it — its auto-reset clears
+// `crossing_alert`, which is our "crossing ended" signal — the ack is dropped
+// so the next crossing of that pair re-alarms. The backend tracks a single
+// crossing at a time, so `activePairKey` is one key (or null when idle).
+export function pruneAcknowledgedPairs(
+  acknowledged: ReadonlySet<string>,
+  activePairKey: string | null,
+): Set<string> {
+  const next = new Set<string>();
+  if (activePairKey !== null && acknowledged.has(activePairKey)) {
+    next.add(activePairKey);
+  }
+  return next;
 }
 
 export function isPairEnabled(
@@ -310,25 +305,6 @@ export function isPairEnabled(
   const side2 = Math.max(sensorA, sensorB);
   return pairings.some(
     (pair) => pair.enabled && pair.side1Id === side1 && pair.side2Id === side2,
-  );
-}
-
-export function isCrossingAlertSuppressed(
-  alert: CrossingAlert | null,
-  windows: CrossingAckWindow[],
-  suppressionWindowMs = CROSSING_ACK_SUPPRESSION_WINDOW_MS,
-): boolean {
-  if (!alert) {
-    return false;
-  }
-  const sensorA = Math.min(alert.sensorA, alert.sensorB);
-  const sensorB = Math.max(alert.sensorA, alert.sensorB);
-
-  return windows.some(
-    (window) =>
-      window.sensorA === sensorA &&
-      window.sensorB === sensorB &&
-      Math.abs(alert.at - window.at) <= suppressionWindowMs,
   );
 }
 
@@ -406,10 +382,6 @@ export function mergeTelemetryUnits(
   }
 
   return nextUnits.sort((a, b) => a.id - b.id).slice(0, MAX_UNITS);
-}
-
-export function shouldShowAck(state: MonitorState): boolean {
-  return state.alarm === 'alarm';
 }
 
 export function isDetectionEvent(msg: string): boolean {

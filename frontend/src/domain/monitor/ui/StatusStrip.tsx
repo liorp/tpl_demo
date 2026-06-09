@@ -3,17 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/component/ui/button';
 
-import type { AlarmState } from '../model/types';
-
-type Props = {
-  alarm: AlarmState;
-  serverOnline: boolean;
-};
-
-export const StatusStrip = React.memo(function StatusStrip({
-  alarm: _alarm,
-  serverOnline: _serverOnline,
-}: Props) {
+export const StatusStrip = React.memo(function StatusStrip() {
   const { t } = useTranslation();
   const handleToggleFullscreen = React.useCallback(() => {
     if (document.fullscreenElement) {

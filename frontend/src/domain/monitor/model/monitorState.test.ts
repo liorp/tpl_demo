@@ -1,16 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import {
   acknowledgeCrossingAlert,
-  addCrossingAckWindow,
   createInitialMonitorState,
-  isCrossingAlertSuppressed,
+  crossingPairKey,
   isDetectionEvent,
   isPairEnabled,
   isSignalFresh,
   mergeCrossingAlerts,
   mergeTelemetryUnits,
+  pruneAcknowledgedPairs,
   setPairing,
-  shouldShowAck,
   toMonitorStateFromPayload,
   toServerStateFromPayload,
   upsertUnit,
@@ -21,7 +20,6 @@ describe('monitor state model', () => {
   test('creates disconnected initial state', () => {
     const state = createInitialMonitorState();
 
-    expect(state.alarm).toBe('disconnected');
     expect(state.connected).toBe(false);
     expect(state.events).toHaveLength(0);
   });
@@ -47,49 +45,6 @@ describe('monitor state model', () => {
 
     expect(state.connected).toBe(true);
     expect(state.port).toBe('/dev/ttyUSB0');
-    expect(state.alarm).toBe('alarm');
-    expect(shouldShowAck(state)).toBe(true);
-  });
-
-  test('derives alarm state from frontend payload data', () => {
-    const clear = toServerStateFromPayload({
-      connected: true,
-      port: '/dev/ttyUSB0',
-      events: [],
-      links: [],
-      crossing_alert: null,
-      config: { gain: null },
-    });
-    expect(clear.alarm).toBe('clear');
-
-    const alarm = toMonitorStateFromPayload({
-      connected: true,
-      port: '/dev/ttyUSB0',
-      events: [],
-      links: [],
-      crossing_alert: {
-        sensor_a: 11,
-        sensor_b: 12,
-        timestamp: 1_739_742_000,
-        value: 860,
-        threshold: 500,
-        lat: null,
-        lng: null,
-        acknowledged: false,
-      },
-      config: { gain: null },
-    });
-    expect(alarm.alarm).toBe('alarm');
-
-    const disconnected = toServerStateFromPayload({
-      connected: false,
-      port: 'None',
-      events: [],
-      links: [],
-      crossing_alert: null,
-      config: { gain: null },
-    });
-    expect(disconnected.alarm).toBe('disconnected');
   });
 
   test('normalizes link updatedAt from backend payload and provides fallback when missing', () => {
@@ -477,64 +432,24 @@ describe('monitor state model', () => {
     expect(next[0]).toMatchObject({ sensorA: 2, sensorB: 12 });
   });
 
-  test('suppresses same crossing pair within ack sliding window in past and future', () => {
-    const windows = addCrossingAckWindow(
-      [],
-      {
-        sensorA: 2,
-        sensorB: 12,
-        at: 10_000,
-        lat: null,
-        lng: null,
-        acknowledged: false,
-      },
-      20,
-    );
+  test('builds a canonical crossing pair key regardless of sensor order', () => {
+    expect(crossingPairKey(12, 2)).toBe('2-12');
+    expect(crossingPairKey(2, 12)).toBe('2-12');
+  });
 
-    expect(
-      isCrossingAlertSuppressed(
-        {
-          sensorA: 12,
-          sensorB: 2,
-          at: 8_500,
-          lat: null,
-          lng: null,
-          acknowledged: false,
-        },
-        windows,
-        2_000,
-      ),
-    ).toBe(true);
+  test('keeps a dismissed pair acknowledged while it keeps crossing', () => {
+    const acknowledged = new Set(['2-12']);
+    // The device still reports this pair, so the dismissal must persist and the
+    // banner stays hidden for the ongoing crossing.
+    expect([...pruneAcknowledgedPairs(acknowledged, '2-12')]).toEqual(['2-12']);
+  });
 
-    expect(
-      isCrossingAlertSuppressed(
-        {
-          sensorA: 2,
-          sensorB: 12,
-          at: 11_500,
-          lat: null,
-          lng: null,
-          acknowledged: false,
-        },
-        windows,
-        2_000,
-      ),
-    ).toBe(true);
-
-    expect(
-      isCrossingAlertSuppressed(
-        {
-          sensorA: 2,
-          sensorB: 12,
-          at: 12_500,
-          lat: null,
-          lng: null,
-          acknowledged: false,
-        },
-        windows,
-        2_000,
-      ),
-    ).toBe(false);
+  test('clears a dismissed pair once its crossing ends so it can re-alarm', () => {
+    const acknowledged = new Set(['2-12']);
+    // Backend auto-reset -> no active crossing -> dismissal dropped.
+    expect([...pruneAcknowledgedPairs(acknowledged, null)]).toEqual([]);
+    // A different pair now crossing also means the old pair's crossing ended.
+    expect([...pruneAcknowledgedPairs(acknowledged, '3-8')]).toEqual([]);
   });
 
   test('detects stale signal links', () => {

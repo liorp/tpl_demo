@@ -13,7 +13,7 @@ afterEach(async () => {
 
 describe('StatusStrip', () => {
   test('renders only product name on the left and fullscreen on the right', () => {
-    render(<StatusStrip alarm="alarm" serverOnline={true} />);
+    render(<StatusStrip />);
 
     expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
     const productName = screen.getByText('TPL SIGNUM');
@@ -37,7 +37,7 @@ describe('StatusStrip', () => {
       value: exitFullscreenMock,
     });
 
-    render(<StatusStrip alarm="clear" serverOnline={true} />);
+    render(<StatusStrip />);
 
     const toggleButton = screen.getByRole('button', { name: 'Fullscreen' });
     fireEvent.click(toggleButton);
