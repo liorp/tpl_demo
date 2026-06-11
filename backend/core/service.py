@@ -34,7 +34,7 @@ def _extract_peers(entry: SensorStatusEntry, sensor_id: int) -> set[int]:
 
 
 def _update_sensor_link_status(
-    state: SensorState, sensor_id: int, peer_id: int, connected: bool, last_seen: int
+    state: SensorState, sensor_id: int, peer_id: int, connected: bool
 ) -> None:
     sensor_key = str(sensor_id)
     entry = dict(state.sensor_status.get(sensor_key, {}))
@@ -43,7 +43,6 @@ def _update_sensor_link_status(
         peers.add(peer_id)
     else:
         peers.discard(peer_id)
-    entry["last_seen"] = last_seen
     entry["connected_peers"] = sorted(peers)
     state.sensor_status[sensor_key] = entry  # type: ignore[assignment]
 
@@ -55,6 +54,17 @@ def _set_sensor_status_fields(
     entry = dict(state.sensor_status.get(sensor_key, {}))
     entry.setdefault("connected_peers", [])
     entry["last_seen"] = last_seen
+    for key, value in fields.items():
+        entry[key] = value
+    state.sensor_status[sensor_key] = entry  # type: ignore[assignment]
+
+
+def _set_sensor_metadata_fields(
+    state: SensorState, sensor_id: int, **fields: object
+) -> None:
+    sensor_key = str(sensor_id)
+    entry = dict(state.sensor_status.get(sensor_key, {}))
+    entry.setdefault("connected_peers", [])
     for key, value in fields.items():
         entry[key] = value
     state.sensor_status[sensor_key] = entry  # type: ignore[assignment]
@@ -103,14 +113,13 @@ def set_connection_state(state: SensorState, connected: bool, port: str = "None"
 
 
 def _handle_detection(state: SensorState, event: Event) -> bool:
-    last_seen = _event_last_seen()
     _update_sensor_link_status(
         state, sensor_id=event["unit_a"], peer_id=event["unit_b"],
-        connected=True, last_seen=last_seen,
+        connected=True,
     )
     _update_sensor_link_status(
         state, sensor_id=event["unit_b"], peer_id=event["unit_a"],
-        connected=True, last_seen=last_seen,
+        connected=True,
     )
     set_connection_state(state, True, state.current_port)
     # Alerting is frontend-owned: the backend only forwards the detection as a
@@ -126,14 +135,13 @@ def _handle_detection(state: SensorState, event: Event) -> bool:
 
 
 def _handle_comm_loss(state: SensorState, event: Event) -> bool:
-    last_seen = _event_last_seen()
     _update_sensor_link_status(
         state, sensor_id=event["unit_a"], peer_id=event["unit_b"],
-        connected=True, last_seen=last_seen,
+        connected=True,
     )
     _update_sensor_link_status(
         state, sensor_id=event["unit_b"], peer_id=event["unit_a"],
-        connected=True, last_seen=last_seen,
+        connected=True,
     )
     set_connection_state(state, True, state.current_port)
     log_event(
@@ -152,11 +160,11 @@ def _handle_link_up(state: SensorState, event: Event) -> bool:
     linked = event["linked_unit"]
     _update_sensor_link_status(
         state, sensor_id=reporting, peer_id=linked,
-        connected=True, last_seen=last_seen,
+        connected=True,
     )
     _update_sensor_link_status(
         state, sensor_id=linked, peer_id=reporting,
-        connected=True, last_seen=last_seen,
+        connected=True,
     )
     _upsert_link(
         state, reporting, linked,
@@ -177,16 +185,15 @@ def _handle_link_up(state: SensorState, event: Event) -> bool:
 
 
 def _handle_link_down(state: SensorState, event: Event) -> bool:
-    last_seen = _event_last_seen()
     reporting = event["reporting_unit"]
     linked = event["linked_unit"]
     _update_sensor_link_status(
         state, sensor_id=reporting, peer_id=linked,
-        connected=False, last_seen=last_seen,
+        connected=False,
     )
     _update_sensor_link_status(
         state, sensor_id=linked, peer_id=reporting,
-        connected=False, last_seen=last_seen,
+        connected=False,
     )
     _remove_link(state, reporting, linked)
     log_event(
@@ -199,11 +206,9 @@ def _handle_link_down(state: SensorState, event: Event) -> bool:
 
 
 def _handle_map_dev(state: SensorState, event: Event) -> bool:
-    last_seen = _event_last_seen()
-    _set_sensor_status_fields(
+    _set_sensor_metadata_fields(
         state,
         sensor_id=event["unit_id"],
-        last_seen=last_seen,
         version=event["version"],
         voltage=event["voltage"],
     )
@@ -222,11 +227,11 @@ def _handle_map_link(state: SensorState, event: Event) -> bool:
     linked = event["linked_unit"]
     _update_sensor_link_status(
         state, sensor_id=reporting, peer_id=linked,
-        connected=True, last_seen=last_seen,
+        connected=True,
     )
     _update_sensor_link_status(
         state, sensor_id=linked, peer_id=reporting,
-        connected=True, last_seen=last_seen,
+        connected=True,
     )
     _upsert_link(
         state, reporting, linked,
@@ -264,10 +269,12 @@ def _handle_trace(state: SensorState, event: Event) -> bool:
 
 
 def _handle_ping_response(state: SensorState, event: Event) -> bool:
+    last_seen = _event_last_seen()
     state.ping_latencies[event["unit"]] = {
         "round_trip_ms": event["round_trip_ms"],
-        "received_at": now_ts(),
+        "received_at": float(last_seen),
     }
+    _set_sensor_status_fields(state, sensor_id=event["unit"], last_seen=last_seen)
     log_event(
         state,
         logger,
@@ -278,11 +285,9 @@ def _handle_ping_response(state: SensorState, event: Event) -> bool:
 
 
 def _handle_antenna(state: SensorState, event: Event) -> bool:
-    last_seen = _event_last_seen()
-    _set_sensor_status_fields(
+    _set_sensor_metadata_fields(
         state,
         sensor_id=event["unit"],
-        last_seen=last_seen,
         active_antenna=event["active_antenna"],
         supported_antennas=event["supported_antennas"],
     )

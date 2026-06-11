@@ -215,6 +215,7 @@ def test_handle_map_dev_records_voltage_and_version(monkeypatch):
     assert changed is True
     assert state.sensor_status["11"]["version"] == "SG_0_10b19"
     assert state.sensor_status["11"]["voltage"] == 3015
+    assert "last_seen" not in state.sensor_status["11"]
 
 
 def test_handle_link_up_sets_threshold_and_gain_on_pair(monkeypatch):
@@ -246,6 +247,33 @@ def test_handle_link_up_sets_threshold_and_gain_on_pair(monkeypatch):
     ]
     assert state.config["gain"] == 64
     assert state.config["noise_threshold"] == 300
+
+
+def test_handle_link_up_does_not_refresh_sensor_liveness(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_001_000.0)
+    state = SensorState()
+    state.sensor_status = {
+        "10": {"last_seen": 1_700_000_000, "connected_peers": []},
+        "11": {"last_seen": 1_700_000_010, "connected_peers": []},
+    }
+
+    changed = handle_event(
+        state,
+        {
+            "type": "link_up",
+            "reporting_unit": 10,
+            "linked_unit": 11,
+            "rssi": -27,
+            "threshold_cfg": 300,
+            "gain_cfg": 64,
+        },
+    )
+
+    assert changed is True
+    assert state.sensor_status["10"]["last_seen"] == 1_700_000_000
+    assert state.sensor_status["11"]["last_seen"] == 1_700_000_010
+    assert state.sensor_status["10"]["connected_peers"] == [11]
+    assert state.sensor_status["11"]["connected_peers"] == [10]
 
 
 def test_handle_link_down_removes_link_and_marks_peers_disconnected(monkeypatch):
@@ -320,6 +348,49 @@ def test_handle_ping_response_records_latency(monkeypatch):
         "round_trip_ms": 232,
         "received_at": 1_700_003_000.0,
     }
+    assert state.sensor_status["11"]["last_seen"] == 1_700_003_000
+    assert state.sensor_status["11"]["connected_peers"] == []
+
+
+def test_handle_ping_response_is_authoritative_liveness_signal(monkeypatch):
+    monkeypatch.setattr(service, "now_ts", lambda: 1_700_003_000.0)
+    state = SensorState()
+    state.sensor_status = {
+        "11": {
+            "last_seen": 1_700_002_000,
+            "connected_peers": [10],
+            "version": "SG_0_10b19",
+            "voltage": 3015,
+        }
+    }
+
+    handle_event(
+        state,
+        {
+            "type": "map_dev",
+            "unit_id": 11,
+            "version": "SG_0_10b20",
+            "voltage": 2999,
+        },
+    )
+
+    assert state.sensor_status["11"]["last_seen"] == 1_700_002_000
+
+    handle_event(
+        state,
+        {
+            "type": "ping_response",
+            "unit": 11,
+            "round_trip_ms": 232,
+        },
+    )
+
+    assert state.sensor_status["11"] == {
+        "last_seen": 1_700_003_000,
+        "connected_peers": [10],
+        "version": "SG_0_10b20",
+        "voltage": 2999,
+    }
 
 
 def test_handle_antenna_event_records_status(monkeypatch):
@@ -339,6 +410,7 @@ def test_handle_antenna_event_records_status(monkeypatch):
     assert changed is True
     assert state.sensor_status["11"]["active_antenna"] == 2
     assert state.sensor_status["11"]["supported_antennas"] == 3
+    assert "last_seen" not in state.sensor_status["11"]
 
 
 def test_handle_detection_mode_updates_config():

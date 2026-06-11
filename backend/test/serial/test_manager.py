@@ -93,10 +93,10 @@ def _attach_serial(monkeypatch, scripted: _ScriptedSerial, port: str) -> None:
     monkeypatch.setattr("backend.serial.manager.time.sleep", lambda *_: None)
 
 
-def test_handshake_sends_get_version_then_validates_on_reply(monkeypatch):
+def test_handshake_sends_ping_then_validates_on_ping_reply(monkeypatch):
     port = "/dev/cu.usbmodem1101"
     scripted = _ScriptedSerial(
-        deque([b"#GETVERSION:1.0b24\r\nOK\r\n", b""])
+        deque([b"#PINGRSP=10,160\r\nOK\r\n", b""])
     )
     _attach_serial(monkeypatch, scripted, port)
 
@@ -106,7 +106,8 @@ def test_handshake_sends_get_version_then_validates_on_reply(monkeypatch):
 
     manager.serial_reader_loop(sink=sink, stop_event=stop)
 
-    assert "AT#GETVERSION?\r" in scripted.writes
+    assert scripted.writes[0] == "AT#PING=0\r"
+    assert "AT#GETVERSION?\r" not in scripted.writes
     connected = [m for m in sink.messages if isinstance(m, SerialConnected)]
     assert connected and connected[0].port == port
 
@@ -136,7 +137,7 @@ def test_command_pacing_waits_for_ok_before_next_command(monkeypatch):
     scripted = _ScriptedSerial(
         deque(
             [
-                b"#GETVERSION:1.0b24\r\nOK\r\n",  # validates handshake
+                b"#PINGRSP=10,160\r\nOK\r\n",     # validates handshake
                 b"",                              # idle: drains first user cmd
                 b"",                              # still awaiting ack
                 b"OK\r\n",                        # ack first cmd
@@ -158,12 +159,16 @@ def test_command_pacing_waits_for_ok_before_next_command(monkeypatch):
     manager.serial_reader_loop(sink=sink, stop_event=stop)
 
     # First write is the handshake. Then exactly one queued command per OK gate.
-    assert scripted.writes[0] == "AT#GETVERSION?\r"
+    assert scripted.writes[0] == "AT#PING=0\r"
+    assert "AT#GETVERSION?\r" not in scripted.writes
     assert "AT#REQMESHMAP=0\r" in scripted.writes
     assert "AT#PING=0\r" in scripted.writes
     # The second user command must arrive after the OK that ack'd the first.
     first_idx = scripted.writes.index("AT#REQMESHMAP=0\r")
-    second_idx = scripted.writes.index("AT#PING=0\r")
+    ping_indices = [
+        index for index, write in enumerate(scripted.writes) if write == "AT#PING=0\r"
+    ]
+    second_idx = ping_indices[1]
     assert second_idx > first_idx
 
 
@@ -172,7 +177,7 @@ def test_at_event_lines_are_forwarded_to_sink(monkeypatch):
     scripted = _ScriptedSerial(
         deque(
             [
-                b"#GETVERSION:1.0b24\r\nOK\r\n",
+                b"#PINGRSP=10,160\r\nOK\r\n",
                 b"#EVTDETECT=11,12,555,500\r\n",
                 b"",
             ]
@@ -197,7 +202,7 @@ def test_at_event_lines_are_forwarded_to_sink(monkeypatch):
 
 def test_disconnects_when_port_disappears(monkeypatch):
     port = "/dev/cu.usbmodem1101"
-    scripted = _ScriptedSerial(deque([b"#GETVERSION:1.0b24\r\nOK\r\n", b""]))
+    scripted = _ScriptedSerial(deque([b"#PINGRSP=10,160\r\nOK\r\n", b""]))
     monkeypatch.setattr(
         "backend.serial.manager.serial.Serial",
         lambda *_a, **_k: scripted,
@@ -223,7 +228,7 @@ def test_disconnects_when_port_disappears(monkeypatch):
 def test_boot_sets_detection_mode_after_validation(monkeypatch):
     port = "/dev/cu.usbmodem1101"
     scripted = _ScriptedSerial(
-        deque([b"#GETVERSION:1.0b24\r\nOK\r\n", b"OK\r\n", b""])
+        deque([b"#PINGRSP=10,160\r\nOK\r\n", b"OK\r\n", b""])
     )
     _attach_serial(monkeypatch, scripted, port)
 
@@ -241,9 +246,9 @@ def test_boot_applies_gain_and_threshold_defaults_to_unconfigured_link(monkeypat
     scripted = _ScriptedSerial(
         deque(
             [
-                b"#GETVERSION:1.0b24\r\nOK\r\n",
+                b"#PINGRSP=10,160\r\nOK\r\n",
                 b"#EVTMESHMAPDEVLINK=10,11,-16,0,0,00000000\r\n",
-                b"OK\r\n",  # ack get_version
+                b"OK\r\n",  # ack initial ping
                 b"OK\r\n",  # ack set_detection_mode
                 b"OK\r\n",  # ack set_gain
                 b"OK\r\n",  # ack set_threshold
@@ -267,7 +272,7 @@ def test_boot_preserves_configured_threshold_and_only_sets_gain(monkeypatch):
     scripted = _ScriptedSerial(
         deque(
             [
-                b"#GETVERSION:1.0b24\r\nOK\r\n",
+                b"#PINGRSP=10,160\r\nOK\r\n",
                 b"#EVTMESHMAPDEVLINK=10,11,-16,300,0,00000000\r\n",
                 b"OK\r\n",
                 b"OK\r\n",
@@ -292,7 +297,7 @@ def test_boot_skips_fully_configured_link(monkeypatch):
     scripted = _ScriptedSerial(
         deque(
             [
-                b"#GETVERSION:1.0b24\r\nOK\r\n",
+                b"#PINGRSP=10,160\r\nOK\r\n",
                 b"#EVTMESHMAPDEVLINK=10,11,-16,300,64,00000000\r\n",
                 b"OK\r\n",
                 b"OK\r\n",
@@ -316,8 +321,8 @@ def test_at_cmd_ready_token_queues_a_map_refresh(monkeypatch):
     scripted = _ScriptedSerial(
         deque(
             [
-                b"#GETVERSION:1.0b24\r\nOK\r\nATCMD_CLI_READY\r\n",
-                b"OK\r\n",  # ack get_version
+                b"#PINGRSP=10,160\r\nOK\r\nATCMD_CLI_READY\r\n",
+                b"OK\r\n",  # ack initial ping
                 b"OK\r\n",  # ack boot set_detection_mode
                 b"OK\r\n",  # ack map refresh
                 b"",
@@ -333,3 +338,34 @@ def test_at_cmd_ready_token_queues_a_map_refresh(monkeypatch):
     manager.serial_reader_loop(sink=sink, stop_event=stop)
 
     assert "AT#REQMESHMAP=0\r" in scripted.writes
+
+
+def test_periodic_heartbeat_sends_ping_not_map(monkeypatch):
+    port = "/dev/cu.usbmodem1101"
+    scripted = _ScriptedSerial(
+        deque(
+            [
+                b"#PINGRSP=10,160\r\nOK\r\n",
+                b"OK\r\n",  # ack boot set_detection_mode
+                b"OK\r\n",  # ack periodic ping if it was queued behind boot defaults
+                b"",
+            ]
+        )
+    )
+    _attach_serial(monkeypatch, scripted, port)
+    monkeypatch.setattr("backend.serial.manager.PING_HEARTBEAT_INTERVAL_SEC", 0.0)
+
+    monotonic_values = iter([0.0, 0.0, 0.0, 10.5, 10.5, 10.5, 10.5, 10.5])
+    monkeypatch.setattr(
+        "backend.serial.manager.time.monotonic",
+        lambda: next(monotonic_values, 10.5),
+    )
+
+    manager = SerialManager(forced_port="")
+    stop = threading.Event()
+    sink = _StoppingSink(stop)
+
+    manager.serial_reader_loop(sink=sink, stop_event=stop)
+
+    assert scripted.writes.count("AT#PING=0\r") >= 2
+    assert "AT#REQMESHMAP=0\r" not in scripted.writes

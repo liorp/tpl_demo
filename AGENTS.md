@@ -27,7 +27,7 @@ Run all commands from repo root unless noted.
 ## Device Operation & AT Commands
 The backend is the only process that should talk directly to the TPL device during normal app operation. It opens serial at `57600` baud, 8-N-1, no flow control. Set `SERIAL_PORT=/dev/...` to force a specific port; otherwise the backend scans non-Bluetooth USB/ACM/ttyUSB/COM-style ports. `TPL_BACKEND_PORT` overrides the backend HTTP port.
 
-On connection, the backend sends `AT#GETVERSION?` and treats a valid version/map/detection/link event as protocol validation. Serial commands are written with carriage return (`\r`) and paced: one queued command is sent at a time until `OK` or `ERROR` is received, with a 2s ack timeout. After validation, the backend requests `AT#REQMESHMAP=0` every 10s as a heartbeat. `ATCMD_CLI_READY` causes an immediate map request.
+On connection, the backend sends `AT#PING=0` and treats a valid ping/map/detection/link event as protocol validation. Serial commands are written with carriage return (`\r`) and paced: one queued command is sent at a time until `OK` or `ERROR` is received, with a 2s ack timeout. After validation, the backend requests `AT#PING=0` every 10s as the authoritative sensor liveness heartbeat. `AT#GETVERSION?` is only a manual diagnostics command for the locally connected device; it must not drive connection validation or sensor liveness. `ATCMD_CLI_READY` causes an immediate map request.
 
 Supported WebSocket command payloads and their device effect:
 

@@ -20,16 +20,16 @@ from backend.core.events import (
     SerialEvent,
     SerialIdle,
 )
-from backend.parsing.encoder import format_get_version, format_request_map
+from backend.parsing.encoder import format_ping, format_request_map
 from backend.parsing.parser import ControlFrame, parse_line
 from backend.serial.boot_defaults import detection_mode_command, link_default_commands
 
 logger = logging.getLogger("tpl-signum")
 PROTOCOL_VALIDATION_TIMEOUT_SEC = 8.0
-MAP_HEARTBEAT_INTERVAL_SEC = 10.0
+PING_HEARTBEAT_INTERVAL_SEC = 10.0
 COMMAND_ACK_TIMEOUT_SEC = 2.0
 _PROTOCOL_VALIDATING_EVENT_TYPES = frozenset(
-    {"version", "map_dev", "map_link", "detection", "link_up"}
+    {"ping_response", "map_dev", "map_link", "detection", "link_up"}
 )
 
 
@@ -158,11 +158,11 @@ class SerialManager:
 
         self._configured_pairs = set()
         with self._serial_lock:
-            self._pending_commands.appendleft(format_get_version())
+            self._pending_commands.appendleft(format_ping(0))
 
         validated_protocol = False
         validation_started_at = time.monotonic()
-        last_map_time = validation_started_at
+        last_ping_time = validation_started_at
         awaiting_ack = False
         ack_sent_at: float | None = None
         buffer = ""
@@ -205,11 +205,11 @@ class SerialManager:
 
             if (
                 validated_protocol
-                and now - last_map_time >= MAP_HEARTBEAT_INTERVAL_SEC
+                and now - last_ping_time >= PING_HEARTBEAT_INTERVAL_SEC
             ):
                 with self._serial_lock:
-                    self._pending_commands.append(format_request_map(0))
-                last_map_time = now
+                    self._pending_commands.append(format_ping(0))
+                last_ping_time = now
 
             now_awaiting, sent_at = self._drain_one_pending(
                 ser, awaiting_ack=awaiting_ack
